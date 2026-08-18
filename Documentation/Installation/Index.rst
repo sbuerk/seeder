@@ -13,7 +13,7 @@ Composer mode
 
 ..  code-block:: bash
 
-    composer require sbuerk/extension-skeleton
+    composer require sbuerk/seeder
 
 ..  note::
 
@@ -22,7 +22,7 @@ Composer mode
 
     ..  code-block:: bash
 
-        composer require sbuerk/extension-skeleton:^1.0@dev
+        composer require sbuerk/seeder:^1.0@dev
 
     This additionally requires ``minimum-stability`` to be set to ``dev``
     together with ``prefer-stable`` set to ``true`` in the root
@@ -34,12 +34,12 @@ Classic mode
 #.  **Get it from the Extension Manager**:
     Switch to the module :guilabel:`Admin Tools > Extensions`, switch to
     :guilabel:`Get Extensions` and search for the extension key
-    *extension_skeleton*, then import the extension from the repository.
+    *seeder*, then import the extension from the repository.
 
 #.  **Get it from typo3.org**:
     You can always get the current version from `TER`_ by downloading the zip
     version. Upload the file afterwards in the Extension Manager.
 
-..  _TER: https://extensions.typo3.org/extension/extension_skeleton
+..  _TER: https://extensions.typo3.org/extension/seeder
 
 The extension does not require any further configuration yet.

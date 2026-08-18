@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\ExtensionSkeleton\Tests\Unit\Core14\Example;
+namespace SBUERK\Seeder\Tests\Unit\Core14\Example;
 
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\ExtensionSkeleton\Core14\Example\Example;
+use SBUERK\Seeder\Core14\Example\Example;
 use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 

@@ -1,6 +1,6 @@
 ..  include:: /Includes.rst.txt
 
-..  _feature-initial-extension-skeleton:
+..  _feature-initial-seeder:
 
 ===================================
 Feature: Initial extension skeleton
@@ -9,7 +9,7 @@ Feature: Initial extension skeleton
 Description
 ===========
 
-Initial skeleton of the ``sbuerk/extension-skeleton`` extension, providing the
+Initial skeleton of the ``sbuerk/seeder`` extension, providing the
 project setup the actual implementation is built on:
 
 *   TYPO3 v13 and v14 support on PHP 8.2 up to 8.5, with core version aware
@@ -29,6 +29,6 @@ project setup the actual implementation is built on:
 *   Developer documentation below :file:`docs/`, covering the architecture,
     the quality gates, both test suites and the release workflow.
 
-The extension ships a :php:`SBUERK\ExtensionSkeleton\Dummy` placeholder class
-and an :php:`SBUERK\ExtensionSkeleton\Example\ExampleInterface` example
+The extension ships a :php:`SBUERK\Seeder\Dummy` placeholder class
+and an :php:`SBUERK\Seeder\Example\ExampleInterface` example
 service, both meant to be removed once the first real implementation is added.

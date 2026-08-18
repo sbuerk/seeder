@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\ExtensionSkeleton\Core14\Example;
+namespace SBUERK\Seeder\Core14\Example;
 
-use SBUERK\ExtensionSkeleton\Example\AbstractExample;
-use SBUERK\ExtensionSkeleton\Example\ExampleInterface;
+use SBUERK\Seeder\Example\AbstractExample;
+use SBUERK\Seeder\Example\ExampleInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 
 /**

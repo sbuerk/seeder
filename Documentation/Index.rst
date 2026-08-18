@@ -2,15 +2,15 @@
 
 ..  _start:
 
-==================
-Extension Skeleton
-==================
+======
+Seeder
+======
 
 :Extension key:
-    extension_skeleton
+    seeder
 
 :Package name:
-    sbuerk/extension-skeleton
+    sbuerk/seeder
 
 :Version:
     |release|

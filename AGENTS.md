@@ -370,8 +370,8 @@ It is the starting point for concrete extensions, so **generic beats specific**.
 When a choice is between something reusable and something tailored, prefer the
 reusable one — stripping out is easier than adding.
 
-Identifiers of the template (`sbuerk/extension-skeleton`, `extension_skeleton`,
-`SBUERK\ExtensionSkeleton\`) are rewritten on initialization. Two consequences:
+Identifiers of the template (`sbuerk/seeder`, `seeder`,
+`SBUERK\Seeder\`) are rewritten on initialization. Two consequences:
 
 - Third party package names and namespaces must survive that rewrite. The
   mechanism is derived, not hardcoded, so it normally needs no attention — but

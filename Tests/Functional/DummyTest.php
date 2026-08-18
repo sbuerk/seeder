@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\ExtensionSkeleton\Tests\Functional;
+namespace SBUERK\Seeder\Tests\Functional;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\ExtensionSkeleton\Dummy;
+use SBUERK\Seeder\Dummy;
 
 final class DummyTest extends AbstractFunctionalTestCase
 {

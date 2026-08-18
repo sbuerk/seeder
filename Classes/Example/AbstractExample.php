@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\ExtensionSkeleton\Example;
+namespace SBUERK\Seeder\Example;
 
 use Symfony\Contracts\Service\Attribute\Required;
 use TYPO3\CMS\Core\Information\Typo3Version;

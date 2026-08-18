@@ -5,7 +5,7 @@ need to get started and links to the detailed developer documentation in
 [`docs/`](docs/Index.md).
 
 Source code and issue tracker are hosted on GitHub:
-[sbuerk/extension-skeleton](https://github.com/sbuerk/extension-skeleton).
+[sbuerk/seeder](https://github.com/sbuerk/seeder).
 
 ## Table of contents
 

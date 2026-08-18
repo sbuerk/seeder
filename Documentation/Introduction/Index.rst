@@ -9,7 +9,7 @@ Introduction
 What does it do?
 ================
 
-The :guilabel:`Extension Skeleton` extension supports TYPO3 v13 and v14
+The :guilabel:`Seeder` extension supports TYPO3 v13 and v14
 within one code base. Core version specific implementations are provided
 through :ref:`core version aware <introduction-core-version-aware>` classes
 and are wired by the dependency injection container of the running TYPO3
@@ -54,4 +54,4 @@ Contributing
 
 Contributions are welcome. The development setup, the quality gates and the
 commit message rules are described in the :file:`CONTRIBUTING.md` file of the
-`source repository <https://github.com/sbuerk/extension-skeleton>`__.
+`source repository <https://github.com/sbuerk/seeder>`__.

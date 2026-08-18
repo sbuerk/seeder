@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\ExtensionSkeleton\Tests;
+namespace SBUERK\Seeder\Tests;
 
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -33,8 +33,8 @@ use TYPO3\CMS\Core\Information\Typo3Version;
  * below, because an attribute argument has to be a constant expression and the
  * rest of this repository spells them out as well.
  *
- * @see \SBUERK\ExtensionSkeleton\Tests\Unit\VersionCompatTest
- * @see \SBUERK\ExtensionSkeleton\Tests\Functional\ExtensionLoadedTest
+ * @see \SBUERK\Seeder\Tests\Unit\VersionCompatTest
+ * @see \SBUERK\Seeder\Tests\Functional\ExtensionLoadedTest
  */
 trait ExtensionCoreVersionCompatTestsTrait
 {

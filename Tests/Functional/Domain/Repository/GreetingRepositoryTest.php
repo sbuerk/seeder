@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\ExtensionSkeleton\Tests\Functional\Domain\Repository;
+namespace SBUERK\Seeder\Tests\Functional\Domain\Repository;
 
 use FGTCLB\EnvironmentStateManager\StateBuildContext;
 use FGTCLB\EnvironmentStateManager\StateManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\ExtensionSkeleton\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
 use SBUERK\TYPO3\Testing\SiteHandling\SiteBasedTestTrait;
 use TESTS\ExampleFixture\Domain\Model\Greeting;
 use TESTS\ExampleFixture\Domain\Repository\GreetingRepository;
@@ -40,7 +40,7 @@ final class GreetingRepositoryTest extends AbstractFunctionalTestCase
     ];
 
     protected array $testExtensionsToLoad = [
-        'sbuerk/extension-skeleton',
+        'sbuerk/seeder',
         'fgtclb/environment-state-manager',
         'tests/example-fixture',
     ];

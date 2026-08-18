@@ -1,8 +1,8 @@
 <?php
 
-$EM_CONF['extension_skeleton'] = [
-    'title' => 'Extension Skeleton',
-    'description' => 'TYPO3 CMS extension extension_skeleton.',
+$EM_CONF['seeder'] = [
+    'title' => 'Seeder',
+    'description' => 'TYPO3 CMS extension seeder.',
     'version' => '1.0.0',
     'category' => 'misc',
     'state' => 'alpha',

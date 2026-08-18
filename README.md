@@ -1,12 +1,12 @@
-# TYPO3 extension `extension_skeleton`
+# TYPO3 extension `seeder`
 
 TYPO3 CMS extension skeleton supporting TYPO3 v13 and v14 within one code base,
 including core version aware class loading, the container based test and
 quality gate harness, the GitHub Actions workflows and the release tooling.
 
-- **Package name**: `sbuerk/extension-skeleton`
-- **Extension key**: `extension_skeleton`
-- **Repository**: https://github.com/sbuerk/extension-skeleton
+- **Package name**: `sbuerk/seeder`
+- **Extension key**: `seeder`
+- **Repository**: https://github.com/sbuerk/seeder
 - **License**: GPL-2.0-or-later
 
 ## Creating a repository from this template
@@ -22,7 +22,7 @@ commit** and carries none of the history of this repository.
 
 ```bash
 gh repo create <owner>/<repository> \
-  --template sbuerk/extension-skeleton \
+  --template sbuerk/seeder \
   --public \
   --description "<description>" \
   --clone
@@ -42,7 +42,7 @@ Explicitly in a user namespace:
 
 ```bash
 gh repo create sbuerk/my-new-typo3-extension \
-  --template sbuerk/extension-skeleton \
+  --template sbuerk/seeder \
   --public \
   --description "My super cool new extension"
 ```
@@ -52,7 +52,7 @@ authenticated user, and `--team` may be added to grant a team access right away:
 
 ```bash
 gh repo create my-organization/my-new-typo3-extension \
-  --template sbuerk/extension-skeleton \
+  --template sbuerk/seeder \
   --public \
   --description "My super cool new extension"
 ```
@@ -62,7 +62,7 @@ namespace of the authenticated user:
 
 ```bash
 gh repo create my-new-typo3-extension \
-  --template sbuerk/extension-skeleton \
+  --template sbuerk/seeder \
   --public \
   --description "My super cool new extension"
 ```
@@ -72,7 +72,7 @@ list of options.
 
 ### In the web interface
 
-1. Open <https://github.com/sbuerk/extension-skeleton>.
+1. Open <https://github.com/sbuerk/seeder>.
 2. Click **Use this template** above the file list, and choose
    **Create a new repository**.
 3. Pick the **Owner** — a user or an organization.
@@ -135,14 +135,14 @@ know about.
 ## Installation
 
 ```bash
-composer require sbuerk/extension-skeleton
+composer require sbuerk/seeder
 ```
 
 As long as no stable version has been released, require the development version
 of the main branch explicitly:
 
 ```bash
-composer require sbuerk/extension-skeleton:^1.0@dev
+composer require sbuerk/seeder:^1.0@dev
 ```
 
 This additionally requires `minimum-stability: "dev"` together with

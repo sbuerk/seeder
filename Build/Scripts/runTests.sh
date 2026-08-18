@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ----------------------------------------------------------------------------------------------------------------------
-# sbuerk/extension-skeleton test runner based on docker/podman.
+# sbuerk/seeder test runner based on docker/podman.
 # Adopted from TYPO3 Core Development and extension based additions.
 # ----------------------------------------------------------------------------------------------------------------------
 if [ "${CI}" != "true" ]; then
@@ -173,7 +173,7 @@ cleanRenderedDocumentationFiles() {
 loadHelp() {
     # Load help text into $HELP
     read -r -d '' HELP <<EOF
-sbuerk/extension-skeleton test runner. Execute unit, functional and other test suites
+sbuerk/seeder test runner. Execute unit, functional and other test suites
 in a container based test environment. Handles execution of single test files,
 sending xdebug information to a local IDE and more.
 
@@ -507,7 +507,7 @@ fi
 shift $((OPTIND - 1))
 
 SUFFIX=$(echo $RANDOM)
-NETWORK="extension-skeleton-${SUFFIX}"
+NETWORK="seeder-${SUFFIX}"
 ${CONTAINER_BIN} network create ${NETWORK} >/dev/null
 
 if [ "${CONTAINER_BIN}" == "docker" ]; then

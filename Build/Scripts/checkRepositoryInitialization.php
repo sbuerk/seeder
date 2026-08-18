@@ -23,8 +23,8 @@ require_once __DIR__ . '/MarkdownTableFormatter.php';
  * The interesting cases are the ones where the new repository name contains the
  * current one — as a prefix, a suffix or in the middle. Replacements applied one
  * after the other into the same buffer expand such a name twice, which is what
- * turned "sbuerk/test-extension-skeleton-demo" into
- * "sbuerk/test-test-extension-skeleton-demo-demo".
+ * turned "sbuerk/test-seeder-demo" into
+ * "sbuerk/test-test-seeder-demo-demo".
  *
  *   Build/Scripts/runTests.sh -s checkRepositoryInitialization
  *

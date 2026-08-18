@@ -1,11 +1,11 @@
 {
-    "name": "sbuerk/extension-skeleton",
-    "description": "TYPO3 CMS extension extension_skeleton.",
+    "name": "sbuerk/seeder",
+    "description": "TYPO3 CMS extension seeder.",
     "type": "typo3-cms-extension",
-    "homepage": "https://github.com/sbuerk/extension-skeleton",
+    "homepage": "https://github.com/sbuerk/seeder",
     "support": {
-        "issues": "https://github.com/sbuerk/extension-skeleton/issues",
-        "source": "https://github.com/sbuerk/extension-skeleton"
+        "issues": "https://github.com/sbuerk/seeder/issues",
+        "source": "https://github.com/sbuerk/seeder"
     },
     "license": "GPL-2.0-or-later",
     "keywords": [
@@ -50,14 +50,14 @@
     },
     "autoload": {
         "psr-4": {
-            "SBUERK\\ExtensionSkeleton\\": "Classes/",
-            "SBUERK\\ExtensionSkeleton\\Core13\\": "Core13/",
-            "SBUERK\\ExtensionSkeleton\\Core14\\": "Core14/"
+            "SBUERK\\Seeder\\": "Classes/",
+            "SBUERK\\Seeder\\Core13\\": "Core13/",
+            "SBUERK\\Seeder\\Core14\\": "Core14/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "SBUERK\\ExtensionSkeleton\\Tests\\": "Tests/"
+            "SBUERK\\Seeder\\Tests\\": "Tests/"
         }
     },
     "scripts": {
@@ -80,7 +80,7 @@
             }
         },
         "typo3/cms": {
-            "extension-key": "extension_skeleton",
+            "extension-key": "seeder",
             "web-dir": ".Build/Web",
             "version": "1.0.0-dev",
             "Package": {

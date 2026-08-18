@@ -236,7 +236,7 @@ the class was found and instantiated, not what it computes.
 
    ```php
    protected array $testExtensionsToLoad = [
-       'sbuerk/extension-skeleton',
+       'sbuerk/seeder',
        'tests/example-fixture',
    ];
    ```

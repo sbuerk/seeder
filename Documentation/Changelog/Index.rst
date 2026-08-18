@@ -6,7 +6,7 @@
 Changelog
 =========
 
-Every notable change to the :guilabel:`Extension Skeleton` extension is
+Every notable change to the :guilabel:`Seeder` extension is
 documented here, grouped by version and change type.
 
 ..  toctree::

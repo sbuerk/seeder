@@ -146,21 +146,21 @@ design. Keep new fixtures free of them too.
 
 The replacement list is ordered from the most specific pattern to the least, so
 that a short pattern cannot consume part of a longer one — the full package name
-`sbuerk/extension-skeleton` is handled before the bare repository name
-`extension-skeleton`. Ordering alone is not enough, because a *new* identifier
+`sbuerk/seeder` is handled before the bare repository name
+`seeder`. Ordering alone is not enough, because a *new* identifier
 may contain the *old* one whenever the new repository name does:
 
-| Repository reference                  | Contains the template name | Rewritten correctly |
-|---------------------------------------|----------------------------|---------------------|
-| `vendor/some-repository-name`         | no                         | yes                 |
-| `sbuerk/my-extension-skeleton`        | yes, as a suffix           | yes                 |
-| `sbuerk/extension-skeleton-foo`       | yes, as a prefix           | yes                 |
-| `sbuerk/test-extension-skeleton-demo` | yes, in the middle         | yes                 |
+| Repository reference          | Contains the template name | Rewritten correctly |
+|-------------------------------|----------------------------|---------------------|
+| `vendor/some-repository-name` | no                         | yes                 |
+| `sbuerk/my-seeder`            | yes, as a suffix           | yes                 |
+| `sbuerk/seeder-foo`           | yes, as a prefix           | yes                 |
+| `sbuerk/test-seeder-demo`     | yes, in the middle         | yes                 |
 
 Applied one after the other into the same buffer, the bare repository name would
-find `extension-skeleton` inside the `sbuerk/my-extension-skeleton` that the
+find `seeder` inside the `sbuerk/my-seeder` that the
 previous replacement had just written, and expand it a second time to
-`sbuerk/my-my-extension-skeleton`.
+`sbuerk/my-my-seeder`.
 
 Every search is therefore replaced by a **placeholder**, and the placeholders are
 resolved to their final values only once the whole list has been processed — the
