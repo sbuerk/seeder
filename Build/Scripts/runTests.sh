@@ -367,7 +367,7 @@ Examples:
     ./Build/Scripts/runTests.sh -s unit -x
 
     # Run a single functional test class on sqlite, phpunit arguments after "--"
-    ./Build/Scripts/runTests.sh -s functional -d sqlite -- --filter DummyTest
+    ./Build/Scripts/runTests.sh -s functional -d sqlite -- --filter ExtensionLoadedTest
 
     # Run functional tests on postgres 10
     ./Build/Scripts/runTests.sh -s functional -d postgres -i 10

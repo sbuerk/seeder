@@ -28,7 +28,3 @@ project setup the actual implementation is built on:
     repository tests running in a built frontend environment.
 *   Developer documentation below :file:`docs/`, covering the architecture,
     the quality gates, both test suites and the release workflow.
-
-The extension ships a :php:`SBUERK\Seeder\Dummy` placeholder class
-and an :php:`SBUERK\Seeder\Example\ExampleInterface` example
-service, both meant to be removed once the first real implementation is added.

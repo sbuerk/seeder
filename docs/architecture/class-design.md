@@ -13,7 +13,7 @@ extending classes:
 ```php
 use Symfony\Contracts\Service\Attribute\Required;
 
-abstract readonly class AbstractExample implements ExampleInterface
+abstract readonly class AbstractSeedWriter implements SeedWriterInterface
 {
     /** @phpstan-ignore property.uninitializedReadonly */
     protected Typo3Version $typo3Version;
@@ -105,9 +105,9 @@ Extbase requires mutable properties and a no-argument constructor, because the
 data mapper assigns properties by reflection on an instance it creates without
 calling the constructor. So an Extbase model is neither `readonly` nor
 constructor-injected — but it is still a data object, and it still carries
-`#[Exclude]`. The skeleton's own
+`#[Exclude]`. The
 [`Greeting`](../../Tests/Functional/Fixtures/Extensions/example-fixture/Classes/Domain/Model/Greeting.php)
-model shows both.
+model of the [fixture extension](../testing/fixture-extensions.md) shows both.
 
 See [Dependency injection](dependency-injection.md#rules).
 
@@ -124,12 +124,12 @@ findings on such a property:
 | `property.uninitializedReadonly`          | the property declaration |
 | `property.readOnlyAssignNotInConstructor` | the assignment           |
 
-Both are ignored by their identifier, as shown in the example above. **This is
-required and absolutely fine here**: it is the only way to combine the two rules
-this repository holds — a constructor kept free for extending classes, and a
-`readonly` hierarchy — and PHP itself still guarantees the immutability that
-`readonly` promises. The pattern is verified by the skeleton's own
-[`AbstractExample`](../../Classes/Example/AbstractExample.php).
+Both are ignored by their identifier, as shown in the example above — narrowly,
+on the property declaration and on the assignment, never on the file or the
+class. **This is required and absolutely fine here**: it is the only way to
+combine the two rules this repository holds — a constructor kept free for
+extending classes, and a `readonly` hierarchy — and PHP itself still guarantees
+the immutability that `readonly` promises.
 
 Do **not** take this as a licence to silence PHPStan elsewhere. The ignores are
 acceptable **only** for a property that is

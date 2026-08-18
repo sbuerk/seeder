@@ -14,7 +14,7 @@ Build/Scripts/runTests.sh -s unit
 Build/Scripts/runTests.sh -s unitRandom
 
 # A single class or method.
-Build/Scripts/runTests.sh -s unit -- --filter DummyTest
+Build/Scripts/runTests.sh -s unit -- --filter VersionCompatTest
 ```
 
 `unitRandom` exists to catch tests that depend on execution order. When it fails,
@@ -38,7 +38,7 @@ see [Dual core setup](../development/dual-core-setup.md).
   ```
 
 - Method names describe the expected behaviour, not the mechanics:
-  `exampleReturnsCoreVersionAwareValue()`, not `testExample()`.
+  `getExtensionKeyReturnsExtensionKey()`, not `testGetExtensionKey()`.
 - Every test asserts something. A test without an assertion is risky and
   therefore a failure. When the behaviour under test is "this does not throw",
   say so with `self::expectNotToPerformAssertions()` instead of leaving the
@@ -65,12 +65,14 @@ version they must **not** run on:
 
 ```php
 #[Group('not-core-14')]
-final class ExampleTest extends UnitTestCase
+final class SeedWriterTest extends UnitTestCase
 {
 }
 ```
 
-See [Dual core setup](../development/dual-core-setup.md#test-grouping).
+Note the inverted logic: the class above runs on v13 only, and a test without
+any group runs everywhere. See
+[Dual core setup](../development/dual-core-setup.md#test-grouping).
 
 The same grouping is what makes
 [`Tests/Unit/VersionCompatTest`](../../Tests/Unit/VersionCompatTest.php) work:
@@ -82,17 +84,24 @@ see [the two tests that must never be dropped](Index.md#the-two-tests-that-must-
 ## Testing classes with injected dependencies
 
 A class using `#[Required]` method injection is constructed and injected by hand
-in a unit test — there is no container:
+in a unit test — there is no container, so nothing calls the `inject*()` methods
+for it:
 
 ```php
-$subject = new Example();
+$subject = new SeedWriter();
 $subject->injectTypo3Version(new Typo3Version());
 
-$this->assertSame('Example implementation for TYPO3 v13', $subject->example());
+$this->assertSame(3, $subject->write('pages'));
 ```
 
-If wiring itself is what needs verification, that belongs in a
-[functional test](functional-tests.md), where the real container is available.
+Forgetting the injection call does not produce a helpful failure: the readonly
+property is simply uninitialized and the first read throws. Inject everything
+the code path under test touches.
+
+If the wiring itself is what needs verification — that the container hands out
+the implementation of the running core version — that is not a unit test. It
+belongs in a [functional test](functional-tests.md), where the real container
+is available.
 
 ## See also
 

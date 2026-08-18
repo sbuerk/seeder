@@ -56,6 +56,13 @@ below `Classes/`; split the class instead. Shared code stays readable, and each
 version aware implementation can be deleted as a whole once its core version is
 dropped.
 
+All three directories are tracked with a `.gitkeep` while they are still empty:
+git does not track an empty directory, and `Build/phpstan/Core13/phpstan.neon`,
+`Build/phpstan/Core14/phpstan.neon` and `Build/php-cs-fixer/config.php` name
+them as analysed paths — a missing one aborts those gates. The `is_dir()` guard
+and the glob keep the load itself harmless in the meantime: neither a missing
+nor an empty directory registers anything, and neither is an error.
+
 ## The pattern to follow
 
 1. Declare an **interface** in `Classes/` — consumers only ever type hint this.
@@ -64,19 +71,58 @@ dropped.
    [Class design](class-design.md#abstract-classes-must-not-use-constructor-injection).
 3. Implement it once per core version in `Core13/` and `Core14/`, each
    registering itself as the default implementation of the interface with
-   `#[AsAlias]`:
+   `#[AsAlias]`.
 
-   ```php
-   #[AsAlias(id: ExampleInterface::class, public: true)]
-   final readonly class Example extends AbstractExample
-   {
-   }
-   ```
+The three files of that pattern, sketched with a fictional subject — there is no
+`SeedWriter` in this repository, the names only make the shape readable:
 
-See [`Classes/Example/`](../../Classes/Example),
-[`Core13/Example/`](../../Core13/Example) and
-[`Core14/Example/`](../../Core14/Example) for the complete example shipped with
-the skeleton.
+```php
+// Classes/Seed/SeedWriterInterface.php
+namespace SBUERK\Seeder\Seed;
+
+interface SeedWriterInterface
+{
+    public function write(string $table): int;
+}
+```
+
+```php
+// Classes/Seed/AbstractSeedWriter.php
+namespace SBUERK\Seeder\Seed;
+
+abstract readonly class AbstractSeedWriter implements SeedWriterInterface
+{
+    // Shared behaviour, and #[Required] inject*() methods for its dependencies.
+}
+```
+
+```php
+// Core13/Seed/SeedWriter.php — Core14/Seed/SeedWriter.php is its counterpart
+namespace SBUERK\Seeder\Core13\Seed;
+
+use SBUERK\Seeder\Seed\AbstractSeedWriter;
+use SBUERK\Seeder\Seed\SeedWriterInterface;
+use Symfony\Component\DependencyInjection\Attribute\AsAlias;
+
+#[AsAlias(id: SeedWriterInterface::class, public: true)]
+final readonly class SeedWriter extends AbstractSeedWriter
+{
+    public function write(string $table): int
+    {
+        // May use API that exists on TYPO3 v13 only.
+    }
+}
+```
+
+Only the interface is ever type hinted. `#[AsAlias]` is what makes the two
+implementations interchangeable: both claim the same service id, and only one of
+them is ever registered, so the container hands out the one matching the running
+core version without a consumer knowing that there are two.
+
+`public: true` is needed here because functional tests fetch the service from
+the container to verify exactly that wiring. Services that nothing fetches
+directly stay private — see
+[Dependency injection](dependency-injection.md#rules).
 
 ## Configuration is the exception
 
@@ -138,7 +184,7 @@ is needed at all. Look for that first.
 
   ```php
   #[Group('not-core-14')]
-  final class ExampleTest extends UnitTestCase
+  final class SeedWriterTest extends UnitTestCase
   {
   }
   ```

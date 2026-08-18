@@ -175,15 +175,28 @@ Mirroring the source layout, they live in `Tests/Functional/Core13/` and
 
 ```php
 #[Group('not-core-14')]
-final class ExampleTest extends AbstractFunctionalTestCase
+final class SeedWriterTest extends AbstractFunctionalTestCase
 {
     #[Test]
     public function interfaceIsAliasedToCoreVersionAwareImplementation(): void
     {
-        $this->assertInstanceOf(Example::class, $this->get(ExampleInterface::class));
+        $this->assertInstanceOf(SeedWriter::class, $this->get(SeedWriterInterface::class));
+    }
+
+    #[Test]
+    public function implementationOfTheOtherCoreVersionIsNotRegistered(): void
+    {
+        $this->assertFalse($this->getContainer()->has(
+            'SBUERK\\Seeder\\Core14\\Seed\\SeedWriter',
+        ));
     }
 }
 ```
+
+Two assertions, because they cover different failures: the first proves the
+alias resolves to the implementation of the running core version, the second
+proves the other one was not registered at all — which is what allows it to use
+API that does not exist here.
 
 See [Dual core setup](../development/dual-core-setup.md#test-grouping).
 
