@@ -5,8 +5,8 @@ A *fixture extension* is a minimal TYPO3 extension that exists only inside
 and is loaded by functional tests to provide test doubles, additional TCA,
 service overrides or a plugin to render.
 
-The template ships one, `example-fixture`, to prove the mechanism works and to
-serve as the starting point for real ones.
+This repository ships one, `example-fixture`, to prove the mechanism works and
+to serve as the starting point for real ones.
 
 ## Why load them by composer package name
 

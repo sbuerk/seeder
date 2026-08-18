@@ -40,6 +40,39 @@ Build/Scripts/runTests.sh -s setVersion -- 1.2.0 release
 Everything after `--` is passed to the script unchanged, `--dry-run` included.
 Both ways produce the same result — the wrapper only adds the container.
 
+### `--source-branch`, and the key the alias is stored under
+
+Development happens on one branch, `main`, and both scripts default
+`--source-branch` to it:
+
+```bash
+SOURCE_BRANCH="main"
+```
+
+so nothing has to be passed here. Pass it explicitly only once a maintenance
+branch exists and its release is driven from a checkout of another branch.
+
+The key `extra.branch-alias` is stored under is **not** always
+`dev-<source-branch>`. Composer derives a version from the branch name before it
+consults the alias map, and a branch whose name looks like a version is
+normalised to `<name>.x-dev`:
+
+| Branch                    | Derived by composer | Alias key  |
+|---------------------------|---------------------|------------|
+| `main`                    | `dev-main`          | `dev-main` |
+| `1`, were such a line cut | `1.x-dev`           | `1.x-dev`  |
+
+`setVersion.sh` derives the key from the source branch, so this is not something
+to get right by hand — but it is worth knowing, because getting it wrong is
+**silent**. An alias keyed `dev-1` on a branch named `1` matches no reference
+composer ever produces, so it is ignored: the branch does not provide the
+version it claims to, and nothing reports it.
+
+`release.sh` uses the source branch for more than the alias: it is the branch it
+branches off, refreshes, targets pull requests at with `gh pr create --base`,
+and tags. Run with the default from a maintenance branch, it would open the
+release pull request against `main`.
+
 ## `release.sh` — orchestrate the release
 
 Drives the full two-phase workflow for one release version: branch, apply the
@@ -66,6 +99,18 @@ available and authenticated for `--execute`.
 
 Pushing the tag triggers the [`publish`](../../.github/workflows/publish.yml)
 workflow, which builds the TER artifact and creates the GitHub release.
+
+The tag has to match the version in `ext_emconf.php`, which is what
+`setVersion.sh` keeps in sync: `tailor create-artefact` fails otherwise, on
+purpose, so a release cannot disagree with the extension metadata.
+
+Publishing that artifact to the TYPO3 Extension Repository is prepared in the
+same workflow but **still commented out**: it needs the extension key registered
+in the TER and owned by the token behind the `TYPO3_API_TOKEN` repository
+secret, which it authenticates with. Enable the step once both exist. It runs
+**after** the GitHub release, so an upload that fails — an expired token, a
+version already published — leaves the release and its artifact in place to
+retry against instead of losing both.
 
 ## Before releasing
 
