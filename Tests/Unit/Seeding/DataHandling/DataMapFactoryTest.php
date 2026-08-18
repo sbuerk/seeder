@@ -537,4 +537,31 @@ final class DataMapFactoryTest extends UnitTestCase
 
         $this->subject->createFromDefinition($definition);
     }
+
+    /**
+     * The parser refuses this shape already; this is the second half of the
+     * same rule, where the drop used to happen. An inline child is reached
+     * through the "inline" recursion, its page-style children are handled by
+     * collect() alone, and building a record by hand is what would slip past
+     * the parser.
+     */
+    #[Test]
+    public function nestedRecordsOfAnInlineChildAreRefusedRatherThanDropped(): void
+    {
+        $definition = $this->definition(
+            new SeedRecord('tt_content', 'grid', [], null, [], [], [
+                'tx_example_items' => [
+                    new SeedRecord('tx_example_item', 'tile', [], null, [
+                        new SeedRecord('tt_content', 'lost', []),
+                    ]),
+                ],
+            ]),
+        );
+
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787078002);
+        $this->expectExceptionMessage('The inline child "tile" of "grid"');
+
+        $this->subject->createFromDefinition($definition);
+    }
 }

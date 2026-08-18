@@ -154,6 +154,7 @@ relation field like any other value.
 | `uid`, where present, is an integer ≥ 1                                   | refused                                    |
 | an `inline` or `records` child declares `table`                           | refused, stating that it is never inferred |
 | `content`, `children`, `records` are lists                                | refused, naming the key and the record     |
+| an `inline` child declares no `children`, `content` or `records`          | refused, naming the child and the key      |
 | `inline` and `files` are maps of field name to a list                     | refused, naming the field                  |
 | a field name is a string                                                  | refused                                    |
 | a field value is scalar or null                                           | refused, naming the field                  |
@@ -200,13 +201,12 @@ placeholders in declaration order.
 Inline nests arbitrarily deep, and an inline child may carry `files` and
 `inline` of its own.
 
-An inline child must **not** carry `children`, `content` or `records`. Those
-describe what sits on a page, and an inline child is not a page. The parser
-accepts them today and `DataMapFactory` never writes them — it walks the
-`children` of a top level or nested record and the `inline` of any record, and an
-inline child's page-style children are reached by neither. Nothing reports it,
-which makes this the one place in the format where a declaration is silently
-ignored; treat it as a defect to be fixed rather than as behaviour to rely on.
+An inline child must **not** carry `children`, `content` or `records`, and the
+parser refuses a definition that declares one of them, naming the child and the
+key. Those keys nest onto the page that declares them, and an inline child sits
+in a relation rather than on a page — the format has no meaning to give them
+there. `records` stays a *field* on an inline child that is not a page, exactly
+as it is on a content element.
 
 ## Files
 

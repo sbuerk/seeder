@@ -303,6 +303,70 @@ final class SeedDefinitionParserTest extends UnitTestCase
     }
 
     #[Test]
+    public function anInlineChildDeclaringNestedRecordsIsRejected(): void
+    {
+        // "children", "content" and "records" describe what sits on a page.
+        // The data map factory reaches the children of a record from the page
+        // level and the inline children of any record - the page-style children
+        // of an inline child were reached by neither and vanished without a
+        // word, which is the one thing this format must never do.
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787078001);
+        $this->expectExceptionMessage('The inline child "grid-tile"');
+        $this->expectExceptionMessage('"content"');
+
+        $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'pages' => [[
+                'identifier' => 'home',
+                'content' => [[
+                    'identifier' => 'grid',
+                    'inline' => [
+                        'tx_example_items' => [[
+                            'identifier' => 'grid-tile',
+                            'table' => 'tx_example_item',
+                            'content' => [['identifier' => 'lost', 'CType' => 'header']],
+                        ]],
+                    ],
+                ]],
+            ]],
+        ]);
+    }
+
+    #[Test]
+    public function recordsIsAFieldOnAnInlineChildThatIsNotAPage(): void
+    {
+        // The rejection above is about structure, and "records" is structure
+        // on a page alone: "tt_content" has a column of that name, so an inline
+        // child of that table writes it as a field exactly as a content
+        // element does.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'pages' => [[
+                'identifier' => 'home',
+                'content' => [[
+                    'identifier' => 'grid',
+                    'inline' => [
+                        'tx_example_items' => [[
+                            'identifier' => 'grid-tile',
+                            'table' => 'tt_content',
+                            'CType' => 'shortcut',
+                            'records' => 'tt_content_601',
+                        ]],
+                    ],
+                ]],
+            ]],
+        ]);
+
+        $child = $definition->records[0]->children[0]->inline['tx_example_items'][0];
+
+        $this->assertSame(['CType' => 'shortcut', 'records' => 'tt_content_601'], $child->values);
+        $this->assertSame([], $child->children);
+    }
+
+    #[Test]
     public function recordsCarryTheirOwnTableAndAreNestedOntoThePageDeclaringThem(): void
     {
         $definition = $this->subject->parse([
@@ -916,6 +980,70 @@ final class SeedDefinitionParserTest extends UnitTestCase
                 'pages' => [['identifier' => 'home', 'inline' => [7 => []]]],
             ],
             'code' => 1787072861,
+        ];
+        yield 'inline child declaring content' => [
+            'definition' => [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'pages' => [[
+                    'identifier' => 'home',
+                    'inline' => ['tx_example_items' => [[
+                        'identifier' => 'child',
+                        'table' => 'tx_example_item',
+                        'content' => [['identifier' => 'lost', 'CType' => 'header']],
+                    ]]],
+                ]],
+            ],
+            'code' => 1787078001,
+        ];
+        yield 'inline child declaring children' => [
+            'definition' => [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'pages' => [[
+                    'identifier' => 'home',
+                    'inline' => ['tx_example_items' => [[
+                        'identifier' => 'child',
+                        'table' => 'tx_example_item',
+                        'children' => [['identifier' => 'lost', 'title' => 'Lost']],
+                    ]]],
+                ]],
+            ],
+            'code' => 1787078001,
+        ];
+        yield 'inline child of the pages table declaring records' => [
+            'definition' => [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'pages' => [[
+                    'identifier' => 'home',
+                    'inline' => ['tx_example_pages' => [[
+                        'identifier' => 'child',
+                        'table' => 'pages',
+                        'records' => [['identifier' => 'lost', 'table' => 'sys_category']],
+                    ]]],
+                ]],
+            ],
+            'code' => 1787078001,
+        ];
+        yield 'inline child of an inline child declaring content' => [
+            'definition' => [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'pages' => [[
+                    'identifier' => 'home',
+                    'inline' => ['tx_example_items' => [[
+                        'identifier' => 'child',
+                        'table' => 'tx_example_item',
+                        'inline' => ['tx_example_links' => [[
+                            'identifier' => 'grandchild',
+                            'table' => 'tx_example_link',
+                            'content' => [['identifier' => 'lost', 'CType' => 'header']],
+                        ]]],
+                    ]]],
+                ]],
+            ],
+            'code' => 1787078001,
         ];
         yield 'inline field not a list of records' => [
             'definition' => [

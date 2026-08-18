@@ -72,6 +72,14 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *               table: tx_example_item
  *               label: 'Documentation'
  *
+ * An inline child may carry `files` and `inline` of its own, and nests
+ * arbitrarily deep that way. It may **not** nest records onto itself: those
+ * keys nest onto the page that declares them, and an inline child sits in a
+ * relation rather than on a page of its own. `children` and `content` are
+ * therefore refused on an inline child, and `records` is where it is structure
+ * at all - on a child of the `pages` table. The declaration is refused rather
+ * than ignored.
+ *
  * An inline child declares the `table` it belongs to itself. Inferring it from
  * `config.foreign_table` of the parent's field would make a seed definition
  * depend on the TCA being loaded, and would fail with a null dereference rather
@@ -505,10 +513,19 @@ final readonly class SeedDefinitionParser
      * @param string $childContext Names the structural key these records were
      *        declared under, for the messages of the levels that do not have a
      *        table to name themselves by.
+     * @param bool $inlineChild Whether these records are the children of a
+     *        relation rather than of a page, which decides whether they may
+     *        nest records of their own - see the rejection below.
      * @return list<SeedRecord>
      */
-    private function parseRecords(array $records, ?string $table, string $source, array &$seen, string $childContext = self::INLINE): array
-    {
+    private function parseRecords(
+        array $records,
+        ?string $table,
+        string $source,
+        array &$seen,
+        string $childContext = self::INLINE,
+        bool $inlineChild = false,
+    ): array {
         $context = $table ?? $childContext;
         $parsed = [];
         foreach ($records as $record) {
@@ -576,6 +593,44 @@ final readonly class SeedDefinitionParser
                 $recordTable = $declaredTable;
             }
             $seen[$identifier] = $recordTable;
+
+            if ($inlineChild) {
+                // "children", "content" and "records" describe what sits on a
+                // page, and an inline child is not a page: it is nested into a
+                // relation, and its own pid is the page its parent sits on.
+                //
+                // This is a rejection rather than a semantic, because the
+                // format has none to offer here. It is also not a lost
+                // feature: the data map factory reaches the "children" of a
+                // record from the page level and the "inline" of any record,
+                // and page-style children of an inline child were reached by
+                // neither - they were parsed, dropped from the data map and
+                // never mentioned again, by the parser, by DataHandler or by
+                // the import. Refusing them costs nothing that ever worked,
+                // and it keeps the promise the rest of the format makes: what
+                // is declared is either written or refused with a message.
+                //
+                // Only the keys that are structure on this record: "records"
+                // is a field on everything but a page, see STRUCTURAL_KEYS.
+                $nestingKeys = [self::CHILDREN, self::CONTENT];
+                if ($recordTable === self::PAGES) {
+                    $nestingKeys[] = self::RECORDS;
+                }
+                foreach ($nestingKeys as $nestingKey) {
+                    if (($record[$nestingKey] ?? []) === []) {
+                        continue;
+                    }
+                    throw new InvalidSeedDefinitionException(
+                        sprintf(
+                            'The inline child "%s" in the seed definition "%s" declares "%s". An inline child cannot carry nested records: "children", "content" and "records" nest onto the page declaring them, and an inline child is nested into a relation instead. Declare those records on a page, and reference them from there.',
+                            $identifier,
+                            $source,
+                            $nestingKey,
+                        ),
+                        1787078001,
+                    );
+                }
+            }
 
             $children = [];
             $nestedContent = $record[self::CONTENT] ?? [];
@@ -704,7 +759,7 @@ final readonly class SeedDefinitionParser
                     1787072862,
                 );
             }
-            $parsed[$field] = $this->parseRecords($children, null, $source, $seen);
+            $parsed[$field] = $this->parseRecords($children, null, $source, $seen, self::INLINE, true);
         }
 
         return $parsed;

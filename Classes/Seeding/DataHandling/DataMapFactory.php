@@ -354,6 +354,22 @@ final readonly class DataMapFactory
 
         foreach ($record->inline as $children) {
             foreach ($children as $child) {
+                if ($child->children !== []) {
+                    // The parser refuses this, and this is the second half of
+                    // that rule: an inline child is nested by a relation, its
+                    // page-style children are reached by neither this loop nor
+                    // collect(), and writing them here would need a pid rule
+                    // the format does not define. Dropping them is what used to
+                    // happen, and it happened without a word.
+                    throw new InvalidSeedDefinitionException(
+                        sprintf(
+                            'The inline child "%s" of "%s" carries nested records, which cannot be written: "children", "content" and "records" nest onto a page, and an inline child is nested into a relation instead.',
+                            $child->identifier,
+                            $record->identifier,
+                        ),
+                        1787078002,
+                    );
+                }
                 // The page the parent sits on, for the child and for anything
                 // the child carries in turn.
                 $this->write(
