@@ -6,6 +6,7 @@ namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
 use SBUERK\Seeder\Seeding\DataHandling\DataMapFactory;
+use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\RecordSeeder;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedRecord;
@@ -13,6 +14,8 @@ use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
 use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Core\Environment;
+use TYPO3\CMS\Core\Resource\StorageRepository;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Writes seed definitions into a real instance.
@@ -43,10 +46,17 @@ final class RecordSeederTest extends AbstractFunctionalTestCase
      * Symfony removes it while compiling the container and `$this->get()`
      * cannot reach it. Its wiring is proven where it is first injected - the
      * import command - rather than by publishing it for a test.
+     *
+     * The `FileSeeder` it is given never has anything to do here: none of these
+     * definitions declares a file, and a definition without files touches no
+     * storage - which is why this test case needs none.
      */
     private function subject(): RecordSeeder
     {
-        return new RecordSeeder(new DataMapFactory());
+        return new RecordSeeder(
+            new DataMapFactory(),
+            new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class)),
+        );
     }
 
     /**

@@ -1,0 +1,54 @@
+# The seed set of "FileSeedingTest".
+#
+# It is a file rather than an array built in the test, because two of the
+# things under test only exist for a set that was read from disk: a "source"
+# relative to the directory holding the set, and an "EXT:" source next to it.
+identifier: file-seeding
+title: 'A page tree with file references'
+
+files:
+  # Relative to this directory, which is what lets a set be moved or renamed
+  # without touching its paths.
+  - identifier: landscape
+    source: 'Files/placeholder.svg'
+    folder: 'seed-files'
+  # The other accepted form, resolved by the core rather than against the set.
+  - identifier: portrait
+    source: 'EXT:seeder/Tests/Functional/Fixtures/Seeds/Files/placeholder-portrait.svg'
+    folder: 'seed-files'
+
+pages:
+  - identifier: home
+    uid: 1
+    title: 'Image elements'
+    slug: '/'
+    is_siteroot: 1
+    # The long form: the fields of the reference record itself, which is where
+    # the alternative text and the title live.
+    files:
+      media:
+        - identifier: landscape
+          alternative: 'A placeholder graphic'
+          title: 'Placeholder'
+    content:
+      - identifier: single
+        CType: image
+        header: 'A single image'
+        files:
+          image:
+            - identifier: landscape
+              alternative: 'A placeholder graphic in landscape format'
+              description: 'The description of a file reference is the caption'
+      - identifier: gallery
+        CType: image
+        header: 'Two images'
+        # The short form: the bare identifier of a seeded file, which writes
+        # the reference and nothing on it. Two of them, so their order can be
+        # asserted.
+        files:
+          image:
+            - landscape
+            - portrait
+      - identifier: without-image
+        CType: image
+        header: 'An element without an image'
