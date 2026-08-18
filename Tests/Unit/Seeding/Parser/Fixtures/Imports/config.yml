@@ -1,0 +1,9 @@
+identifier: imports-demo
+title: 'A set split over two files'
+
+imports:
+  - { resource: Pages.yaml }
+
+pages:
+  - identifier: contact
+    title: 'Contact'

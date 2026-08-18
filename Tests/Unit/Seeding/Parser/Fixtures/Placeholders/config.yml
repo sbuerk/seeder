@@ -1,0 +1,7 @@
+identifier: placeholders
+title: 'Save 50% today, 100% sure'
+
+pages:
+  - identifier: home
+    title: '%identifier% is not substituted'
+    subtitle: 'width: 50%; height: 100%'

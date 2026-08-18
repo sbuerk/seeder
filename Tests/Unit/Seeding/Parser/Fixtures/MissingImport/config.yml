@@ -1,0 +1,9 @@
+identifier: missing-import
+title: 'A set importing a file that is not there'
+
+imports:
+  - { resource: DoesNotExist.yaml }
+
+pages:
+  - identifier: home
+    title: 'Home'
