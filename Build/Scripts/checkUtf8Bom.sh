@@ -11,6 +11,9 @@
 FILES=`find . -type f \
     ! -path "./.Build/*" \
     ! -path "./.git/*" \
+    ! -path "./.agent/*" \
+    ! -path "./.cache/*" \
+    ! -path "./var/*" \
     ! -path "./.php-cs-fixer.cache" \
     ! -path "./Documentation-GENERATED-temp/*" \
     -print0 | xargs -0 -n1 -P8 file {} | grep 'UTF-8 Unicode (with BOM)'`
