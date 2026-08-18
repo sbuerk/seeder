@@ -1,0 +1,15 @@
+#
+# The directory name and the identifier deliberately do not match, and sorting
+# the sets of this extension by directory name gives a different order than
+# sorting them by identifier. That is what makes the ordering assertion of the
+# discovery test say something.
+#
+identifier: demo-pages
+title: 'Demo page tree'
+description: 'A page tree with nothing but pages in it.'
+
+pages:
+  - identifier: home
+    title: 'Home'
+    slug: '/'
+    is_siteroot: 1

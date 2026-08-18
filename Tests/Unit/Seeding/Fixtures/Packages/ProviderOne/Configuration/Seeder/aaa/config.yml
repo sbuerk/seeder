@@ -1,0 +1,7 @@
+#
+# The directory is sorted before "bbb", the identifier is sorted after "alpha".
+# Discovery returns this set first, which is what makes the ordering assertion
+# distinguish "by directory" from "by identifier".
+#
+identifier: zulu
+title: 'The set in the first directory'

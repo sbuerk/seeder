@@ -1,0 +1,6 @@
+#
+# Declares the identifier of "ProviderOne/Configuration/Seeder/aaa" a second
+# time, from a second package.
+#
+identifier: zulu
+title: 'The set claiming an identifier a second time'

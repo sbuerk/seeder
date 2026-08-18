@@ -1,0 +1,5 @@
+identifier: described
+title: 'A set whose description is a list'
+description:
+  - 'not'
+  - 'a string'
