@@ -17,9 +17,6 @@ use SBUERK\TYPO3\Testing\TestCase\FunctionalTestCase;
  * `sys_template` record. Having every functional test go through this class
  * means the whole suite gains that without a second base class — see the
  * "Site based tests" page of the developer documentation in "docs/testing/".
- *
- * The class name intentionally does not contain the extension name, so the
- * repository initialization never has to rename classes.
  */
 abstract class AbstractFunctionalTestCase extends FunctionalTestCase
 {

@@ -200,15 +200,6 @@ A fixture extension is **not** core version aware. There is no `Core13/` and
 `Core14/` split — if a fixture needs to behave differently per core version,
 that belongs in the test, not in the fixture.
 
-## The identifiers are chosen to survive initialization
-
-`tests/example-fixture`, `tests_example_fixture` and `TESTS\ExampleFixture\`
-contain none of the template identifiers. When this repository is turned into a
-concrete extension, the fixture extension is therefore left untouched — see
-[Repository initialization](../workflow/repository-initialization.md). Keep it
-that way when adding fixtures: name them after what they do, not after the
-extension they belong to.
-
 ## What the test proves
 
 [`Tests/Functional/FixturePackagesTest.php`](../../Tests/Functional/FixturePackagesTest.php)
@@ -240,6 +231,10 @@ the class was found and instantiated, not what it computes.
        'tests/example-fixture',
    ];
    ```
+
+Name a fixture after **what it provides**, not after the extension it belongs
+to. The identifier is what appears in the `$testExtensionsToLoad` of every test
+loading it, and there it is the only indication of what the fixture is for.
 
 ## See also
 

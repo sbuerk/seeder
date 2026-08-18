@@ -44,7 +44,6 @@ Documentation for people **using** the extension lives in
 | [Pull requests](workflow/pull-requests.md)                             | Branching, the pre-flight checklist, review.            |
 | [Changelog and documentation](workflow/changelog-and-documentation.md) | reST changelog entries, rendering, the core changelogs. |
 | [Releasing](workflow/releasing.md)                                     | `setVersion.sh` and `release.sh`.                       |
-| [Repository initialization](workflow/repository-initialization.md)     | Turning the template into a concrete extension.         |
 
 ## Conventions of this documentation
 

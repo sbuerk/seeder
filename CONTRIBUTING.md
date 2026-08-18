@@ -18,7 +18,6 @@ Source code and issue tracker are hosted on GitHub:
 - [Documentation](#documentation)
 - [Releasing](#releasing)
 - [AI-assisted contributions](#ai-assisted-contributions)
-- [Repository initialization](#repository-initialization)
 
 ## Getting started
 
@@ -57,7 +56,6 @@ Build/Scripts/runTests.sh -s composerValidate
 Build/Scripts/runTests.sh -s checkBom
 Build/Scripts/runTests.sh -s checkExceptionCodes
 Build/Scripts/runTests.sh -s checkMarkdownTables
-Build/Scripts/runTests.sh -s checkRepositoryInitialization
 Build/Scripts/runTests.sh -s checkTestMethodsPrefix
 ```
 
@@ -212,19 +210,5 @@ below the git-ignored `.agent/`, and the quality gate matrix including the dual
 core rule.
 
 → [Agent instructions](AGENTS.md)
-
-## Repository initialization
-
-This repository is a GitHub template repository. Turning a repository created
-from it into a concrete extension is a single command, and normally happens
-automatically through the [`initialize`](.github/workflows/initialize.yml)
-workflow:
-
-```bash
-Build/Scripts/initializeRepository.sh vendor/some-repository-name --dry-run
-Build/Scripts/initializeRepository.sh vendor/some-repository-name
-```
-
-→ [Repository initialization](docs/workflow/repository-initialization.md)
 
 [ai-policy]: https://github.com/TYPO3-Documentation/Policy/pull/47

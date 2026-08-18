@@ -12,17 +12,14 @@ declare(strict_types=1);
  * fenced code blocks are left alone, so a page may show an unformatted table as
  * an example.
  *
- * This file carries the algorithm alone and **requires nothing**, neither the
- * composer autoloader nor an installed dependency set. Two callers rely on
- * that:
+ * This file carries the algorithm alone: it decides what a formatted table
+ * looks like and touches no file, while "checkMarkdownTables.php" decides which
+ * files to look at and how to report them. It is the only caller, and it loads
+ * this file with "require_once" rather than through the autoloader, because
+ * "Build/Scripts/" is in none of the autoload maps of "composer.json".
  *
- *   - "checkMarkdownTables.php", the quality gate, which adds the file
- *     traversal and the reporting on top of it.
- *   - "initializeRepository.sh", which reformats the tables it just widened by
- *     rewriting the template identifiers — in a fresh repository, where nothing
- *     is installed yet.
- *
- * Keep it dependency free.
+ * Keep it free of a namespace and of composer dependencies, so that
+ * "require_once" stays all it takes to use it.
  *
  * See the documentation conventions in "docs/Index.md".
  */

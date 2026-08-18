@@ -11,11 +11,7 @@ name: publish
 # metadata.
 #
 # The extension key is read from "composer.json" at runtime rather than written
-# into this file. Workflow files are the one thing
-# "Build/Scripts/initializeRepository.sh" never rewrites, because the
-# GITHUB_TOKEN of an Actions run may not update files below ".github/workflows/",
-# so an identifier hardcoded here would survive into every repository created
-# from this template.
+# into this file, so this workflow does not become one more place carrying it.
 #
 # Requirements before the first release:
 #

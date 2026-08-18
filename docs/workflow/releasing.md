@@ -38,10 +38,7 @@ Build/Scripts/runTests.sh -s setVersion -- 1.2.0 release
 ```
 
 Everything after `--` is passed to the script unchanged, `--dry-run` included.
-Both ways produce the same result — the wrapper only adds the container. The
-same reasoning applies to
-[repository initialization](repository-initialization.md), which a quality gate
-runs inside a container where `jq` does not exist.
+Both ways produce the same result — the wrapper only adds the container.
 
 ## `release.sh` — orchestrate the release
 
@@ -81,4 +78,3 @@ workflow, which builds the TER artifact and creates the GitHub release.
 
 - [Pull requests](pull-requests.md)
 - [Commit messages](commit-messages.md)
-- [Repository initialization](repository-initialization.md)
