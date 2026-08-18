@@ -31,6 +31,10 @@ return static function (
     // v14. Both directories are autoloaded by composer, but only the one
     // matching the running core version is registered as services, so an
     // implementation may safely use API that exists in its core version only.
+    //
+    // The `is_dir()` guard covers the directory of a core version that has no
+    // implementation of its own yet. An empty or absent directory registers
+    // nothing and is not an error, here or in `Classes/` above.
     $coreMajorVersion = (new Typo3Version())->getMajorVersion();
     $coreAwareDirectory = sprintf('%s/../Core%d', __DIR__, $coreMajorVersion);
     if (is_dir($coreAwareDirectory)) {

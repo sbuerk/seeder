@@ -83,7 +83,7 @@ The wrapper parses its own options with `getopts`, so arguments meant for
 PHPUnit (or any other dispatched tool) must follow a `--` separator:
 
 ```bash
-Build/Scripts/runTests.sh -s functional -d sqlite -- --filter DummyTest
+Build/Scripts/runTests.sh -s functional -d sqlite -- --filter ExtensionLoadedTest
 ```
 
 ## See also

@@ -99,7 +99,7 @@ PHPUnit. A test that must not run on TYPO3 v14 therefore declares:
 
 ```php
 #[Group('not-core-14')]
-final class ExampleTest extends UnitTestCase
+final class SeedWriterTest extends UnitTestCase
 {
 }
 ```
