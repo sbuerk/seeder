@@ -1,14 +1,18 @@
 # Architecture
 
-How the code base is organised and which design rules apply to it. The code
-examples on these pages are sketches: they show the shape a rule asks for, and
-the class names in them are not classes of this repository.
+How the code base is organised and which design rules apply to it. On the three
+rule pages the code examples are sketches — they show the shape a rule asks for,
+and the class names in them are not classes of this repository. The two seeding
+pages are the other way round: everything they name exists, and every claim about
+TYPO3 behaviour on them was read out of the core on disk.
 
 | Page                                                  | Contents                                                                                                                                                |
 |-------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [Core version aware code](core-version-aware-code.md) | `Classes/` vs `Core13/` vs `Core14/`, container based selection of the right variant, the interface + abstract + implementation pattern.                |
 | [Dependency injection](dependency-injection.md)       | Symfony DI attributes instead of `Services.yaml`, stateless services, private by default, `#[AsAlias]`, non-shared services.                            |
 | [Class design](class-design.md)                       | `final readonly` and what it implies for hierarchies, method injection in abstract classes, data objects vs services, the two accepted PHPStan ignores. |
+| [Seeding](seeding.md)                                 | Why seeding goes through DataHandler, the admin user, declaration order, suggested uids, placeholders, the two-pass file write, `isImporting`.          |
+| [Site configurations](site-configuration.md)          | Writing a site from a template, why `rootPageId` always wins, the refusal of an existing identifier, the uncovered-site-roots report.                   |
 
 ## The short version
 

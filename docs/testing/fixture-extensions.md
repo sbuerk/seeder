@@ -5,18 +5,62 @@ A *fixture extension* is a minimal TYPO3 extension that exists only inside
 and is loaded by functional tests to provide test doubles, additional TCA,
 service overrides or a plugin to render.
 
-This repository ships three:
+This repository ships six:
 
-| Fixture           | Extension key           | Provides                                                                          |
-|-------------------|-------------------------|-----------------------------------------------------------------------------------|
-| `example-fixture` | `tests_example_fixture` | The plugin, model and dummy service the mechanism itself is proven with.          |
-| `seeds-demo`      | `tests_seeds_demo`      | Two seed sets, plus a directory below `Configuration/Seeder/` that is not one.    |
-| `seeds-collision` | `tests_seeds_collision` | A seed set claiming the identifier of `seeds-demo`, so a collision can be tested. |
+| Fixture            | Extension key            | Provides                                                                                                                                          |
+|--------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `example-fixture`  | `tests_example_fixture`  | The plugin, model and dummy service the mechanism itself is proven with.                                                                          |
+| `seeds-demo`       | `tests_seeds_demo`       | Two seed sets and four site configuration templates, plus a directory below `Configuration/Seeder/` that is not a set.                            |
+| `seeds-collision`  | `tests_seeds_collision`  | A seed set claiming the identifier of `seeds-demo`, so a collision can be tested.                                                                 |
+| `seeds-import`     | `tests_seeds_import`     | The set `seeder:import` is driven with — declared uids, a file, a reference, a site, an `imports` — and one that is discoverable and unparseable. |
+| `inline-relations` | `tests_inline_relations` | A content element with an inline relation, and two child tables carrying a file field and a further relation of their own.                        |
+| `file-fields`      | `tests_file_fields`      | A content element with a file field of its own.                                                                                                   |
 
 A fixture providing seed data needs nothing but a `composer.json` and its
 `Configuration/Seeder/<name>/config.yml` — no `Classes/`, no autoload section,
 no `ext_localconf.php`. The plugin adopts what is there and says so for what is
-not.
+not. `file-fields` and `inline-relations` are the same thing for TCA: a
+`composer.json` and `Configuration/TCA/`, with no PHP class in them at all.
+
+The two TCA fixtures exist so that seeding is proven against a **real relation**
+rather than against a data map. Which columns tie an inline child to its parent
+comes from the TCA of the *parent field* and never from the child, and a file
+field that a core version happens to ship on `tt_content` today is free to
+change tomorrow — neither is the subject of a test about seeding, so both are
+provided here.
+
+## Two things a table has to declare to be seedable
+
+Both were found while building `inline-relations`, both cost an afternoon, and
+both are invisible until a test goes red for a reason that names something else.
+They are recorded in the TCA files themselves as well.
+
+**A custom table needs `ctrl.security.ignorePageTypeRestriction`.** Without it, a
+record of that table may not be written onto a standard page at all: DataHandler
+asks `PageDoktypeRegistry`, whose default doktype allows
+`pages,sys_category,sys_file_reference,sys_file_collection` and everything
+carrying that flag, and refuses the rest with *"Attempt to insert record on
+pages:1 where table … is not allowed"*. Every core table an editor puts on a
+page, `tt_content` included, declares it — so a fixture table that does not would
+be testing an installation nobody has.
+
+```php
+'ctrl' => [
+    'security' => [
+        'ignorePageTypeRestriction' => true,
+    ],
+],
+```
+
+**An inline child of a workspace aware table has to be workspace aware itself.**
+On **TYPO3 v14 only**, a child that is not gets migrated by the TCA migration —
+with a deprecation, which this suite turns into a failure. `tt_content` is
+workspace aware, so the item table below it needs `'versioningWS' => true`, and
+the link table below *that* needs it in turn.
+
+Neither is a rule about seeding. Both are rules about TCA that a fixture author
+meets for the first time here, because a fixture table is usually the first table
+somebody writes by hand.
 
 ## Why load them by composer package name
 
@@ -252,3 +296,5 @@ loading it, and there it is the only indication of what the fixture is for.
 - [PHPUnit configuration](phpunit-configuration.md)
 - [Site based tests](site-based-tests.md)
 - [Dependency injection](../architecture/dependency-injection.md)
+- [Seed definitions](../development/seed-definitions.md) — the format the seed fixtures are written in
+- [Seeding](../architecture/seeding.md)
