@@ -1,0 +1,41 @@
+#
+# The set "seeder:import" is driven with: pages with declared uids, content
+# elements, a file, a file reference, a site configuration - and an "imports"
+# of a file next to this one, so the resolution of a relative resource is
+# exercised for a set that was discovered rather than handed over by a test.
+#
+identifier: import-full
+title: 'Everything the importer writes'
+description: 'Pages, content elements, a file, a file reference and a site configuration.'
+
+imports:
+  - { resource: Files.yaml }
+
+pages:
+  - identifier: home
+    uid: 11
+    title: 'Import home'
+    slug: '/'
+    is_siteroot: 1
+    content:
+      - identifier: home-heading
+        uid: 21
+        CType: header
+        header: 'Imported content'
+      - identifier: home-image
+        CType: image
+        header: 'An imported image'
+        files:
+          image:
+            - identifier: placeholder
+              alternative: 'A placeholder graphic'
+    children:
+      - identifier: about
+        uid: 12
+        title: 'About'
+        slug: '/about'
+
+sites:
+  - identifier: import-main
+    rootPage: home
+    template: Sites/main

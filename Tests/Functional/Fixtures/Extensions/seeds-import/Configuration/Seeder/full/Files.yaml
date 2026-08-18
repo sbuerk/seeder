@@ -1,0 +1,8 @@
+#
+# Imported by "config.yml". The source is relative to the directory of the set,
+# which is the directory of the file importing this one - not of this file.
+#
+files:
+  - identifier: placeholder
+    source: 'Files/placeholder.svg'
+    folder: 'seed-import'

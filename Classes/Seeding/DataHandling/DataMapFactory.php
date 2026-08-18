@@ -138,6 +138,26 @@ final readonly class DataMapFactory
      *        {@see FileSeeder::seed()} returns. A record referencing a file
      *        needs that uid before the reference can be described, which is why
      *        the files are copied before the map is built.
+     * @param array<string, true> $withoutSuggestedUids The uids of the
+     *        definition that are *not* suggested to DataHandler, keyed
+     *        `<table>:<uid>` - the shape of the result's `suggestedUids`, so
+     *        the answer of a collision check can be handed straight back in.
+     *        Those records are written with the next free uid instead. This is
+     *        what `seeder:import --force` uses: leaving the suggestion in for a
+     *        uid another row already holds does not write the record with a
+     *        different uid, it makes the `INSERT` fail on the primary key -
+     *        DataHandler forces the uid into the field array
+     *        (`insertDB()`, 13.4: DataHandler.php:7786, 14.3:
+     *        DataHandler.php:7761) and the insert is refused by the database.
+     *        What that looks like was established by removing the check and
+     *        watching it: on 13.4 the failed insert returns `null` and the
+     *        `pages` branch of `process_datamap()` hands that `null` on to
+     *        `addDefaultPermittedLanguageIfNotSet()`, which raises a
+     *        `TypeError` - so it is not even the logged SQL error one would
+     *        expect. The `uid` is dropped from the row as well, so the map says
+     *        what will happen;
+     *        DataHandler unsets it there anyway ("Do NOT insert the UID field,
+     *        ever!") and reads the suggestion from this list.
      * @return array{
      *     dataMap: array<string, array<string, array<string, scalar|null>>>,
      *     suggestedUids: array<string, true>,
@@ -145,13 +165,25 @@ final readonly class DataMapFactory
      * }
      * @throws InvalidSeedDefinitionException
      */
-    public function createFromDefinition(SeedDefinition $definition, int $rootPageId = 0, array $fileUids = []): array
-    {
+    public function createFromDefinition(
+        SeedDefinition $definition,
+        int $rootPageId = 0,
+        array $fileUids = [],
+        array $withoutSuggestedUids = [],
+    ): array {
         $dataMap = [];
         $suggestedUids = [];
         $references = [];
 
-        $this->collect($definition->records, (string)$rootPageId, $dataMap, $suggestedUids, $fileUids, $references);
+        $this->collect(
+            $definition->records,
+            (string)$rootPageId,
+            $dataMap,
+            $suggestedUids,
+            $fileUids,
+            $references,
+            $withoutSuggestedUids,
+        );
 
         return ['dataMap' => $dataMap, 'suggestedUids' => $suggestedUids, 'references' => $references];
     }
@@ -162,6 +194,7 @@ final readonly class DataMapFactory
      * @param array<string, true> $suggestedUids
      * @param array<string, int> $fileUids
      * @param list<SeedFileReferenceRow> $references
+     * @param array<string, true> $withoutSuggestedUids
      * @throws InvalidSeedDefinitionException
      */
     private function collect(
@@ -171,6 +204,7 @@ final readonly class DataMapFactory
         array &$suggestedUids,
         array $fileUids,
         array &$references,
+        array $withoutSuggestedUids,
     ): void {
         /** @var array<string, string> $previousIdPerTable */
         $previousIdPerTable = [];
@@ -180,12 +214,29 @@ final readonly class DataMapFactory
             $previousId = $previousIdPerTable[$record->table] ?? null;
             $pid = $previousId === null ? $parentId : '-' . $previousId;
 
-            $this->write($record, $pid, $parentId, $dataMap, $suggestedUids, $fileUids, $references);
+            $this->write(
+                $record,
+                $pid,
+                $parentId,
+                $dataMap,
+                $suggestedUids,
+                $fileUids,
+                $references,
+                $withoutSuggestedUids,
+            );
 
             $previousIdPerTable[$record->table] = $placeholder;
 
             if ($record->children !== []) {
-                $this->collect($record->children, $placeholder, $dataMap, $suggestedUids, $fileUids, $references);
+                $this->collect(
+                    $record->children,
+                    $placeholder,
+                    $dataMap,
+                    $suggestedUids,
+                    $fileUids,
+                    $references,
+                    $withoutSuggestedUids,
+                );
             }
         }
     }
@@ -203,6 +254,7 @@ final readonly class DataMapFactory
      * @param array<string, true> $suggestedUids
      * @param array<string, int> $fileUids
      * @param list<SeedFileReferenceRow> $references
+     * @param array<string, true> $withoutSuggestedUids
      * @throws InvalidSeedDefinitionException
      */
     private function write(
@@ -213,6 +265,7 @@ final readonly class DataMapFactory
         array &$suggestedUids,
         array $fileUids,
         array &$references,
+        array $withoutSuggestedUids,
     ): void {
         $values = $record->values;
         // Structural, so never taken from the definition.
@@ -272,7 +325,7 @@ final readonly class DataMapFactory
             }
         }
 
-        if ($record->uid !== null) {
+        if ($record->uid !== null && !isset($withoutSuggestedUids[$record->table . ':' . $record->uid])) {
             // Both halves are required, and neither is obvious.
             //
             // The uid goes into the data map row, because DataHandler reads the
@@ -303,7 +356,16 @@ final readonly class DataMapFactory
             foreach ($children as $child) {
                 // The page the parent sits on, for the child and for anything
                 // the child carries in turn.
-                $this->write($child, $parentId, $parentId, $dataMap, $suggestedUids, $fileUids, $references);
+                $this->write(
+                    $child,
+                    $parentId,
+                    $parentId,
+                    $dataMap,
+                    $suggestedUids,
+                    $fileUids,
+                    $references,
+                    $withoutSuggestedUids,
+                );
             }
         }
     }

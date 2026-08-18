@@ -1,0 +1,6 @@
+"pages",,,,,,
+,"uid","pid","doktype","is_siteroot","title","slug"
+,11,0,1,1,"An existing page","/existing"
+"tt_content",,,,,,
+,"uid","pid","colPos","CType","header",
+,21,11,0,"header","An existing element",
