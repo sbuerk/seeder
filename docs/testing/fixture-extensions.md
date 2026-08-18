@@ -5,8 +5,18 @@ A *fixture extension* is a minimal TYPO3 extension that exists only inside
 and is loaded by functional tests to provide test doubles, additional TCA,
 service overrides or a plugin to render.
 
-This repository ships one, `example-fixture`, to prove the mechanism works and
-to serve as the starting point for real ones.
+This repository ships three:
+
+| Fixture           | Extension key           | Provides                                                                          |
+|-------------------|-------------------------|-----------------------------------------------------------------------------------|
+| `example-fixture` | `tests_example_fixture` | The plugin, model and dummy service the mechanism itself is proven with.          |
+| `seeds-demo`      | `tests_seeds_demo`      | Two seed sets, plus a directory below `Configuration/Seeder/` that is not one.    |
+| `seeds-collision` | `tests_seeds_collision` | A seed set claiming the identifier of `seeds-demo`, so a collision can be tested. |
+
+A fixture providing seed data needs nothing but a `composer.json` and its
+`Configuration/Seeder/<name>/config.yml` — no `Classes/`, no autoload section,
+no `ext_localconf.php`. The plugin adopts what is there and says so for what is
+not.
 
 ## Why load them by composer package name
 

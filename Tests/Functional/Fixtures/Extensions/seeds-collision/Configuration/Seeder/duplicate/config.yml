@@ -1,0 +1,15 @@
+#
+# Declares the identifier of "tests_seeds_demo" a second time. Nothing about
+# this file is wrong on its own - which is the point: a collision only exists
+# between two extensions, and it is only visible because the identifier is
+# declared rather than derived from the directory name.
+#
+identifier: demo-pages
+title: 'A second page tree claiming the same identifier'
+description: 'Provided by a different extension than the set it collides with.'
+
+pages:
+  - identifier: home
+    title: 'Home of the colliding set'
+    slug: '/'
+    is_siteroot: 1
