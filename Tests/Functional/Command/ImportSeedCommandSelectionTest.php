@@ -26,6 +26,7 @@ final class ImportSeedCommandSelectionTest extends AbstractFunctionalTestCase
     protected array $testExtensionsToLoad = [
         'sbuerk/seeder',
         'tests/seeds-import',
+        'tests/file-fields',
     ];
 
     protected function setUp(): void

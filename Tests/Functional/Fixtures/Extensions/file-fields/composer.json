@@ -1,0 +1,18 @@
+{
+    "name": "tests/file-fields",
+    "description": "Fixture extension providing a content element with a file field of its own.",
+    "type": "typo3-cms-extension",
+    "license": "GPL-2.0-or-later",
+    "version": "1.0.0-dev",
+    "require": {
+        "typo3/cms-core": "*"
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "tests_file_fields",
+            "Package": {
+                "providesPackages": []
+            }
+        }
+    }
+}

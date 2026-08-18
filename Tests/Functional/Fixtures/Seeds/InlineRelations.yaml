@@ -1,0 +1,82 @@
+# The seed set of "InlineRelationSeedingTest".
+#
+# It is a file rather than an array built in the test for the same reason
+# "FileSeeding.yaml" is one: an inline child declaring "files" needs a "source"
+# relative to the directory holding the set, and that has nothing to resolve
+# against otherwise.
+#
+# Everything it names below "inline" comes from the "tests/inline-relations"
+# fixture extension: the CType, the field carrying the relation, and both child
+# tables.
+identifier: inline-relations
+title: 'Content elements with inline children'
+
+files:
+  - identifier: landscape
+    source: 'Files/placeholder.svg'
+    folder: 'inline-files'
+
+pages:
+  - identifier: home
+    uid: 1
+    title: 'Inline relations'
+    slug: '/'
+    is_siteroot: 1
+    content:
+      # A content element before the one carrying the relation, so the parent
+      # is not the first record of its table and a child taking the parent's
+      # uid for its pid cannot accidentally hit the right page.
+      - identifier: intro
+        CType: text
+        header: 'Intro'
+        bodytext: '<p>Before the item list.</p>'
+      - identifier: items
+        CType: tests_inline_relations_itemlist
+        header: 'Three items'
+        inline:
+          tx_testsinlinerelations_items:
+            # The first child carries everything a child may carry: a
+            # suggested uid, a file reference and inline children of its own.
+            - identifier: items-first
+              table: tx_testsinlinerelations_item
+              uid: 4711
+              title: 'First item'
+              files:
+                image:
+                  - identifier: landscape
+                    alternative: 'A placeholder graphic'
+                    title: 'Placeholder'
+              inline:
+                links:
+                  - identifier: items-first-alpha
+                    table: tx_testsinlinerelations_link
+                    title: 'Alpha'
+                  - identifier: items-first-beta
+                    table: tx_testsinlinerelations_link
+                    title: 'Beta'
+            - identifier: items-second
+              table: tx_testsinlinerelations_item
+              title: 'Second item'
+            # Three children rather than two, so a relation numbered in
+            # reverse cannot be mistaken for one numbered in declaration
+            # order by symmetry.
+            - identifier: items-third
+              table: tx_testsinlinerelations_item
+              title: 'Third item'
+    children:
+      - identifier: sub
+        title: 'Sub page'
+        slug: '/sub'
+        content:
+          # The same relation one page deeper. The children of this element
+          # belong onto the sub page, which is the only assertion that tells
+          # "the page the parent sits on" apart from "the page the seed was
+          # written below".
+          - identifier: sub-items
+            CType: tests_inline_relations_itemlist
+            header: 'One item on a sub page'
+            inline:
+              tx_testsinlinerelations_items:
+                - identifier: sub-items-only
+                  table: tx_testsinlinerelations_item
+                  title: 'Only item'
