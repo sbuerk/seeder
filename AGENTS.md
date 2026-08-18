@@ -10,11 +10,69 @@ repository is built lives in [`docs/`](docs/Index.md) and
 adds are the rules that apply *specifically* to working as an agent, and the
 handful of things that are easy to get wrong and expensive to discover later.
 
+## What this extension is
+
+`seeder` seeds a TYPO3 installation from YAML definitions that ship inside the
+extensions themselves. Its entire surface is two console commands:
+
+| Command                      | Does                                                                    |
+|------------------------------|-------------------------------------------------------------------------|
+| `seeder:list`                | List every discovered seed set: identifier, title, providing extension. |
+| `seeder:import <identifier>` | Import one seed set: pages, records of any table, files, site configs.  |
+
+A **seed set** is a directory `Configuration/Seeder/<name>/` in any active
+package, with `config.yml` as its entry point. Every path inside a set resolves
+against that directory, and `EXT:` paths are accepted everywhere a path is.
+
+Output is written through TYPO3 APIs — `DataHandler` for records and
+references, the FAL API for files, the site configuration API for sites — never
+through direct SQL. That is rule 8 below, and it is not a preference.
+
+→ [`README.md`](README.md#what-it-does) states the same for users.
+
+## The seed definition format is a contract
+
+The YAML a seed set ships is what integrators write against, so it is parsed
+strictly rather than leniently:
+
+- **An unknown key is an error, not a silent skip.** A misspelled structural
+  key fails the import naming the key and the level it sat on. Ignoring it
+  would produce an import that reports success and seeded something else.
+- **Structural keys are decided per level.** Everything that is not structural
+  *on that level* is a record field and is written verbatim, which is what lets
+  a table be seeded without support in this extension. Never promote a
+  structural key to "structural everywhere" — `tt_content` has real columns
+  named `table` and `records`.
+- **Identifiers are resolved, never guessed.** A relation, a site's `rootPage`
+  or a file reference names a seed identifier that must exist in the same
+  definition; an unresolved one fails the import. No fallback to a uid, no
+  derivation from a directory or file name.
+- **A format change needs a `Documentation/Changelog/<version>/` entry** —
+  `Feature-*.rst` for a new key, `Breaking-*.rst` or `Deprecation-*.rst` when
+  an existing one changes meaning or goes away. Being pre-1.0 exempts a change
+  from a deprecation phase, not from being documented.
+
+## Discovery is over active extensions, and it is deterministic
+
+Seed sets are collected from the **active packages** of the running
+installation, in package order — never from a configured path list, and never
+by scanning the file system outside the package directories.
+
+- `identifier` is declared in `config.yml`, is required and is globally unique.
+  A duplicate is reported by `seeder:list` and refused by `seeder:import`,
+  naming both providing extensions. Deriving it from the directory name would
+  make that collision silent.
+- The result is ordered and stable: the same installation returns the same sets
+  in the same order on every run. A test over a listing is therefore an
+  equality assertion, not a "contains".
+- Discovery is covered by a functional test over a fixture extension providing
+  a set — see [Fixture extensions](docs/testing/fixture-extensions.md).
+
 ## Local additions and overrides
 
-A machine-local `AGENTS.local.md` may sit next to this file. It is git-ignored,
-never committed and **not** part of the template — a repository created from
-this one starts without it. `CLAUDE.local.md` is a symlink to it.
+A machine-local `AGENTS.local.md` may sit next to this file. It is git-ignored
+and never committed, so a fresh clone starts without it. `CLAUDE.local.md` is a
+symlink to it.
 
 **Read it if it is present.** It belongs to whoever works on this checkout, it
 may add to or override anything in this file, and where the two differ it takes
@@ -129,6 +187,7 @@ Nothing below `.agent/` is ever committed.
 
 | Topic                                               | Page                                                                    |
 |-----------------------------------------------------|-------------------------------------------------------------------------|
+| What is seeded, and from where                      | [What this extension is](#what-this-extension-is)                       |
 | Development environment, container based tooling    | [Environment](docs/development/environment.md)                          |
 | **Dual core setup — read this first**               | [Dual core setup](docs/development/dual-core-setup.md)                  |
 | The gates and what they check                       | [Quality gates](docs/development/quality-gates.md)                      |
@@ -192,6 +251,17 @@ violation of any of them is a rejected change, not a review comment.
    imperative summary` of ~52 characters, blank line, body wrapped at ~72
    explaining *what* and *why*. Issue references are verified, never assumed.
    → [Commit messages](docs/workflow/commit-messages.md)
+
+8. **Seeded data is written through `DataHandler`, never through a
+   `QueryBuilder` insert.** Only then do slugs, TCA defaults and evaluations,
+   `sorting`, the reference index and the cache flush happen — a direct insert
+   produces rows that look right in the database and behave wrong in the
+   backend and the frontend. Reading with a `QueryBuilder`, to check what is
+   already there, is fine; writing is not.
+
+   **Files need a pass of their own before the records.** They are created and
+   indexed through the FAL API first, so that a `sys_file_reference` row in the
+   data map can point at a `sys_file` uid that exists.
 
 ## Verify against the TYPO3 changelogs
 
@@ -304,9 +374,9 @@ Further:
   with. Do not remove it to save a download.
 
 A shell script below `Build/Scripts/` that a gate or a `-s` suite executes runs
-**inside the container images**, and those ship `git` but **no `jq`**.
-`setVersion.sh` therefore reads and writes `composer.json` with `php`, decoding
-into objects so an empty JSON object survives as `{}`, and encoding with
+**inside the container images**, and those ship **no `jq`**. `setVersion.sh`
+therefore reads and writes `composer.json` with `php`, decoding into objects so
+an empty JSON object survives as `{}`, and encoding with
 `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE` plus a
 trailing newline — which is byte identical to `jq --indent 4`. Do not introduce
 a `jq` dependency in a new script; mirror those helpers instead.

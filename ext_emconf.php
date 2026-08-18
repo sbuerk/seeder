@@ -1,13 +1,13 @@
 <?php
 
 $EM_CONF['seeder'] = [
-    'title' => 'Seeder',
-    'description' => 'TYPO3 CMS extension seeder.',
+    'title' => 'TYPO3 Data Seeder',
+    'description' => 'Seeds pages, records, files and site configurations into a TYPO3 installation from YAML definitions shipped by extensions.',
     'version' => '1.0.0',
     'category' => 'misc',
     'state' => 'alpha',
-    'author' => 'sbuerk',
-    'author_email' => '',
+    'author' => 'Stefan Bürk',
+    'author_email' => 'stefan@buerk.tech',
     'author_company' => '',
     'constraints' => [
         'depends' => [
