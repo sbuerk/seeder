@@ -22,11 +22,14 @@ pages:
         uid: 21
         CType: header
         header: 'Imported content'
+      # The CType and the file field come from the "tests/file-fields" fixture
+      # extension: what the shipped "tt_content" TCA offers is free to change
+      # between core versions and is not what the importer is tested for.
       - identifier: home-image
-        CType: image
+        CType: tests_file_fields_teaser
         header: 'An imported image'
         files:
-          image:
+          tx_testsfilefields_media:
             - identifier: placeholder
               alternative: 'A placeholder graphic'
     children:

@@ -36,6 +36,7 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         'sbuerk/seeder',
         'tests/seeds-demo',
         'tests/seeds-import',
+        'tests/file-fields',
     ];
 
     protected function setUp(): void
@@ -90,7 +91,7 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $references = $this->rows('sys_file_reference', ['uid', 'uid_foreign', 'tablenames', 'fieldname']);
         $this->assertCount(1, $references);
         $this->assertSame('tt_content', $references[0]['tablenames']);
-        $this->assertSame('image', $references[0]['fieldname']);
+        $this->assertSame('tx_testsfilefields_media', $references[0]['fieldname']);
     }
 
     #[Test]

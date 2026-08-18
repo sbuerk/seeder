@@ -42,6 +42,23 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
      */
     private const SEED = 'EXT:seeder/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml';
 
+    /**
+     * The file field of the content elements of the set, declared by the
+     * `tests/file-fields` fixture extension. A field of its own rather than
+     * `tt_content.image`, so what is asserted here is the seeding rather than
+     * what a core version happens to offer on `tt_content`.
+     */
+    private const CONTENT_FILE_FIELD = 'tx_testsfilefields_media';
+
+    /**
+     * The extension itself is repeated, because redeclaring the property
+     * replaces the one of the parent class.
+     */
+    protected array $testExtensionsToLoad = [
+        'sbuerk/seeder',
+        'tests/file-fields',
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -242,9 +259,43 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
         ));
         $this->assertCount(3, $onContent);
         foreach ($onContent as $row) {
-            $this->assertSame('image', $row['fieldname']);
+            $this->assertSame(self::CONTENT_FILE_FIELD, $row['fieldname']);
             $this->assertSame($uids['home'], (int)$row['pid']);
         }
+    }
+
+    /**
+     * The six columns the seeder owns on a `sys_file_reference` are asserted
+     * one by one on a single reference, rather than left to the tests that
+     * happen to touch one of them.
+     *
+     * `uid_local`, `uid_foreign`, `tablenames`, `fieldname`, `pid` and
+     * `sorting_foreign` are what makes a reference a reference: the file it
+     * points at, the record it belongs to, which field of which table that
+     * record used, the page it sits on and its place in the relation. A wrong
+     * or unwritten one of them produces a row that exists and a relation that
+     * does not, and DataHandler logs nothing about any of them.
+     *
+     * The reference is picked by uid rather than by a filter over the six
+     * columns, so a column that is wrong cannot make the row disappear from
+     * the selection and take the assertion with it.
+     */
+    #[Test]
+    public function everyStructuralColumnOfAReferenceIsWritten(): void
+    {
+        $uids = $this->seedFileSet();
+
+        $files = array_flip($this->indexedFiles());
+        $references = array_column($this->references(), null, 'uid_foreign');
+
+        $reference = $references[$uids['single']];
+
+        $this->assertSame($files['/seed-files/placeholder.svg'], (int)$reference['uid_local']);
+        $this->assertSame($uids['single'], (int)$reference['uid_foreign']);
+        $this->assertSame('tt_content', $reference['tablenames']);
+        $this->assertSame(self::CONTENT_FILE_FIELD, $reference['fieldname']);
+        $this->assertSame($uids['home'], (int)$reference['pid']);
+        $this->assertSame(1, (int)$reference['sorting_foreign']);
     }
 
     /**
@@ -290,7 +341,11 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
     {
         $uids = $this->seedFileSet();
 
-        $content = array_column($this->queryTable('tt_content', ['uid', 'image'], 'uid'), 'image', 'uid');
+        $content = array_column(
+            $this->queryTable('tt_content', ['uid', self::CONTENT_FILE_FIELD], 'uid'),
+            self::CONTENT_FILE_FIELD,
+            'uid',
+        );
         $pages = array_column($this->queryTable('pages', ['uid', 'media'], 'uid'), 'media', 'uid');
 
         $this->assertSame(1, (int)$content[$uids['single']]);
