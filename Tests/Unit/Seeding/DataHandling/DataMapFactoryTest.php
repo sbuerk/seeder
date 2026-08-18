@@ -7,7 +7,9 @@ namespace SBUERK\Seeder\Tests\Unit\Seeding\DataHandling;
 use PHPUnit\Framework\Attributes\Test;
 use SBUERK\Seeder\Seeding\DataHandling\DataMapFactory;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
+use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
 use SBUERK\Seeder\Seeding\Definition\SeedRecord;
+use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**
@@ -428,5 +430,111 @@ final class DataMapFactoryTest extends UnitTestCase
         // rather than handing DataHandler something to do nothing with.
         $this->assertSame([], $result['dataMap']);
         $this->assertSame([], $result['suggestedUids']);
+        $this->assertSame([], $result['references']);
+    }
+
+    /**
+     * A file reference is collected, not written into the data map.
+     *
+     * `sys_file_reference.uid_foreign` is a plain integer column rather than a
+     * relation DataHandler resolves, so a row written here would carry the
+     * parent's `NEW…` placeholder as a string, be read as `0`, and belong to
+     * record 0 - with an empty error log. What the factory produces is
+     * therefore a description of what to write once the records exist.
+     */
+    #[Test]
+    public function aFileReferenceIsCollectedRatherThanWrittenIntoTheDataMap(): void
+    {
+        $definition = $this->definition(
+            new SeedRecord('pages', 'home', ['title' => 'Home'], null, [], [
+                'media' => [new SeedFileReference('landscape', ['alternative' => 'A placeholder'])],
+            ]),
+        );
+
+        $result = $this->subject->createFromDefinition($definition, 0, ['landscape' => 7]);
+
+        $this->assertArrayNotHasKey('sys_file_reference', $result['dataMap']);
+        // And no counter field either: the parent's field is written in the
+        // second pass, from the placeholders of the rows created there.
+        $this->assertArrayNotHasKey('media', $result['dataMap']['pages']['NEWpages-home']);
+        $this->assertSame(
+            [
+                [
+                    'parent' => 'NEWpages-home',
+                    'table' => 'pages',
+                    'field' => 'media',
+                    'file' => 7,
+                    'pid' => '0',
+                    'values' => ['alternative' => 'A placeholder'],
+                ],
+            ],
+            $result['references'],
+        );
+    }
+
+    /**
+     * The `pid` of a reference is the page of its level, never the record's own
+     * `pid` - which for every sibling after the first is the negative "insert
+     * after" hint, a sorting instruction and not a page.
+     */
+    #[Test]
+    public function aReferenceIsPlacedOnThePageOfItsLevelRatherThanOnTheRecordsOwnPid(): void
+    {
+        $definition = $this->definition(
+            new SeedRecord('pages', 'home', [], null, [
+                new SeedRecord('tt_content', 'first', []),
+                new SeedRecord('tt_content', 'second', [], null, [], [
+                    'image' => [new SeedFileReference('landscape')],
+                ]),
+            ]),
+        );
+
+        $result = $this->subject->createFromDefinition($definition, 0, ['landscape' => 7]);
+
+        $this->assertCount(1, $result['references']);
+        // The record itself is chained behind its predecessor...
+        $this->assertSame('-NEWttcontent-first', $result['dataMap']['tt_content']['NEWttcontent-second']['pid']);
+        // ...and its reference still goes onto the page.
+        $this->assertSame('NEWpages-home', $result['references'][0]['pid']);
+    }
+
+    /**
+     * The references of one field keep their declared order, because that is
+     * the order the second pass numbers `sorting_foreign` in.
+     */
+    #[Test]
+    public function theReferencesOfAFieldAreCollectedInDeclarationOrder(): void
+    {
+        $definition = $this->definition(
+            new SeedRecord('tt_content', 'gallery', [], null, [], [
+                'image' => [new SeedFileReference('landscape'), new SeedFileReference('portrait')],
+            ]),
+        );
+
+        $references = $this->subject->createFromDefinition(
+            $definition,
+            0,
+            ['landscape' => 7, 'portrait' => 8],
+        )['references'];
+
+        $this->assertSame([7, 8], array_column($references, 'file'));
+    }
+
+    /**
+     * A record referencing a file the definition does not declare is refused
+     * rather than written with a `uid_local` of nothing, which would be a
+     * reference to no file at all.
+     */
+    #[Test]
+    public function referencingAFileTheDefinitionDoesNotDeclareIsRefused(): void
+    {
+        $definition = $this->definition(
+            new SeedRecord('pages', 'home', [], null, [], ['media' => [new SeedFileReference('nope')]]),
+        );
+
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787076003);
+
+        $this->subject->createFromDefinition($definition);
     }
 }

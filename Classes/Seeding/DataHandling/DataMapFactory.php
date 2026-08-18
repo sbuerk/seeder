@@ -6,6 +6,7 @@ namespace SBUERK\Seeder\Seeding\DataHandling;
 
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedRecord;
+use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 
 /**
@@ -53,13 +54,23 @@ use TYPO3\CMS\Core\Domain\Repository\PageRepository;
  * branch - a factory special-casing a field it does not have to will
  * special-case the next one too - and the tests are what keep it true.
  *
- * The file references a record declares ({@see SeedRecord::$files}) are **not**
- * handled here yet. `sys_file_reference.uid_foreign` is a plain integer column
- * rather than a relation DataHandler resolves, so a reference cannot be written
- * in the same pass as the record it points at - it needs the seeded `sys_file`
- * uids and a second data map, which arrive together with the file seeding.
+ * The file references a record declares ({@see SeedRecord::$files}) are
+ * **collected rather than written**. `sys_file_reference.uid_foreign` is a
+ * plain integer column and not a relation DataHandler resolves, so a reference
+ * cannot go into the same pass as the record it points at: a `NEW…`
+ * placeholder written there stays a string, is read as `0`, and the reference
+ * silently belongs to record 0. What leaves this factory is therefore a flat
+ * list of what to write once the records exist, which
+ * {@see RecordSeeder} turns into a second data map.
  *
- * @todo Collect the declared file references for that second pass, see #9.
+ * @phpstan-type SeedFileReferenceRow array{
+ *     parent: string,
+ *     table: string,
+ *     field: string,
+ *     file: int,
+ *     pid: string,
+ *     values: array<string, scalar|null>
+ * }
  *
  * @internal Part of the seeding implementation, not public API.
  */
@@ -122,28 +133,45 @@ final readonly class DataMapFactory
     /**
      * @param int $rootPageId The page the top level records of the definition
      *        are written below. `0` is the page tree root.
+     * @param array<string, int> $fileUids The `sys_file` uid of every file the
+     *        definition brought, keyed by its seed identifier - what
+     *        {@see FileSeeder::seed()} returns. A record referencing a file
+     *        needs that uid before the reference can be described, which is why
+     *        the files are copied before the map is built.
      * @return array{
      *     dataMap: array<string, array<string, array<string, scalar|null>>>,
-     *     suggestedUids: array<string, true>
+     *     suggestedUids: array<string, true>,
+     *     references: list<SeedFileReferenceRow>
      * }
+     * @throws InvalidSeedDefinitionException
      */
-    public function createFromDefinition(SeedDefinition $definition, int $rootPageId = 0): array
+    public function createFromDefinition(SeedDefinition $definition, int $rootPageId = 0, array $fileUids = []): array
     {
         $dataMap = [];
         $suggestedUids = [];
+        $references = [];
 
-        $this->collect($definition->records, (string)$rootPageId, $dataMap, $suggestedUids);
+        $this->collect($definition->records, (string)$rootPageId, $dataMap, $suggestedUids, $fileUids, $references);
 
-        return ['dataMap' => $dataMap, 'suggestedUids' => $suggestedUids];
+        return ['dataMap' => $dataMap, 'suggestedUids' => $suggestedUids, 'references' => $references];
     }
 
     /**
      * @param list<SeedRecord> $records
      * @param array<string, array<string, array<string, scalar|null>>> $dataMap
      * @param array<string, true> $suggestedUids
+     * @param array<string, int> $fileUids
+     * @param list<SeedFileReferenceRow> $references
+     * @throws InvalidSeedDefinitionException
      */
-    private function collect(array $records, string $parentId, array &$dataMap, array &$suggestedUids): void
-    {
+    private function collect(
+        array $records,
+        string $parentId,
+        array &$dataMap,
+        array &$suggestedUids,
+        array $fileUids,
+        array &$references,
+    ): void {
         /** @var array<string, string> $previousIdPerTable */
         $previousIdPerTable = [];
 
@@ -152,12 +180,12 @@ final readonly class DataMapFactory
             $previousId = $previousIdPerTable[$record->table] ?? null;
             $pid = $previousId === null ? $parentId : '-' . $previousId;
 
-            $this->write($record, $pid, $parentId, $dataMap, $suggestedUids);
+            $this->write($record, $pid, $parentId, $dataMap, $suggestedUids, $fileUids, $references);
 
             $previousIdPerTable[$record->table] = $placeholder;
 
             if ($record->children !== []) {
-                $this->collect($record->children, $placeholder, $dataMap, $suggestedUids);
+                $this->collect($record->children, $placeholder, $dataMap, $suggestedUids, $fileUids, $references);
             }
         }
     }
@@ -168,10 +196,14 @@ final readonly class DataMapFactory
      * @param string $pid The pid to write, which for a sibling after the first
      *        is the negative "insert after" hint.
      * @param string $parentId The page the record sits on. Needed separately
-     *        from $pid, because an inline child has to go onto a page and the
-     *        negative hint is a sorting instruction rather than one.
+     *        from $pid, because an inline child and a file reference both have
+     *        to go onto a page and the negative hint is a sorting instruction
+     *        rather than one.
      * @param array<string, array<string, array<string, scalar|null>>> $dataMap
      * @param array<string, true> $suggestedUids
+     * @param array<string, int> $fileUids
+     * @param list<SeedFileReferenceRow> $references
+     * @throws InvalidSeedDefinitionException
      */
     private function write(
         SeedRecord $record,
@@ -179,6 +211,8 @@ final readonly class DataMapFactory
         string $parentId,
         array &$dataMap,
         array &$suggestedUids,
+        array $fileUids,
+        array &$references,
     ): void {
         $values = $record->values;
         // Structural, so never taken from the definition.
@@ -206,6 +240,36 @@ final readonly class DataMapFactory
                 static fn(SeedRecord $child): string => $child->placeholder(),
                 $children,
             ));
+        }
+
+        foreach ($record->files as $field => $fileReferences) {
+            foreach ($fileReferences as $fileReference) {
+                if (!isset($fileUids[$fileReference->identifier])) {
+                    throw new InvalidSeedDefinitionException(
+                        sprintf(
+                            'The record "%s" references the file "%s", which the seed definition does not declare.',
+                            $record->identifier,
+                            $fileReference->identifier,
+                        ),
+                        1787076003,
+                    );
+                }
+                $references[] = [
+                    'parent' => $record->placeholder(),
+                    'table' => $record->table,
+                    'field' => $field,
+                    'file' => $fileUids[$fileReference->identifier],
+                    // The page of this level, never the record's own pid: that
+                    // one may be the negative "insert after" hint, which is a
+                    // sorting instruction and not a page.
+                    'pid' => $parentId,
+                    // The fields of the reference record itself - the
+                    // alternative text, the title, the description - which is
+                    // where they belong: the same file carries a different
+                    // alternative text in two places.
+                    'values' => $fileReference->values,
+                ];
+            }
         }
 
         if ($record->uid !== null) {
@@ -239,7 +303,7 @@ final readonly class DataMapFactory
             foreach ($children as $child) {
                 // The page the parent sits on, for the child and for anything
                 // the child carries in turn.
-                $this->write($child, $parentId, $parentId, $dataMap, $suggestedUids);
+                $this->write($child, $parentId, $parentId, $dataMap, $suggestedUids, $fileUids, $references);
             }
         }
     }
