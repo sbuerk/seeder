@@ -167,9 +167,24 @@ composer_json_requires() {
 #   EMCONF_VERSION        -> ext_emconf.php 'version'
 #   FIXTURE_CONSTRAINT    -> composer constraint of fixture extensions
 #                            requiring the extension itself
-#   BRANCH_ALIAS          -> extra.branch-alias.dev-<source-branch>
+#   BRANCH_ALIAS          -> extra.branch-alias.<derived-source-branch>
 # ---------------------------------------------------------------------------
 BRANCH_ALIAS="${MAJOR}.${MINOR}.x-dev"
+
+# The key the alias is stored under is the version composer *derives from the
+# branch name*, not "dev-<branch>" spelled out. Composer normalises a branch
+# whose name looks like a version - "1", "5", "2.1" - to "<name>.x-dev", and
+# only a branch whose name does not look like a version becomes "dev-<name>".
+#
+# Getting this wrong is silent. An alias keyed "dev-1" on a branch named "1"
+# matches no reference composer ever produces, so it is simply ignored: the
+# branch then does not provide the version it claims to, and nothing reports it.
+# That is the trap a branch cut from "main" walks into, because it inherits this
+# file with "main" in it.
+case "${SOURCE_BRANCH}" in
+    *[!0-9.]*|'')   BRANCH_ALIAS_KEY="dev-${SOURCE_BRANCH}" ;;
+    *)              BRANCH_ALIAS_KEY="${SOURCE_BRANCH}.x-dev" ;;
+esac
 
 if [ "${TYPE}" = "release" ]; then
     RELEASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
@@ -203,7 +218,7 @@ step "info" "composer extension version     = ${COMPOSER_VERSION}"
 step "info" "ext_emconf version             = ${EMCONF_VERSION}"
 step "info" "VERSION file                   = ${VERSION_FILE_VALUE}"
 if [ "${SET_BRANCH_ALIAS}" -eq 1 ]; then
-    step "info" "branch-alias dev-${SOURCE_BRANCH} = ${BRANCH_ALIAS}"
+    step "info" "branch-alias ${BRANCH_ALIAS_KEY} = ${BRANCH_ALIAS}"
 fi
 
 # ---------------------------------------------------------------------------
@@ -297,8 +312,8 @@ step "composer.json" "extra.typo3/cms.version = ${COMPOSER_VERSION}"
 apply_composer_json extension-version composer.json "${COMPOSER_VERSION}"
 
 if [ "${SET_BRANCH_ALIAS}" -eq 1 ]; then
-    step "composer.json" "extra.branch-alias.dev-${SOURCE_BRANCH} = ${BRANCH_ALIAS}"
-    apply_composer_json branch-alias composer.json "dev-${SOURCE_BRANCH}" "${BRANCH_ALIAS}"
+    step "composer.json" "extra.branch-alias.${BRANCH_ALIAS_KEY} = ${BRANCH_ALIAS}"
+    apply_composer_json branch-alias composer.json "${BRANCH_ALIAS_KEY}" "${BRANCH_ALIAS}"
 else
     # Left untouched for a release: composer ignores the branch-alias for a
     # tagged version anyway, and rewriting it would only churn the key order.
