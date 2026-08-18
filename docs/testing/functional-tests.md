@@ -37,6 +37,65 @@ the old location. The wrapper places the mount one level higher for `18` and
 above, which is the mount point the image documents for that case — nothing to
 configure, but it explains why that one version is special cased.
 
+### Query the database through the QueryBuilder, in tests too
+
+A test that reads a table back must not do it with hand written SQL:
+
+```php
+// Passes on SQLite and MySQL, fails on PostgreSQL.
+->executeQuery('SELECT pid, CType, header FROM tt_content')
+```
+
+PostgreSQL folds an **unquoted identifier to lower case**, so this asks for a
+column `ctype`, which does not exist — `SQLSTATE[42703]: Undefined column`. The
+`QueryBuilder` quotes identifiers and the same query is then portable:
+
+```php
+$queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tt_content');
+$queryBuilder->getRestrictions()->removeAll();
+$rows = $queryBuilder->select('pid', 'CType', 'header')->from('tt_content')
+    ->orderBy('sorting')->executeQuery()->fetchAllAssociative();
+```
+
+Removing the restrictions is deliberate where the subject is *what was written*
+rather than what is visible: the default restrictions hide deleted and hidden
+rows, and a test asserting that a record exists would otherwise silently assert
+that it is also visible.
+
+This is the concrete reason for the rule above: a defect only PostgreSQL sees
+reaches CI when the change was run against SQLite alone.
+
+### When the database refuses the connection
+
+A run that reports many `Connection refused` errors, from
+`Doctrine\DBAL\Exception\ConnectionException` down to `mysqli_sql_exception`,
+is almost never a defect in the code under test. It means the suite started
+before the database server was ready.
+
+The wrapper therefore waits for the server to **answer a query** — not for its
+TCP port to open, because the MySQL image runs a temporary server while it
+initialises its data directory, so an open port is not a ready server. The probe
+runs the vendor's own client out of the database image itself, which is the only
+client guaranteed to speak the protocol of the version under test.
+
+Two properties of that wait are worth knowing, because each of them produces
+exactly the failure above when it is wrong:
+
+- **The budget is 60 seconds.** `mysql:8.0` needs 12 to 13 seconds under docker
+  to initialise a fresh data directory, roughly twice as long as under podman,
+  and the workflows select docker. A 10 second budget puts the functional MySQL
+  suites on a negative margin, so they fail at random.
+- **A timeout aborts the run**, cleaning up and exiting non-zero with a message
+  naming the server and the budget. It must not do that by signalling `SIGINT`
+  to the process group: the `SIGINT` trap is only installed when `CI` is not
+  `true`, so in CI the signal is a no-op, the run carries on and PHPUnit
+  connects to a database that is not listening — which is how a readiness
+  failure arrives disguised as dozens of test errors.
+
+So if a run does fail this way, read the first lines rather than the last: a
+message naming the server that did not answer means the database never came up,
+and the run stopped there.
+
 Remember to run both core versions, each after the matching `composerUpdate` —
 see [Dual core setup](../development/dual-core-setup.md).
 
