@@ -218,7 +218,13 @@ Records come out in the order they are declared, and pages, content elements and
 records of further tables on one page do not disturb each other's sorting. The
 order of inline children comes from the order they are declared in as well.
 
-An inline child may itself declare :yaml:`files` and :yaml:`inline`.
+An inline child may itself declare :yaml:`files` and :yaml:`inline`, and nests
+arbitrarily deep that way. It may **not** nest records onto itself:
+:yaml:`children`, :yaml:`content` and :yaml:`records` nest onto the page
+declaring them, and an inline child sits in a relation rather than on a page.
+Such a definition is refused, naming the child and the key. Where :yaml:`records`
+is a field rather than structure — on any child that is not a page — it is
+written as a field as usual.
 
 ..  _configuration-uids:
 

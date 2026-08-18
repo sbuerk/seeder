@@ -50,7 +50,10 @@ Further properties of the format:
 *   :yaml:`children`, :yaml:`content` and :yaml:`records` nest records onto the
     declaring page, and records come out in the order they were declared.
 *   :yaml:`inline` nests records into a relation instead, as a map of the parent
-    field to the child records.
+    field to the child records. An inline child may carry :yaml:`files` and
+    :yaml:`inline` of its own, but not :yaml:`children`, :yaml:`content` or
+    :yaml:`records` — it sits in a relation rather than on a page, and a
+    definition declaring them is refused.
 *   A declared :yaml:`uid` makes a seeded page tree reproducible. It is checked
     against the installation before anything is written, and an import that
     would collide is refused with the records that are in the way.
