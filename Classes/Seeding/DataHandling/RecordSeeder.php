@@ -86,6 +86,11 @@ final readonly class RecordSeeder
      * @param BackendUserAuthentication $backendUser The user the write is
      *        performed as. It has to be an admin, see below.
      * @param int $rootPageId The page the top level records are written below.
+     * @param array<string, true> $withoutSuggestedUids The uids of the
+     *        definition not to suggest, keyed `<table>:<uid>`. See
+     *        {@see DataMapFactory::createFromDefinition()}: those records are
+     *        written with the next free uid, which is what makes
+     *        `seeder:import --force` an import rather than a failing one.
      * @return array<string, int> The uids the records were written with, keyed
      *         by their seed identifier.
      * @throws InvalidSeedDefinitionException
@@ -95,6 +100,7 @@ final readonly class RecordSeeder
         SeedDefinition $definition,
         BackendUserAuthentication $backendUser,
         int $rootPageId = 0,
+        array $withoutSuggestedUids = [],
     ): array {
         if (!$backendUser->isAdmin()) {
             // "As a security measure this feature is available only for Admin
@@ -119,7 +125,12 @@ final readonly class RecordSeeder
         // the data map can describe the reference at all.
         $fileUids = $this->fileSeeder->seed($definition);
 
-        $map = $this->dataMapFactory->createFromDefinition($definition, $rootPageId, $fileUids);
+        $map = $this->dataMapFactory->createFromDefinition(
+            $definition,
+            $rootPageId,
+            $fileUids,
+            $withoutSuggestedUids,
+        );
         if ($map['dataMap'] === []) {
             throw new SeedingFailedException(
                 sprintf('The seed definition "%s" contains no records.', $definition->identifier),

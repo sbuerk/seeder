@@ -1,0 +1,17 @@
+#
+# "rootPageId" is deliberately a page that does not exist: the seeder always
+# replaces it with the uid of the declared root page.
+#
+rootPageId: 999
+base: 'https://import.example.org/'
+languages:
+  -
+    title: English
+    enabled: true
+    languageId: 0
+    base: /
+    locale: en_US.UTF-8
+    navigationTitle: English
+    flag: us
+errorHandling: []
+routes: []

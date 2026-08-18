@@ -1,0 +1,10 @@
+#
+# Readable enough to be discovered and not parseable as a definition, which is
+# the difference between the two steps: discovery reads the three metadata keys
+# with a plain YAML parse, and the import validates the whole set.
+#
+identifier: import-broken
+title: 'A set that cannot be parsed'
+description: 'Discovery lists it, the import refuses it.'
+
+pages: 'a page tree is a list, and this is a string'

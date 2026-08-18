@@ -156,14 +156,33 @@ final readonly class SiteConfigurationSeeder
      * @param array<string, int> $seededUids The uids the records were written
      *        with, keyed by their seed identifier - what
      *        {@see RecordSeeder::seed()} returns.
+     * @param string|null $base Replaces the `base` of every site written by
+     *        this run, whatever the template and the definition declare. It is
+     *        what makes one set usable in more than one instance - the seed
+     *        carries a base that is right for exactly one of them, and the
+     *        instance importing it knows its own. `null` changes nothing.
+     * @param bool $writeSiteConfigurations Whether the declared site
+     *        configurations are written at all. `false` skips them and keeps
+     *        everything else, which is deliberately *not* the same as calling
+     *        this method not at all: the suppression of the automatic site
+     *        configuration is unconditional ({@see RecordSeeder}), so skipping
+     *        the declared ones is exactly the case where the uncovered site
+     *        roots of {@see SiteConfigurationSeedResult} have to be reported -
+     *        and this is what still finds them.
      * @throws SeedingFailedException
      */
-    public function seed(SeedDefinition $definition, array $seededUids): SiteConfigurationSeedResult
-    {
+    public function seed(
+        SeedDefinition $definition,
+        array $seededUids,
+        ?string $base = null,
+        bool $writeSiteConfigurations = true,
+    ): SiteConfigurationSeedResult {
         $written = [];
-        foreach ($definition->sites as $site) {
-            $this->writeSite($definition, $site, $seededUids);
-            $written[] = $site->identifier;
+        if ($writeSiteConfigurations) {
+            foreach ($definition->sites as $site) {
+                $this->writeSite($definition, $site, $seededUids, $base);
+                $written[] = $site->identifier;
+            }
         }
 
         return new SiteConfigurationSeedResult(
@@ -174,12 +193,16 @@ final readonly class SiteConfigurationSeeder
 
     /**
      * @param array<string, int> $seededUids
+     * @param string|null $base The override of {@see self::seed()}, which wins
+     *        over the `base` of the definition and over the one of the
+     *        template alike.
      * @throws SeedingFailedException
      */
     private function writeSite(
         SeedDefinition $definition,
         SeedSiteConfiguration $site,
         array $seededUids,
+        ?string $base = null,
     ): void {
         // The parser already refuses a "rootPage" that names no page of the
         // definition, so reaching this is not a broken definition but a record
@@ -226,8 +249,13 @@ final readonly class SiteConfigurationSeeder
         // template, which is the whole reason a seed names the page by its seed
         // identifier.
         $configuration['rootPageId'] = $rootPageId;
-        if ($site->base !== null) {
-            $configuration['base'] = $site->base;
+        // The override of the run first, the "base" the definition declares
+        // behind it, and the template's own last - each of the two overrides is
+        // written by someone who knows more about the instance than the layer
+        // below it.
+        $base ??= $site->base;
+        if ($base !== null) {
+            $configuration['base'] = $base;
         }
 
         try {
