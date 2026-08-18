@@ -1,0 +1,246 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SBUERK\Seeder\Seeding\DataHandling;
+
+use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
+use SBUERK\Seeder\Seeding\Definition\SeedRecord;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
+
+/**
+ * Turns a seed definition into the data map `DataHandler` consumes.
+ *
+ * Four details carry the weight here, and each of them fails silently when it
+ * is wrong: the tree comes out reversed, a relation is written empty, a record
+ * lands on a record instead of on a page, or a suggested uid is dropped without
+ * a word.
+ *
+ * **Nesting becomes `pid`.** A child is written with the placeholder of its
+ * parent as its `pid`, which DataHandler resolves to the real uid once the
+ * parent has been created.
+ *
+ * **Order is preserved through negative pids.** DataHandler puts a new record
+ * at the *top* of its parent by default, so records created in the order they
+ * are declared would come out reversed. The convention it offers instead is a
+ * negative `pid`, meaning "directly after this record" - it strips the sign,
+ * resolves the placeholder and hands the signed value to
+ * `resolveSortingAndPidForNewRecord()` (13.4: DataHandler.php:740ff,
+ * 14.3: DataHandler.php:742ff). Only the first sibling therefore addresses its
+ * parent; every following one addresses the sibling before it.
+ *
+ * That predecessor is tracked **per table**: a negative pid names a record of
+ * the same table, and the children of a page are a mix of sub pages, content
+ * elements and records of other tables. Pointing a content element at the page
+ * before it would place it somewhere else entirely.
+ *
+ * **An inline child is nested by a relation, not by a pid.** Its `pid` is the
+ * page the parent sits on, and the relation is expressed by writing the
+ * parent's field as the comma separated list of the children's placeholders.
+ * DataHandler resolves those and writes the relation columns of the child
+ * itself - which columns those are is per relation and comes from the TCA of
+ * the parent field, so nothing here names one. Their order comes from that list
+ * and from nothing else, which is why an inline child gets a plain pid rather
+ * than the negative "insert after" hint used for a page or a content element.
+ *
+ * Records are also seeded **visible**. A page created through DataHandler comes
+ * out hidden, which is right for an editor and wrong for a seed: the tree would
+ * exist, the frontend would render nothing, and nothing would say why.
+ *
+ * A field needs **no support in this factory to be seedable**. Apart from the
+ * structural `pid` and the defaults below, every declared value is copied into
+ * the data map untouched. That is a design decision made of the absence of a
+ * branch - a factory special-casing a field it does not have to will
+ * special-case the next one too - and the tests are what keep it true.
+ *
+ * The file references a record declares ({@see SeedRecord::$files}) are **not**
+ * handled here yet. `sys_file_reference.uid_foreign` is a plain integer column
+ * rather than a relation DataHandler resolves, so a reference cannot be written
+ * in the same pass as the record it points at - it needs the seeded `sys_file`
+ * uids and a second data map, which arrive together with the file seeding.
+ *
+ * @todo Collect the declared file references for that second pass, see #9.
+ *
+ * @internal Part of the seeding implementation, not public API.
+ */
+final readonly class DataMapFactory
+{
+    /**
+     * The fields every `pages` row carries whether the definition declared them
+     * or not.
+     *
+     * A seed says what it writes. Without these three the values come from
+     * whatever the TCA of the installation happens to declare, so the same
+     * definition writes a different page in the next installation - and none of
+     * that is visible in the definition.
+     *
+     * They are these three because they are the ones another piece of core
+     * reads back: `DataHandler` runs
+     * `TYPO3\CMS\Core\Hooks\CreateSiteConfiguration` after every new record,
+     * and that hook reads `$fieldValues['l10n_parent']`, `$fieldValues['pid']`
+     * and `$fieldValues['doktype']` out of the assembled field array. The
+     * `l10n_parent` read is unguarded on TYPO3 v13.4
+     * (CreateSiteConfiguration.php:71, `?? 0` on v14.3), `doktype` is unguarded
+     * on both (CreateSiteConfiguration.php:74), and `||` short-circuits, so a
+     * seeded page always reaches the `l10n_parent` condition and a seeded root
+     * page always reaches the `doktype` one.
+     *
+     * What arrives without them was established rather than assumed, on 13.4
+     * and 14.3:
+     *
+     * - `doktype` comes from the shipped TCA, which does declare
+     *   `'default' => (string)PageRepository::DOKTYPE_DEFAULT` on both versions
+     *   - so `DataHandler::newFieldArray()` fills it in (13.4:
+     *   DataHandler.php:8244, 14.3: DataHandler.php:8223).
+     * - `l10n_parent` is not a column of the shipped `pages` TCA at all. It is
+     *   materialised by `TcaEnrichment::enrichTransOrigPointerField()`, which
+     *   gives it `'default' => 0` - so it is filled in as well.
+     * - `sys_language_uid` is materialised the same way but as
+     *   `'type' => 'language'`, and `LanguageFieldType::hasDefaultValue()`
+     *   returns `false`. It is therefore *not* filled in, and DataHandler falls
+     *   back to `addDefaultPermittedLanguageIfNotSet()`, which takes the first
+     *   language the site of the target page offers rather than the default
+     *   language.
+     *
+     * So the hook does not warn today, and this is a guard rather than a fix
+     * for an observed warning: an extension redefining `l10n_parent` on `pages`
+     * without a default reintroduces exactly that warning on v13.4, and an
+     * extension changing the `doktype` default silently changes what every seed
+     * writes. The functional test asserts that the hook path is walked, so it
+     * goes red when a core version starts reading a field that is not here.
+     *
+     * A declared value always wins: these are defaults, not overrides. `pid` is
+     * the exception and is never taken from the definition, because it is
+     * structure rather than a field.
+     */
+    private const PAGE_DEFAULTS = [
+        'doktype' => PageRepository::DOKTYPE_DEFAULT,
+        'l10n_parent' => 0,
+        'sys_language_uid' => 0,
+    ];
+
+    /**
+     * @param int $rootPageId The page the top level records of the definition
+     *        are written below. `0` is the page tree root.
+     * @return array{
+     *     dataMap: array<string, array<string, array<string, scalar|null>>>,
+     *     suggestedUids: array<string, true>
+     * }
+     */
+    public function createFromDefinition(SeedDefinition $definition, int $rootPageId = 0): array
+    {
+        $dataMap = [];
+        $suggestedUids = [];
+
+        $this->collect($definition->records, (string)$rootPageId, $dataMap, $suggestedUids);
+
+        return ['dataMap' => $dataMap, 'suggestedUids' => $suggestedUids];
+    }
+
+    /**
+     * @param list<SeedRecord> $records
+     * @param array<string, array<string, array<string, scalar|null>>> $dataMap
+     * @param array<string, true> $suggestedUids
+     */
+    private function collect(array $records, string $parentId, array &$dataMap, array &$suggestedUids): void
+    {
+        /** @var array<string, string> $previousIdPerTable */
+        $previousIdPerTable = [];
+
+        foreach ($records as $record) {
+            $placeholder = $record->placeholder();
+            $previousId = $previousIdPerTable[$record->table] ?? null;
+            $pid = $previousId === null ? $parentId : '-' . $previousId;
+
+            $this->write($record, $pid, $parentId, $dataMap, $suggestedUids);
+
+            $previousIdPerTable[$record->table] = $placeholder;
+
+            if ($record->children !== []) {
+                $this->collect($record->children, $placeholder, $dataMap, $suggestedUids);
+            }
+        }
+    }
+
+    /**
+     * Writes one record into the data map, together with its inline children.
+     *
+     * @param string $pid The pid to write, which for a sibling after the first
+     *        is the negative "insert after" hint.
+     * @param string $parentId The page the record sits on. Needed separately
+     *        from $pid, because an inline child has to go onto a page and the
+     *        negative hint is a sorting instruction rather than one.
+     * @param array<string, array<string, array<string, scalar|null>>> $dataMap
+     * @param array<string, true> $suggestedUids
+     */
+    private function write(
+        SeedRecord $record,
+        string $pid,
+        string $parentId,
+        array &$dataMap,
+        array &$suggestedUids,
+    ): void {
+        $values = $record->values;
+        // Structural, so never taken from the definition.
+        $values['pid'] = $pid;
+        // A page created through DataHandler comes out hidden - verified by
+        // dropping this line and watching the functional test find "hidden=1".
+        // For a seed that is the wrong way round: the tree exists, the frontend
+        // renders nothing and nothing says why. A definition can still ask for
+        // a hidden record by declaring "hidden: 1" itself.
+        $values += ['hidden' => 0];
+        if ($record->table === 'pages') {
+            // See PAGE_DEFAULTS: what a page is - its type and its language -
+            // comes from the seed rather than from the TCA of the installation
+            // it is written into.
+            $values += self::PAGE_DEFAULTS;
+        }
+
+        foreach ($record->inline as $field => $children) {
+            if ($children === []) {
+                continue;
+            }
+            // Declaration order, because that is the order DataHandler numbers
+            // the relation by - it walks this list, not the data map.
+            $values[$field] = implode(',', array_map(
+                static fn(SeedRecord $child): string => $child->placeholder(),
+                $children,
+            ));
+        }
+
+        if ($record->uid !== null) {
+            // Both halves are required, and neither is obvious.
+            //
+            // The uid goes into the data map row, because DataHandler reads the
+            // suggestion from "$incomingFieldArray['uid']" when it calls
+            // "insertDB()" - not from "suggestedInsertUids" (13.4:
+            // DataHandler.php:854/858, 14.3: DataHandler.php:857/861). It then
+            // drops the column again before the insert - "Do NOT insert the UID
+            // field, ever!" (13.4: DataHandler.php:7796, 14.3:
+            // DataHandler.php:7771) - so putting it here cannot write a uid by
+            // itself.
+            //
+            // And "suggestedInsertUids" is keyed "<table>:<uid>", not by the
+            // placeholder, because that is the key "insertDB()" looks up
+            // (13.4: DataHandler.php:7806, 14.3: DataHandler.php:7781). A
+            // placeholder key is simply never found.
+            //
+            // Getting either one wrong fails silently: DataHandler assigns the
+            // next free uid, the seed reports whatever it got, and the result
+            // is right only as long as declaration order happens to equal
+            // insertion order.
+            $values['uid'] = $record->uid;
+            $suggestedUids[$record->table . ':' . $record->uid] = true;
+        }
+
+        $dataMap[$record->table][$record->placeholder()] = $values;
+
+        foreach ($record->inline as $children) {
+            foreach ($children as $child) {
+                // The page the parent sits on, for the child and for anything
+                // the child carries in turn.
+                $this->write($child, $parentId, $parentId, $dataMap, $suggestedUids);
+            }
+        }
+    }
+}
