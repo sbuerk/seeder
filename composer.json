@@ -1,6 +1,6 @@
 {
     "name": "sbuerk/seeder",
-    "description": "TYPO3 CMS extension seeder.",
+    "description": "Seeds pages, records, files and site configurations into a TYPO3 installation from YAML definitions shipped by extensions.",
     "type": "typo3-cms-extension",
     "homepage": "https://github.com/sbuerk/seeder",
     "support": {
@@ -10,11 +10,18 @@
     "license": "GPL-2.0-or-later",
     "keywords": [
         "typo3",
-        "typo3-cms-extension"
+        "typo3-cms-extension",
+        "seeder",
+        "seeding",
+        "fixtures",
+        "demo-data",
+        "cli",
+        "yaml"
     ],
     "authors": [
         {
-            "name": "sbuerk"
+            "name": "Stefan Bürk",
+            "email": "stefan@buerk.tech"
         }
     ],
     "require": {

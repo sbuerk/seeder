@@ -1,21 +1,88 @@
 # TYPO3 extension `seeder`
 
-TYPO3 CMS extension skeleton supporting TYPO3 v13 and v14 within one code base,
-including core version aware class loading, the container based test and
-quality gate harness, the GitHub Actions workflows and the release tooling.
+Seeds a TYPO3 installation — pages, content elements, records of any table,
+files and site configurations — from YAML definitions that ship inside the
+extensions themselves, so an instance can be rebuilt from a repository instead
+of being clicked together by hand.
 
 - **Package name**: `sbuerk/seeder`
 - **Extension key**: `seeder`
 - **Repository**: https://github.com/sbuerk/seeder
 - **License**: GPL-2.0-or-later
 
+> [!IMPORTANT]
+> **This is pre-1.0.** The seed definition format and the public API may change
+> without a deprecation phase until the first stable release. See
+> [Status](#status) for what already exists.
+
+## What it does
+
+| Command                      | Purpose                                                                 |
+|------------------------------|-------------------------------------------------------------------------|
+| `seeder:list`                | List every discovered seed set: identifier, title, providing extension. |
+| `seeder:import <identifier>` | Import one seed set into the installation.                              |
+
+A **seed set** is a directory `Configuration/Seeder/<name>/` in any active
+package, with `config.yml` as its entry point. Discovery walks the active
+packages, so an extension carries the data it needs with it and nothing has to
+be registered anywhere. Every path inside a set is resolved relative to that
+directory; `EXT:` paths are accepted as well.
+
+A set can describe:
+
+- **pages**, nested to any depth, with their content elements,
+- **records of any table**, either on a page or as inline children of a
+  relation,
+- **files**, copied into a storage and attached as file references,
+- **site configurations**, written from a template with the seeded root page.
+
+Everything is written through the TYPO3 `DataHandler` rather than through
+direct database inserts, so slugs, TCA defaults and evaluations, `sorting`, the
+reference index and the cache flush all happen the way they do for an editor.
+
+`seeder:import` takes `--dry-run` to validate and report without writing,
+`--force` to import into an installation that is not empty, `--root-page` to
+choose where the set is written, `--base` to override the base URL of every
+site configuration it declares, and `--no-site-config` to skip them entirely.
+
+## Status
+
+**The seeding implementation is being built.** What is in the repository today
+is the foundation: TYPO3 v13 and v14 support from one code base, the core
+version aware wiring, the container based test and quality gate harness, the
+GitHub Actions workflows and the release tooling.
+
+Not there yet — each of these is a tracked issue:
+
+- the seed definition model and the YAML parser,
+- seed set discovery and `seeder:list`,
+- the data map factory, record seeding, file seeding and file references,
+- site configuration templates and the suppression of the site configuration
+  TYPO3 writes automatically for a new page tree root,
+- `seeder:import` with its dry run and its collision report.
+
+Until those land, the sections above describe what the extension provides, not
+what you can run today. The public API and the seed definition format are not
+stable and may change without a deprecation phase.
+
 ## Compatibility
 
-| Branch | Extension | TYPO3     | PHP       |
-|--------|-----------|-----------|-----------|
-| main   | 1.x       | v13 / v14 | 8.2 - 8.5 |
+| Branch | Extension | TYPO3         | PHP       |
+|--------|-----------|---------------|-----------|
+| `main` | 1.x       | v13.4 / v14.3 | 8.2 - 8.5 |
 
 ## Installation
+
+Seeding demo, fixture and development data is a development concern, so the
+extension usually belongs in `require-dev` of the repository or the test
+instance whose data you want to rebuild:
+
+```bash
+composer require --dev sbuerk/seeder
+```
+
+Require it normally when a project ships seed sets it provisions with — the
+commands then exist in the deployed installation:
 
 ```bash
 composer require sbuerk/seeder
@@ -25,11 +92,46 @@ As long as no stable version has been released, require the development version
 of the main branch explicitly:
 
 ```bash
-composer require sbuerk/seeder:^1.0@dev
+composer require --dev sbuerk/seeder:^1.0@dev
 ```
 
 This additionally requires `minimum-stability: "dev"` together with
 `prefer-stable: true` in the root `composer.json` file.
+
+## Usage at a glance
+
+```bash
+# What is available in this installation?
+vendor/bin/typo3 seeder:list
+
+# Validate a set without writing anything, then import it.
+vendor/bin/typo3 seeder:import demo --dry-run
+vendor/bin/typo3 seeder:import demo --base='https://example.com/'
+```
+
+`packages/my_extension/Configuration/Seeder/demo/config.yml`:
+
+```yaml
+identifier: demo
+title: 'Demo page tree'
+pages:
+  - identifier: home
+    title: 'Demo'
+    slug: '/'
+    is_siteroot: 1
+    content:
+      - identifier: home-heading
+        CType: header
+        header: 'A frontend to look at'
+sites:
+  - identifier: main
+    rootPage: home
+```
+
+Every key that is not structural is written to the record as a field, so a
+table needs no support in the extension to be seedable. The complete key
+reference is written together with the parser — see [Status](#status) — and
+lands in [`Documentation/`](Documentation).
 
 ## Documentation
 
