@@ -1,0 +1,5 @@
+#
+# The smallest template that produces a usable site: everything but the base
+# has a default, and "rootPageId" comes from the seed either way.
+#
+base: 'https://minimal.example.org/'

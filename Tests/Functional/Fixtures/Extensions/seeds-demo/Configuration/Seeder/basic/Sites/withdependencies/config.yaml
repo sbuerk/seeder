@@ -1,0 +1,9 @@
+#
+# "dependencies" names the site sets a site pulls in. The set named here does
+# not exist in the test instance on purpose - the subject is that the key
+# survives being written and is read back into the site entity on TYPO3 v13 and
+# v14 alike, not that a set resolves.
+#
+base: 'https://with-dependencies.example.org/'
+dependencies:
+  - 'tests/a-site-set-that-does-not-exist'

@@ -1,0 +1,20 @@
+#
+# A full site template, in the shape a working site has below "config/sites/".
+#
+# "rootPageId" is deliberately a page that does not exist: the seeder always
+# replaces it with the uid of the declared root page, and a template that
+# happened to name the right uid could not prove that.
+#
+rootPageId: 999
+base: 'https://template.example.org/'
+languages:
+  -
+    title: English
+    enabled: true
+    languageId: 0
+    base: /
+    locale: en_US.UTF-8
+    navigationTitle: English
+    flag: us
+errorHandling: []
+routes: []

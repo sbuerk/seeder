@@ -13,3 +13,12 @@ pages:
     title: 'Home'
     slug: '/'
     is_siteroot: 1
+
+#
+# The site the page tree of this set is reachable through. It declares no
+# "template", so it is written from "Sites/main" next to this file - the
+# default the parser fills in, and the layout a set is expected to use.
+#
+sites:
+  - identifier: main
+    rootPage: home
