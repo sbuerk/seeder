@@ -31,24 +31,20 @@ Build/Scripts/runTests.sh -s checkExceptionCodes
 # Ensure markdown tables are formatted ("-- --fix" formats them).
 Build/Scripts/runTests.sh -s checkMarkdownTables
 
-# Ensure the repository initialization rewrites every identifier.
-Build/Scripts/runTests.sh -s checkRepositoryInitialization
-
 # Ensure test methods do not start with "test".
 Build/Scripts/runTests.sh -s checkTestMethodsPrefix
 ```
 
-| Gate                            | Configuration                                                                                              | Core version dependent |
-|---------------------------------|------------------------------------------------------------------------------------------------------------|------------------------|
-| `cgl`                           | [`Build/php-cs-fixer/config.php`](../../Build/php-cs-fixer/config.php)                                     | no                     |
-| `phpstan`                       | `Build/phpstan/Core13/`, `Build/phpstan/Core14/`                                                           | **yes**                |
-| `lintPhp`                       | —                                                                                                          | no                     |
-| `composerValidate`              | `composer.json`                                                                                            | no                     |
-| `checkBom`                      | [`Build/Scripts/checkUtf8Bom.sh`](../../Build/Scripts/checkUtf8Bom.sh)                                     | no                     |
-| `checkExceptionCodes`           | [`Build/Scripts/duplicateExceptionCodeCheck.sh`](../../Build/Scripts/duplicateExceptionCodeCheck.sh)       | no                     |
-| `checkMarkdownTables`           | [`Build/Scripts/checkMarkdownTables.php`](../../Build/Scripts/checkMarkdownTables.php)                     | no                     |
-| `checkRepositoryInitialization` | [`Build/Scripts/checkRepositoryInitialization.php`](../../Build/Scripts/checkRepositoryInitialization.php) | no                     |
-| `checkTestMethodsPrefix`        | [`Build/Scripts/testMethodPrefixChecker.php`](../../Build/Scripts/testMethodPrefixChecker.php)             | no                     |
+| Gate                     | Configuration                                                                                        | Core version dependent |
+|--------------------------|------------------------------------------------------------------------------------------------------|------------------------|
+| `cgl`                    | [`Build/php-cs-fixer/config.php`](../../Build/php-cs-fixer/config.php)                               | no                     |
+| `phpstan`                | `Build/phpstan/Core13/`, `Build/phpstan/Core14/`                                                     | **yes**                |
+| `lintPhp`                | —                                                                                                    | no                     |
+| `composerValidate`       | `composer.json`                                                                                      | no                     |
+| `checkBom`               | [`Build/Scripts/checkUtf8Bom.sh`](../../Build/Scripts/checkUtf8Bom.sh)                               | no                     |
+| `checkExceptionCodes`    | [`Build/Scripts/duplicateExceptionCodeCheck.sh`](../../Build/Scripts/duplicateExceptionCodeCheck.sh) | no                     |
+| `checkMarkdownTables`    | [`Build/Scripts/checkMarkdownTables.php`](../../Build/Scripts/checkMarkdownTables.php)               | no                     |
+| `checkTestMethodsPrefix` | [`Build/Scripts/testMethodPrefixChecker.php`](../../Build/Scripts/testMethodPrefixChecker.php)       | no                     |
 
 ## PHPStan
 
@@ -122,51 +118,6 @@ Git-ignored files are skipped, and so are the symlinked agent instruction files,
 which are checked through their target.
 → [Documentation conventions](../Index.md#conventions-of-this-documentation)
 
-## Repository initialization
-
-`checkRepositoryInitialization` runs
-[`Build/Scripts/initializeRepository.sh`](../../Build/Scripts/initializeRepository.sh)
-against a throwaway copy of the working tree, once per repository reference, and
-asserts the outcome: the composer package name, the extension key, the PSR-4
-prefixes, the namespaces declared in the PHP files, that no dependency package
-name was rewritten, that no masking placeholder survived, that no template
-identifier is left anywhere, and that the markdown tables are still formatted.
-
-That last one is not cosmetic. A cell holding an identifier changes width when
-the identifier is renamed, so a longer repository name leaves the tables
-unaligned and `checkMarkdownTables` fails in the first pull request of the new
-repository, on a file nobody touched. The script reformats them, and this
-asserts it — the assertion goes red on all six references when the step is
-removed.
-
-It also asserts that `--dry-run` changes nothing, and that initializing a second
-time to the same reference is recognized and does nothing — the
-[initialize workflow](../../.github/workflows/initialize.yml) triggers on more
-than one event.
-
-The references are **derived from the current package name**, not hardcoded, so
-the gate keeps testing the right thing in a repository created from this
-template. Three of them deliberately contain the current repository name, as a
-prefix, a suffix and in the middle: that is the case which regressed, and the
-reason the replacements are
-[one pass rather than a sequence](../workflow/repository-initialization.md#the-replacements-are-one-pass-not-a-sequence).
-
-The gate takes about half a minute, which is why it is worth knowing what it is
-buying: the script runs exactly once per repository created from this template,
-in a job nobody watches, and a wrong identifier produces a repository that
-cannot resolve its own dependencies.
-
-> [!NOTE]
-> This is why `initializeRepository.sh` reads `composer.json` with `php` and not
-> with `jq` — the container images have no `jq`, and a gate that cannot run the
-> script it verifies is worth nothing. `setVersion.sh` follows it, which is what
-> lets `-s setVersion` run a release step in a container as well.
-
-What it does not cover: the bare owner. That is rewritten too, but it also
-legitimately survives inside dependency package names, so "is it gone" is not a
-property that can be asserted. The dependency assertion covers the part that
-actually breaks a repository.
-
 ## Continuous integration
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs everything for
@@ -207,12 +158,9 @@ Two decisions are worth knowing:
 
 ### Why CI passes `-b docker`
 
-Every `runTests.sh` invocation in the workflows passes `-b docker`, and
-[`initialize.yml`](../../.github/workflows/initialize.yml) hands
-`--container-bin=docker` to the initialization script for the same reason.
-
-The script itself prefers **podman** and only falls back to docker. That default
-is right and stays: podman-only machines are exactly what it is built for.
+Every `runTests.sh` invocation in the workflows passes `-b docker`. The script
+itself prefers **podman** and only falls back to docker, and that default is
+right and stays: podman-only machines are exactly what it is built for.
 GitHub hosted runners happen to ship both, and that is the single place this
 repository meets a broken combination — their podman/crun pairing has been
 observed to abort the *first* container start of a job with

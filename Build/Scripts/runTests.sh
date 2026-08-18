@@ -186,7 +186,6 @@ Options:
             - checkBom: check UTF-8 files do not contain BOM
             - checkExceptionCodes: check for duplicate and missing exception codes
             - checkMarkdownTables: check markdown tables are formatted, "-- --fix" to format them
-            - checkRepositoryInitialization: check initializeRepository.sh rewrites all identifiers
             - checkTestMethodsPrefix: check test methods do not start with "test"
             - clean: clean up build, cache, rendered documentation and testing related files
             - cleanCache: clean up cache related files and folders
@@ -573,11 +572,6 @@ case ${TEST_SUITE} in
     checkMarkdownTables)
         COMMAND="php -dxdebug.mode=off Build/Scripts/checkMarkdownTables.php $@"
         ${CONTAINER_BIN} run ${CONTAINER_COMMON_PARAMS} --name check-markdown-tables-${SUFFIX} ${IMAGE_PHP} /bin/sh -c "${COMMAND}"
-        SUITE_EXIT_CODE=$?
-        ;;
-    checkRepositoryInitialization)
-        COMMAND="php -dxdebug.mode=off Build/Scripts/checkRepositoryInitialization.php"
-        ${CONTAINER_BIN} run ${CONTAINER_COMMON_PARAMS} --name check-repository-initialization-${SUFFIX} ${IMAGE_PHP} /bin/bash -c "${COMMAND}"
         SUITE_EXIT_CODE=$?
         ;;
     checkTestMethodsPrefix)

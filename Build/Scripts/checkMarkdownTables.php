@@ -9,10 +9,11 @@ require_once __DIR__ . '/../../.Build/vendor/autoload.php';
 require_once __DIR__ . '/MarkdownTableFormatter.php';
 
 /**
- * Quality gate over the Markdown tables of "./*.md" and "docs/". The algorithm
- * lives in "MarkdownTableFormatter.php", which is dependency free so that
- * "initializeRepository.sh" can use it in a repository where nothing is
- * installed yet; this file adds the file traversal and the reporting.
+ * Quality gate over the Markdown tables of "./*.md" and "docs/": this file
+ * decides which files to look at and how to report them, while the formatting
+ * rules themselves live in "MarkdownTableFormatter.php", which it pulls in with
+ * a plain "require_once" — "Build/Scripts/" is in none of the autoload maps of
+ * "composer.json".
  *
  * Run "--fix" to rewrite the files instead of only reporting them:
  *

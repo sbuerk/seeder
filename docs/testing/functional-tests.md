@@ -77,10 +77,6 @@ and adds what a site based test needs. Keeping that at the root of the chain is
 a rule, not a detail — see
 [Site based tests](site-based-tests.md#no-test-extends-the-framework-test-case-directly).
 
-Its class name intentionally does not contain the extension name, so
-[repository initialization](../workflow/repository-initialization.md) never has
-to rename it.
-
 A test needing more extensions extends the abstract class and redeclares
 `$testExtensionsToLoad`. Redeclaring **replaces** the property, so the extension
 itself has to be repeated:

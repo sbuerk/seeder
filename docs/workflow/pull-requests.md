@@ -18,7 +18,6 @@
    Build/Scripts/runTests.sh -s checkBom
    Build/Scripts/runTests.sh -s checkExceptionCodes
    Build/Scripts/runTests.sh -s checkMarkdownTables
-   Build/Scripts/runTests.sh -s checkRepositoryInitialization
    Build/Scripts/runTests.sh -s checkTestMethodsPrefix
    Build/Scripts/runTests.sh -s renderDocumentation
    ```

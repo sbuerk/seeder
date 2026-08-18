@@ -130,10 +130,9 @@ fi
 # ---------------------------------------------------------------------------
 # composer.json access.
 #
-# php rather than jq, for the same reason Build/Scripts/initializeRepository.sh
-# uses it: the container images of Build/Scripts/runTests.sh ship no jq, so a
-# script depending on it cannot be run through the wrapper — and this one is,
-# with "-s setVersion", so a host without php can release as well.
+# php rather than jq: the container images of Build/Scripts/runTests.sh ship no
+# jq, so a script depending on it cannot be run through the wrapper — and this
+# one is, with "-s setVersion", so a host without php can release as well.
 #
 # Values are decoded into objects, not associative arrays, so an empty JSON
 # object survives the round trip as "{}" instead of turning into "[]".

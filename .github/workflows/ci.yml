@@ -113,9 +113,6 @@ jobs:
       - name: "Ensure markdown tables are formatted"
         run: "Build/Scripts/runTests.sh -b docker -t ${{ matrix.typo3 }} -p ${{ matrix.php-version }} -s checkMarkdownTables"
 
-      - name: "Ensure the repository initialization rewrites all identifiers"
-        run: "Build/Scripts/runTests.sh -b docker -t ${{ matrix.typo3 }} -p ${{ matrix.php-version }} -s checkRepositoryInitialization"
-
       - name: "Ensure test methods do not start with \"test\""
         run: "Build/Scripts/runTests.sh -b docker -t ${{ matrix.typo3 }} -p ${{ matrix.php-version }} -s checkTestMethodsPrefix"
 
