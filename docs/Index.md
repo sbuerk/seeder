@@ -16,6 +16,8 @@ Documentation for people **using** the extension lives in
 | [Development environment](development/environment.md) | `runTests.sh`, container runtimes, suites and options.                       |
 | [Dual core setup](development/dual-core-setup.md)     | Running against TYPO3 v13 and v14, and the rule that avoids false positives. |
 | [Quality gates](development/quality-gates.md)         | Every gate and its configuration, PHPStan per core version, CI.              |
+| [Seed definitions](development/seed-definitions.md)   | The YAML format: structural keys, accepted shapes, defaults, validation.     |
+| [Seed sets and the CLI](development/seed-sets.md)     | Discovery, ordering, `imports`, `seeder:list` and `seeder:import`.           |
 
 ## [Architecture](architecture/Index.md)
 
@@ -24,6 +26,8 @@ Documentation for people **using** the extension lives in
 | [Core version aware code](architecture/core-version-aware-code.md) | `Classes/` vs `Core13/` vs `Core14/`, and how the right variant is selected.                        |
 | [Dependency injection](architecture/dependency-injection.md)       | Symfony DI attributes, stateless services, the rules that apply.                                    |
 | [Class design](architecture/class-design.md)                       | `final readonly`, method injection in abstract classes, data objects, the accepted PHPStan ignores. |
+| [Seeding](architecture/seeding.md)                                 | Why it goes through DataHandler, and every behaviour of it a seed has to work around.               |
+| [Site configurations](architecture/site-configuration.md)          | Writing a site from a template, the refusals, the uncovered-site-roots report.                      |
 
 ## [Testing](testing/Index.md)
 

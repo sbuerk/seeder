@@ -194,6 +194,10 @@ Nothing below `.agent/` is ever committed.
 | Version differences split classes, not conditionals | [Core version aware code](docs/architecture/core-version-aware-code.md) |
 | Symfony DI attributes, stateless services           | [Dependency injection](docs/architecture/dependency-injection.md)       |
 | `final readonly`, injected abstracts, DTOs          | [Class design](docs/architecture/class-design.md)                       |
+| The DataHandler behaviours seeding works around     | [Seeding](docs/architecture/seeding.md)                                 |
+| The seed definition format, key by key              | [Seed definitions](docs/development/seed-definitions.md)                |
+| Discovery, ordering and the command surface         | [Seed sets and the CLI](docs/development/seed-sets.md)                  |
+| Site templates, refusals, uncovered site roots      | [Site configurations](docs/architecture/site-configuration.md)          |
 | Both test suites and their strictness               | [Testing](docs/testing/Index.md)                                        |
 | Commit message conventions                          | [Commit messages](docs/workflow/commit-messages.md)                     |
 

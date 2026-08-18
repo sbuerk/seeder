@@ -30,13 +30,16 @@ Seeder
 
 ----
 
-TYPO3 CMS extension supporting TYPO3 v13 and v14 within one code base.
+Seeds a TYPO3 installation — pages, content elements, records of any table,
+files and site configurations — from YAML definitions shipped inside extensions,
+so that the content an installation starts from lives in a repository instead of
+being clicked together by hand. Supports TYPO3 v13 and v14 within one code base.
 
 ..  note::
 
-    This extension is in an early development stage. The public API is not
-    stable yet and may change without a deprecation phase until the first
-    stable release.
+    This extension has not reached a stable release yet. The seed definition
+    format and the public API may change without a deprecation phase until the
+    first stable release.
 
 ----
 
@@ -49,12 +52,17 @@ TYPO3 CMS extension supporting TYPO3 v13 and v14 within one code base.
 
     ..  card:: :ref:`Introduction <introduction>`
 
-        Learn what the extension provides and which TYPO3 and PHP versions
-        are supported.
+        Learn what the extension provides, what a seed set is and which TYPO3
+        and PHP versions are supported.
 
     ..  card:: :ref:`Installation <installation>`
 
         Install the extension in your TYPO3 installation.
+
+    ..  card:: :ref:`Configuration <configuration>`
+
+        Write a seed set: the YAML format, the file and site configuration
+        keys, and the two console commands.
 
     ..  card:: :ref:`Changelog <changelog>`
 
@@ -67,4 +75,5 @@ TYPO3 CMS extension supporting TYPO3 v13 and v14 within one code base.
 
     Introduction/Index
     Installation/Index
+    Configuration/Index
     Changelog/Index
