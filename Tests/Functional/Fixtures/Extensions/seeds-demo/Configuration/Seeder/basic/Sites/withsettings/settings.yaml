@@ -1,0 +1,7 @@
+#
+# Site settings, which the backend persists separately from "config.yaml" and
+# which a template therefore ships separately as well.
+#
+seeds:
+  demo:
+    greeting: 'from the template'
