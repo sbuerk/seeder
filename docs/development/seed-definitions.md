@@ -383,11 +383,32 @@ Items of the same entity, with `languageColumnNames` filled from the ancestor
 chain. They nest: a variant of a variant carries both ancestors, which is what
 distinguishes `l10n_parent` from `l10n_source`.
 
+That distinction is real in the data map and **does not survive the write**.
+`l10n_source` is a `passthrough` column, so a `NEW…` value in it goes on
+`DataHandler`'s remap stack with no resolver, and `processRemapStack()` declares
+`$newValue` once outside its loop and never resets it — an entry without a
+resolver writes whatever the entry before it produced, which for a translation
+is always the `l10n_parent` resolved immediately before. A translation of a
+translation therefore reaches the database with both columns on the original.
+TYPO3 Core carries the same observation as a `@todo` on the nested
+`languageVariants` of its own `CommonScenario.yaml`. Declare `l10n_source`
+explicitly on the variant when the chain matters — a declared value wins.
+Pinned by `LanguageVariantSeedingTest`.
+
 The node pointer differs by entity kind, and deliberately. For a **node** entity
 the variant is given `-<identifier of the original>` - the "insert directly
 after" convention, so a translated page sits next to its original rather than at
 the top of the page tree. For any other entity the enclosing node is passed
 through unchanged, so a translated content element stays on its page.
+
+Both halves of that sentence depend on the entity declaring `nodeColumnName`.
+It is the node pointer that positions a language variant, never
+`parentColumnName` - `processLanguageVariantItem()` is called without a parent
+id at all. A node entity declaring only `parentColumnName` therefore has nothing
+to position its translations by, and their `pid` falls back to `defaultValues`,
+usually `0` and out of the tree. Every scenario file of TYPO3 Core declares
+`nodeColumnName: 'pid'` on its `'*'` entry, which is why the normal case is the
+first one. Both are pinned by `LanguageVariantSeedingTest`.
 
 A language variant may carry `versionVariants` and further `languageVariants`,
 and it may carry `actions`. It may not carry `children` or `entities` - those
@@ -407,7 +428,11 @@ A workspace overlay of the declaring record. Two things are different from every
 other item:
 
 - it declares `version:` and **must not** declare `self` (`1574365935`) or an
-  `id` (`1574365936`) - the uid is the ancestor's;
+  `id` (`1574365936`). The overlay is a row of its own with a uid the database
+  assigns; it is found through `t3ver_oid`, which holds the uid of the live
+  record. A uid that could be declared for it would be a uid nothing honours -
+  the row is created by `DataHandler` while it versions the live record, not
+  inserted by the seed;
 - it is written into the data map under the **ancestor's key**, in the workspace
   its `version.workspace` names, so `DataHandler` sees an overlay of that record
   rather than a new one.
@@ -433,6 +458,16 @@ may therefore target a record the same scenario creates.
 `toTop` needs an enclosing node and does nothing on a top level item; `toPage`
 and `afterRecord` need a `target`. An action that matches none of the rows is
 dropped without a word - there is no unknown-action error in this format.
+
+**`discard` has no effect on TYPO3 v13 or v14.** `clearWSID` is a *command
+name* there, and `DataHandler::process_cmdmap()` switches over the command name
+and has no case for it - the spelling core still understands is
+`['version' => ['action' => 'clearWSID']]`, forwarded to `discard()` under a
+`@todo` naming the testing framework as its last caller. An unknown command
+falls through the switch with no branch and no log entry, so the version
+survives and the import reports success. Pinned by `WorkspaceSeedingTest`;
+repairing it means changing `DataHandlerFactory::setInCommandMap()`, which the
+conformance test holds to the letter.
 
 `delete` on a record the same scenario just wrote is not pointless: it is how a
 scenario produces a deleted row to test against, and how a workspace overlay
@@ -838,6 +873,19 @@ importing loader; see
 | Explicit MM relation construction              | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names.                                                                                            |
 | A `be_users` record without credentials        | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                                                                                                                        |
 | Deleting or overwriting anything               | An import refuses a uid collision and refuses an existing site identifier. There is no mode in which it removes data.                                                                                                                                 |
+
+## A worked set that is executed
+
+`Documentation/Configuration/Index.rst` prints one complete set — a page tree
+with content, a translation of both, a file, a file reference and a site. That
+example is not written in prose: it is the fixture set
+`Tests/Functional/Fixtures/Extensions/seeds-import/Configuration/Seeder/documented/`,
+and `DocumentedSeedSetTest` both imports it and compares every captioned code
+block of that section against the file it names. Change either side alone and a
+test goes red.
+
+Use it when a change to the format needs an end-to-end example, rather than
+adding a second one that nothing runs.
 
 ## See also
 

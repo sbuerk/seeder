@@ -1,0 +1,25 @@
+identifier: import-documented
+title: 'A complete seed set'
+description: 'Pages with content and translations, a file, a file reference and a site.'
+
+scenarios:
+  - Scenario.yaml
+
+files:
+  - identifier: placeholder
+    source: 'Files/placeholder.svg'
+    folder: 'documented'
+
+references:
+  - file: placeholder
+    table: pages
+    uid: 1000
+    field: media
+    values:
+      title: 'The placeholder'
+      alternative: 'A grey rectangle'
+
+sites:
+  - identifier: documented-main
+    rootPage: 1000
+    template: Sites/main

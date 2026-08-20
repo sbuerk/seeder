@@ -1,0 +1,28 @@
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid', language: 'sys_language_uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    languageColumnNames: ['l10n_parent', 'l10n_source']
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    languageColumnNames: ['l18n_parent', 'l10n_source']
+    columnNames: {title: 'header', type: 'CType'}
+
+entities:
+  page:
+    - self: {id: 1000, title: 'EN: Demo', slug: '/', is_siteroot: 1}
+      children:
+        - self: {id: 1100, title: 'EN: About', slug: '/about'}
+          languageVariants:
+            - self: {id: 1101, title: 'DE: Über uns', language: 1, slug: '/ueber-uns'}
+          entities:
+            content:
+              - self: {id: 2100, title: 'EN: About us', type: 'header'}
+                languageVariants:
+                  - self: {id: 2101, title: 'DE: Über uns', language: 1, type: 'header'}

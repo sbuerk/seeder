@@ -46,7 +46,7 @@ final class LanguageVariantSeedingTest extends AbstractFunctionalTestCase
         $this->seed();
 
         $this->assertSame(
-            [100, 101, 102, 110, 111],
+            [100, 101, 102, 110, 111, 200, 210, 211],
             array_column($this->rows('pages', 'uid'), 'uid'),
         );
         $this->assertSame(
@@ -64,7 +64,7 @@ final class LanguageVariantSeedingTest extends AbstractFunctionalTestCase
         // is reached through "columnNames", exactly as every scenario file of
         // TYPO3 Core reaches it.
         $this->assertSame(
-            [100 => 0, 101 => 1, 102 => 2, 110 => 0, 111 => 1],
+            [100 => 0, 101 => 1, 102 => 2, 110 => 0, 111 => 1, 200 => 0, 210 => 0, 211 => 1],
             $this->column('pages', 'sys_language_uid'),
         );
         $this->assertSame(
@@ -142,20 +142,36 @@ final class LanguageVariantSeedingTest extends AbstractFunctionalTestCase
     }
 
     #[Test]
-    public function aTranslatedPageDoesNotInheritThePageItsOriginalSitsOn(): void
+    public function aTranslatedPageOfANodeEntityWithoutANodeColumnFallsOutOfTheTree(): void
     {
         $this->seed();
 
         // Page 110 is a child of 100 and sits on it. Its translation is not a
         // child of anything: "processLanguageVariantItem()" passes no parent
-        // id, so "parentColumnName" is never assigned and the "pid" falls back
-        // to the "defaultValues" of the entity - 0 here, and 0 is where the
-        // translation lands.
-        //
-        // A set that wants a translated page in the tree of its original has
-        // to say so, by declaring "pid" on the language variant.
+        // id, so "parentColumnName" is never assigned. What is assigned is
+        // "nodeColumnName", and the "page" entity of the fixture declares
+        // none - so the "pid" falls back to the "defaultValues" of the entity,
+        // 0 here, and 0 is where the translation lands.
         $this->assertSame(100, $this->column('pages', 'pid')[110]);
         $this->assertSame(0, $this->column('pages', 'pid')[111]);
+    }
+
+    #[Test]
+    public function aTranslatedPageOfANodeEntityWithANodeColumnStaysNextToItsOriginal(): void
+    {
+        $this->seed();
+
+        // The same declaration one entity further down the fixture, and the
+        // only difference is "nodeColumnName: 'pid'" - which every scenario
+        // file of TYPO3 Core declares, on the "'*'" entity, and which is
+        // therefore the normal case rather than this one.
+        //
+        // A language variant of a node entity is handed the node id
+        // "-<identifier of the original>", the "insert directly after"
+        // convention, so the translation is written onto the page its original
+        // sits on and directly behind it.
+        $this->assertSame(200, $this->column('pages', 'pid')[210]);
+        $this->assertSame(200, $this->column('pages', 'pid')[211]);
     }
 
     #[Test]
@@ -175,7 +191,7 @@ final class LanguageVariantSeedingTest extends AbstractFunctionalTestCase
     {
         $result = $this->seed();
 
-        $this->assertSame(['pages' => 5, 'tt_content' => 3], $result->recordCounts);
+        $this->assertSame(['pages' => 8, 'tt_content' => 3], $result->recordCounts);
         $this->assertSame(102, $result->writtenUid('pages', 102));
         $this->assertSame(302, $result->writtenUid('tt_content', 302));
     }
