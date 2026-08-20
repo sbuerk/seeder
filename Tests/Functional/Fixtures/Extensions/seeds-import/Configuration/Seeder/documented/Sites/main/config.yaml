@@ -1,0 +1,17 @@
+rootPageId: 0
+base: 'https://documented.example.org/'
+languages:
+  -
+    title: English
+    enabled: true
+    languageId: 0
+    base: /
+    locale: en_US.UTF-8
+  -
+    title: Deutsch
+    enabled: true
+    languageId: 1
+    base: /de/
+    locale: de_DE.UTF-8
+errorHandling: []
+routes: []

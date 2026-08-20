@@ -10,6 +10,11 @@
 # "language" is mapped rather than declared as "sys_language_uid" because that
 # is what every scenario file of TYPO3 Core does, and it keeps the fixture a
 # statement about "columnNames" as well.
+#
+# Two node entities write "pages", and the only difference between them is
+# "nodeColumnName". That is the difference that decides where a translated page
+# lands, so both of them are here rather than only the one TYPO3 Core happens
+# to declare.
 ##
 entitySettings:
   '*':
@@ -19,6 +24,17 @@ entitySettings:
     isNode: true
     tableName: 'pages'
     parentColumnName: 'pid'
+    languageColumnNames: ['l10n_parent', 'l10n_source']
+    columnNames:
+      language: 'sys_language_uid'
+    defaultValues:
+      pid: 0
+      doktype: 1
+  positionedpage:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    nodeColumnName: 'pid'
     languageColumnNames: ['l10n_parent', 'l10n_source']
     columnNames:
       language: 'sys_language_uid'
@@ -53,3 +69,9 @@ entities:
         - self: {id: 110, title: 'EN: Child', slug: '/child'}
           languageVariants:
             - self: {id: 111, title: 'DE: Child', language: 1, slug: '/de/child'}
+  positionedpage:
+    - self: {id: 200, title: 'EN: Positioned root', slug: '/positioned'}
+      children:
+        - self: {id: 210, title: 'EN: Positioned child', slug: '/positioned/child'}
+          languageVariants:
+            - self: {id: 211, title: 'DE: Positioned child', language: 1, slug: '/de/positioned/child'}

@@ -33,15 +33,15 @@ directory; `EXT:` paths are accepted as well.
 
 `config.yml` describes the *set*: its `identifier`, `title` and `description`,
 the scenario files it is built from, the files it provisions, the records those
-files are attached to and the site configurations it writes. The records themselves live in the scenario files it
-names.
+files are attached to and the site configurations it writes. The records
+themselves live in the scenario files it names.
 
 A set can describe:
 
 - **pages**, nested to any depth, with **records of any table** on them,
 - **translations** of a record, through `languageVariants`,
 - **workspace records**, through `versionVariants`,
-- **`DataHandler` commands** - move, delete, discard - through `actions`,
+- **`DataHandler` commands** - move and delete - through `actions`,
 - **files**, copied into a storage,
 - **file references**, attaching a seeded file to a field of a seeded record,
 - **site configurations**, written from a template with a seeded page as root.

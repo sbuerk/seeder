@@ -20,7 +20,9 @@ of the format:
     the YAML scenario format of :php:`typo3/testing-framework`, the format the
     TYPO3 Core writes its own functional test fixtures in.
 
-This chapter is the reference for both, and for the commands.
+This chapter is the reference for both, and for the commands. It is written to
+be read in order; if you would rather see a whole set first and look the keys
+up afterwards, start at :ref:`A complete seed set <configuration-complete-set>`.
 
 ..  contents::
     :local:
@@ -448,12 +450,18 @@ Three things follow from how the variants are written:
 *   **The language itself is an ordinary field.** :yaml:`language` is only a
     column alias for :sql:`sys_language_uid`, declared in
     :yaml:`columnNames`. It is not built into the format.
-*   **A translated page does not follow its original into the tree.** A
-    language variant is written without the parent pointer of the item it
-    translates, so its :sql:`pid` falls back to the :yaml:`defaultValues` of
-    the entity - usually ``0``. Declare :sql:`pid` on the variant to put the
-    translation on the page its original sits on. A nested record such as a
-    content element is not affected: it keeps the node it was declared under.
+*   **A translated page follows its original through** :yaml:`nodeColumnName`
+    **, not through** :yaml:`parentColumnName`. A language variant is written
+    without the parent pointer of the item it translates - what it is given
+    instead is the node pointer, set to "directly after the original". A node
+    entity declaring :yaml:`nodeColumnName: 'pid'`, as every scenario file of
+    TYPO3 Core does on its :yaml:`'*'` entry, therefore puts the translated
+    page on the page its original sits on and right behind it. A node entity
+    that declares only :yaml:`parentColumnName` has nothing to be positioned
+    by, and the :sql:`pid` falls back to the :yaml:`defaultValues` of the
+    entity - usually ``0``, which is out of the tree. A nested record such as a
+    content element is not affected either way: it keeps the node it was
+    declared under.
 
 ..  _configuration-version-variants:
 
@@ -995,6 +1003,132 @@ The consequence is reported rather than left to be discovered: when a seeded
 site root ends up covered by no site configuration at all, the import warns and
 names the pages by uid. A page tree without a site is a frontend that cannot
 render, and nothing else would say so.
+
+..  _configuration-complete-set:
+
+A complete seed set
+===================
+
+Everything above, in one set. It is the set this extension's own functional
+tests import, and a test compares the three files printed here against the
+files on disk - so what is shown is what runs.
+
+..  code-block:: none
+
+    packages/my_extension/Configuration/Seeder/complete/
+    ├── config.yml
+    ├── Scenario.yaml
+    ├── Files/
+    │   └── placeholder.svg
+    └── Sites/
+        └── main/
+            └── config.yaml
+
+..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/complete/config.yml
+
+    identifier: import-documented
+    title: 'A complete seed set'
+    description: 'Pages with content and translations, a file, a file reference and a site.'
+
+    scenarios:
+      - Scenario.yaml
+
+    files:
+      - identifier: placeholder
+        source: 'Files/placeholder.svg'
+        folder: 'documented'
+
+    references:
+      - file: placeholder
+        table: pages
+        uid: 1000
+        field: media
+        values:
+          title: 'The placeholder'
+          alternative: 'A grey rectangle'
+
+    sites:
+      - identifier: documented-main
+        rootPage: 1000
+        template: Sites/main
+
+..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/complete/Scenario.yaml
+
+    entitySettings:
+      '*':
+        nodeColumnName: 'pid'
+        columnNames: {id: 'uid', language: 'sys_language_uid'}
+        defaultValues: {pid: 0, hidden: 0}
+      page:
+        isNode: true
+        tableName: 'pages'
+        parentColumnName: 'pid'
+        languageColumnNames: ['l10n_parent', 'l10n_source']
+        defaultValues: {doktype: 1}
+      content:
+        tableName: 'tt_content'
+        languageColumnNames: ['l18n_parent', 'l10n_source']
+        columnNames: {title: 'header', type: 'CType'}
+
+    entities:
+      page:
+        - self: {id: 1000, title: 'EN: Demo', slug: '/', is_siteroot: 1}
+          children:
+            - self: {id: 1100, title: 'EN: About', slug: '/about'}
+              languageVariants:
+                - self: {id: 1101, title: 'DE: Über uns', language: 1, slug: '/ueber-uns'}
+              entities:
+                content:
+                  - self: {id: 2100, title: 'EN: About us', type: 'header'}
+                    languageVariants:
+                      - self: {id: 2101, title: 'DE: Über uns', language: 1, type: 'header'}
+
+..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/complete/Sites/main/config.yaml
+
+    rootPageId: 0
+    base: 'https://documented.example.org/'
+    languages:
+      -
+        title: English
+        enabled: true
+        languageId: 0
+        base: /
+        locale: en_US.UTF-8
+      -
+        title: Deutsch
+        enabled: true
+        languageId: 1
+        base: /de/
+        locale: de_DE.UTF-8
+    errorHandling: []
+    routes: []
+
+Importing it with :bash:`vendor/bin/typo3 seeder:import import-documented`
+writes, in this order:
+
+*   the file :file:`placeholder.svg` into :file:`fileadmin/documented/`, indexed
+    as a :sql:`sys_file`;
+*   the pages ``1000``, ``1100`` and its translation ``1101``, and the content
+    elements ``2100`` and its translation ``2101``, each with the uid it
+    declares;
+*   a :sql:`sys_file_reference` attaching the file to :sql:`pages.media` of page
+    ``1000``, carrying the declared :yaml:`title` and :yaml:`alternative`;
+*   the site :file:`config/sites/documented-main/config.yaml`, from the
+    template, with :yaml:`rootPageId` replaced by ``1000``.
+
+Two details of the example are deliberate and worth copying. The entities
+declare :yaml:`nodeColumnName`, which is what puts the translated page onto the
+page its original sits on rather than out of the tree, and :yaml:`hidden` sits
+on the :yaml:`'*'` entry while :yaml:`doktype` sits on :yaml:`page` - a key
+declared on both sides is merged into a **list**, not overridden.
+
+Workspaces are the one construct the example leaves out. They need a
+:sql:`sys_workspace` record and have a
+:ref:`section of their own <configuration-version-variants>`; a set that seeds
+a workspace is not what a first set looks like.
 
 ..  _configuration-imports:
 
