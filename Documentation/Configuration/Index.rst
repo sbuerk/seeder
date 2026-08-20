@@ -14,8 +14,8 @@ A set is made of two kinds of file, and keeping them apart is the whole layout
 of the format:
 
 *   :file:`config.yml` describes the **set** - what it is called, which scenario
-    files it is written from, which files it brings and which site
-    configurations it writes.
+    files it is written from, which files it brings, which of those files are
+    attached to which records, and which site configurations it writes.
 *   One or more **scenario files** describe the **records**. They are written in
     the YAML scenario format of :php:`typo3/testing-framework`, the format the
     TYPO3 Core writes its own functional test fixtures in.
@@ -85,6 +85,12 @@ The set descriptor
         source: 'Files/placeholder.svg'
         folder: 'demo'
 
+    references:
+      - file: placeholder
+        table: tt_content
+        uid: 2000
+        field: assets
+
     sites:
       - identifier: main
         rootPage: 1000
@@ -117,6 +123,10 @@ The set descriptor
     *   -   :yaml:`files`
         -   no
         -   Files copied into a file storage before any record is written.
+    *   -   :yaml:`references`
+        -   no
+        -   File references attached to seeded records, written after the
+            records.
     *   -   :yaml:`sites`
         -   no
         -   Site configurations written after the records.
@@ -581,6 +591,95 @@ Suggested uids are honoured for an **administrator** backend user only.
 to run as a non-admin rather than write a set whose uids are not the ones it
 declares.
 
+..  _configuration-inline-relations:
+
+Relations between records
+=========================
+
+A relation needs no key of its own, in :file:`config.yml` or anywhere else.
+Because every record has a uid **before** it is written, the record holding the
+relation can name the records on the other end of it by writing their uids into
+its relation field, exactly as a backend form submits them:
+
+..  code-block:: yaml
+    :caption: an inline relation, expressed with what the scenario format already has
+
+    entitySettings:
+      '*':
+        nodeColumnName: 'pid'
+        columnNames: {id: 'uid'}
+        defaultValues: {pid: 0, hidden: 0}
+      page:
+        isNode: true
+        tableName: 'pages'
+        parentColumnName: 'pid'
+        defaultValues: {doktype: 1}
+      content:
+        tableName: 'tt_content'
+        columnNames: {title: 'header', type: 'CType'}
+      item:
+        tableName: 'tx_myext_item'
+
+    entities:
+      page:
+        - self: {id: 1, title: 'Root', slug: '/', is_siteroot: 1}
+          entities:
+            content:
+              - self: {id: 21, title: 'List', type: 'my_itemlist', tx_myext_items: '32,31'}
+            item:
+              - self: {id: 31, title: 'One'}
+              - self: {id: 32, title: 'Two'}
+
+That is the whole declaration. The relation itself is described where it is
+always described, in the TCA of the field:
+
+..  code-block:: php
+    :caption: the TCA of tt_content.tx_myext_items
+
+    'tx_myext_items' => [
+        'config' => [
+            'type' => 'inline',
+            'foreign_table' => 'tx_myext_item',
+            'foreign_field' => 'parentid',
+            'foreign_table_field' => 'parenttable',
+            'foreign_sortby' => 'sorting_foreign',
+        ],
+    ],
+
+The children are an entity of their own in the same scenario, and the parent
+declares its relation field as the **comma separated list of the ids they
+declare**. Nothing else is needed: :php:`DataHandler` resolves that list like
+any other relation and writes the columns tying a child to its parent by
+itself. Which columns those are is read from the TCA of the **parent field** -
+its ``foreign_field``, ``foreign_table_field`` and ``foreign_sortby``, which
+are :sql:`parentid`, :sql:`parenttable` and :sql:`sorting_foreign` above. A
+scenario therefore never names them, and a relation whose TCA calls them
+something else needs nothing different here. The relation field of the
+parent ends up holding the number of children, the way TYPO3 stores an inline
+relation.
+
+Two consequences are worth stating, because they are what an integrator will
+actually rely on:
+
+*   **The order of the relation is the order of the declared list**, not the
+    order of the uids. The example writes ``'32,31'``, and item 32 comes first.
+*   **It works more than one level deep.** A child that is itself the parent of
+    a relation declares its own list the same way, and the second level is
+    resolved from the TCA of the child's field. Nothing about it is special
+    cased.
+
+The children live on the page the scenario declares them under, like every
+other record: the relation ties them to the parent record, not to its page.
+
+..  note::
+
+    The same trick cannot work for a **file** reference, and that is the whole
+    reason :ref:`references <configuration-references>` exists. A
+    :sql:`sys_file_reference` points at its file through :sql:`uid_local`, and
+    that uid is handed out by the FAL indexer while the file is being placed -
+    nobody can write it down in a scenario in advance. A file reference is
+    therefore declared in :file:`config.yml`, where the file is declared too.
+
 ..  _configuration-files:
 
 Files
@@ -630,8 +729,151 @@ exists on disk and does not exist for TYPO3. A missing target folder is created,
 an existing file of the same name is replaced, and the source file in the
 extension is left where it is.
 
-This version seeds files, and it does not attach them to records - see
-:ref:`What this version does not do <configuration-limits>`.
+Placing a file is one thing and attaching it to a record is another, and the
+second is what :ref:`references <configuration-references>` below does.
+
+..  _configuration-references:
+
+File references
+===============
+
+..  code-block:: yaml
+
+    references:
+      - file: placeholder                 # required, an identifier declared under "files"
+        table: tt_content                 # required, the table of the record it hangs on
+        uid: 2000                         # required, the uid the scenario declares as "id"
+        field: assets                     # required, the file relation column of that record
+        values:                           # optional, the fields of the sys_file_reference row
+          title: 'A placeholder'
+          alternative: 'Nothing to see here'
+
+..  list-table::
+    :header-rows: 1
+
+    *   -   Key
+        -   Required
+        -   Meaning
+    *   -   :yaml:`file`
+        -   yes
+        -   The :yaml:`identifier` of a file the same set declares under
+            :yaml:`files`. A name no file of the set carries is refused.
+    *   -   :yaml:`table`
+        -   yes
+        -   The table of the record the reference hangs on.
+    *   -   :yaml:`uid`
+        -   yes
+        -   The **uid** of that record: the :yaml:`id` an entity of the
+            scenario declares for it. A positive integer.
+    *   -   :yaml:`field`
+        -   yes
+        -   The column of that record the file is attached to - a TCA file
+            relation, such as :sql:`assets` or :sql:`image` on
+            :sql:`tt_content` and :sql:`media` on :sql:`pages`.
+    *   -   :yaml:`values`
+        -   no
+        -   The fields written on the :sql:`sys_file_reference` row itself: the
+            ones an editor fills in on a file relation, such as ``title``,
+            ``alternative``, ``description``, ``link`` or ``crop``. Every value
+            has to be a string, a number, a boolean or null.
+
+This list is **closed** as well: any other key on a reference is refused, naming
+the known ones.
+
+A scenario record carries no symbolic name, so a reference names its record by
+uid - the same rule :yaml:`rootPage` follows, and for the same reason. That uid
+is **resolved against what the run actually wrote** rather than trusted. A
+reference naming a record no entity of the scenario declares is refused before
+anything is written:
+
+..  code-block:: none
+
+    [ERROR] The seed set "demo" declares a file reference to "placeholder" on the
+            record tt_content:2001, which no entity of its scenario declares as
+            its "id".
+
+Five columns of the :sql:`sys_file_reference` row are **structural** and are
+written by the seeder: :sql:`uid_local`, :sql:`uid_foreign`,
+:sql:`tablenames`, :sql:`fieldname` and :sql:`pid`. Declaring one of them under
+:yaml:`values` does not change it - the seeder's value wins, because a
+definition may not detach a reference from the record it declares it on.
+:sql:`pid` follows the convention TYPO3 uses for a file relation: a reference
+belongs to the page its record is on, and for a record that *is* a page, to that
+page itself.
+
+Several references on one field come out in the order they are declared, which
+is what :sql:`sorting_foreign` is written from - so a multi image field is a
+gallery in the declared order rather than in whatever order the database returns.
+The same file may be referenced from several records, or from none.
+
+References are written in a pass of their own, through :php:`DataHandler`,
+after every record of the set exists. That is what puts the relation into the
+reference index, and it is why a mistyped :yaml:`uid` is caught up front rather
+than after the whole tree has been written.
+
+A worked example
+----------------
+
+..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+
+    identifier: demo
+    title: 'A content element with two images'
+
+    scenarios:
+      - Scenario.yaml
+
+    files:
+      - identifier: landscape
+        source: 'Files/landscape.jpg'
+        folder: 'demo'
+      - identifier: portrait
+        source: 'Files/portrait.jpg'
+        folder: 'demo'
+
+    references:
+      - file: landscape
+        table: tt_content
+        uid: 2000
+        field: assets
+        values: {title: 'Landscape', alternative: 'The wide one'}
+      - file: portrait
+        table: tt_content
+        uid: 2000
+        field: assets
+      - file: landscape
+        table: pages
+        uid: 1000
+        field: media
+
+..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/demo/Scenario.yaml
+
+    entitySettings:
+      '*':
+        nodeColumnName: 'pid'
+        columnNames: {id: 'uid'}
+        defaultValues: {pid: 0, hidden: 0}
+      page:
+        isNode: true
+        tableName: 'pages'
+        parentColumnName: 'pid'
+        defaultValues: {doktype: 1}
+      content:
+        tableName: 'tt_content'
+        columnNames: {title: 'header', type: 'CType'}
+
+    entities:
+      page:
+        - self: {id: 1000, title: 'Demo', slug: '/', is_siteroot: 1}
+          entities:
+            content:
+              - self: {id: 2000, title: 'Teaser', type: 'textmedia'}
+
+The scenario file knows nothing about a file, and that is deliberate: it stays a
+file that could be lifted into a functional test unchanged. The content element
+2000 ends up with two images in the declared order, and the page 1000 with the
+first of them in its :sql:`media` field.
 
 ..  _configuration-sites:
 
@@ -783,21 +1025,18 @@ a map, or declares an unknown top level key stops the import.
 What this version does not do
 =============================
 
-Two things the seed definition format does not currently express. Both are
-named here rather than left to be discovered:
+Two boundaries of the format, named here rather than left to be discovered:
 
-*   **A record cannot attach a file.** File *provisioning* works: the
-    :yaml:`files` of a set are copied and indexed, and a :sql:`sys_file` row
-    exists afterwards. What is missing is the file *reference* - there is no
-    way to hang a :sql:`sys_file_reference` onto a record's :sql:`assets` or
-    :sql:`media` field from a scenario. The scenario format has no concept of a
-    file, and inventing one is a change of its own.
-*   **There is no inline relation construct.** In this format every record has
-    a uid before it is written - declared as :yaml:`id`, or handed out from
-    ``10000`` upwards - so a relation is expressed by writing that uid into the
-    relation field, the same way any other value is written. What does not
-    exist is a nesting construct that creates the child and the relation in one
-    declaration.
+*   **A file reference reaches only the records of its own set.** The
+    :yaml:`uid` of a :yaml:`references` entry is resolved against what the run
+    writes, so it cannot attach a file to a record that is already in the
+    installation. Naming one is refused as an undeclared record, not answered
+    with a database lookup.
+*   **A file reference cannot be declared in a scenario file.** The scenario
+    format has no concept of a file, and this extension does not give it one -
+    that is the point of :ref:`references <configuration-references>` living in
+    :file:`config.yml`. A scenario file of a seed set stays a file that could be
+    lifted into a functional test unchanged.
 
 ..  _configuration-commands:
 
@@ -936,6 +1175,14 @@ What the seeder writes by itself
         -   Everything :php:`DataHandler` derives from a record is derived,
             because the records go through it rather than through an
             :sql:`INSERT`.
+    *   -   The reference columns
+        -   :sql:`uid_local`, :sql:`uid_foreign`, :sql:`tablenames`,
+            :sql:`fieldname` and :sql:`pid` of a :sql:`sys_file_reference`
+            written from :yaml:`references`. A value declared for one of them
+            under :yaml:`values` does not win.
+    *   -   ``sorting_foreign``
+        -   Written by TYPO3 for a relation, from the order the children - or
+            the references - are declared in.
 
 Everything else in a record comes from its :yaml:`self` or :yaml:`version`, from
 the :yaml:`defaultValues` of its entity, or from the TCA of the installation

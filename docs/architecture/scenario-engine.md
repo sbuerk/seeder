@@ -243,9 +243,18 @@ following exists in it, and each is added on top rather than inside:
 
 - **Files.** There is no `sys_file`, no `sys_file_reference`, no storage
   handling, no FAL call of any kind — verified by grep over the whole package.
-  The structural reason is that the factory emits one flat data map entry per
-  item and has no way to write a child's `NEW` id back into a *field* of the
-  parent, which is exactly what a file reference needs.
+  The structural reason is that a `sys_file_reference` needs a `uid_local`, and
+  the `sys_file` uid is assigned by the FAL indexer while the file is placed, so
+  it cannot be declared in a scenario at all. Both halves are added on top:
+  `FileSeeder` before the record pass, `FileReferenceSeeder` after it, from the
+  `files:` and `references:` lists of `config.yml`. See
+  [The file reference pass](seeding.md#the-file-reference-pass).
+
+  An **inline relation** is the opposite case, and it is worth naming next to
+  this one: the engine needs nothing for it either, and nothing was added. A
+  declared `id` is a suggested uid, so a parent can name its children by listing
+  their ids in its relation field, and `DataHandler` does the rest. See
+  [Inline relations need no support](../development/seed-definitions.md#inline-relations-need-no-support).
 - **Site configurations.** Core's tests write sites with their own helpers.
 - **A set concept** — an identifier, a `config.yml`, discovery over active
   packages, an ordered composition of several scenario files.

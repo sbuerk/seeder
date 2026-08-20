@@ -170,14 +170,24 @@ vendor/bin/typo3 seeder:import demo --base='https://example.com/'
    nothing.
 2. The **descriptor is parsed and the scenario composed** into one
    `DataHandlerFactory`, before anything is written, so a set that cannot be
-   written fails before its first row exists.
+   written fails before its first row exists. This is also where the two
+   cross references between the descriptor and the scenario are checked: a site
+   naming a `rootPage` no `pages` entity declares, and a file reference naming a
+   record no entity declares at all.
 3. The **uids are checked** against the installation, per table - every uid the
    scenario declares *and* every one the factory assigned dynamically.
 4. **Nothing is written on a dry run.** The run stops here and reports what the
    first three steps found.
 5. The **backend user is authenticated**, and refused unless it is an admin.
-6. **Files, records and site configurations** are written, in that order,
-   because each needs the uids of the one before it.
+6. **Files, records, file references and site configurations** are written, in
+   that order, because each needs the uids of the one before it. The reference
+   pass is separate rather than folded into the record pass for a reason that
+   fails silently otherwise; see
+   [The file reference pass](../architecture/seeding.md#the-file-reference-pass).
+
+Both a dry run and a real run report the references as a line of their own -
+`File references to attach: N` and `File references attached: N` - next to the
+file and site configuration lines.
 
 ### Options
 

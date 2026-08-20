@@ -30,12 +30,29 @@ final readonly class ScenarioSeedResult
      *        table, in the order the tables first occur in the scenario.
      * @param array<string, int> $fileUids File identifier of the set mapped to
      *        the `sys_file` uid it was indexed under.
+     * @param list<int> $referenceUids The `sys_file_reference` uid of every
+     *        reference the set declared, in declared order.
      */
     public function __construct(
         public array $writtenUids = [],
         public array $recordCounts = [],
         public array $fileUids = [],
+        public array $referenceUids = [],
     ) {}
+
+    /**
+     * The same result with the file references filled in.
+     *
+     * They are written in a pass after the records, and that pass is handed
+     * this object to resolve the records and the files it points at - so the
+     * result exists before the last thing it reports does.
+     *
+     * @param list<int> $referenceUids
+     */
+    public function withReferenceUids(array $referenceUids): self
+    {
+        return new self($this->writtenUids, $this->recordCounts, $this->fileUids, $referenceUids);
+    }
 
     /**
      * The uid a record declared as `<table>:<declaredUid>` was written with, or

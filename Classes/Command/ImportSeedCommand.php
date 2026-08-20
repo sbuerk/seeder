@@ -66,8 +66,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * 4. **Nothing is written on a dry run.** The run stops here and reports what
  *    the first three steps found.
  * 5. **The backend user is authenticated**, and refused unless it is an admin.
- * 6. **Files, records, and site configurations** are written, in that order,
- *    because each needs the uids of the one before it.
+ * 6. **Files, records, file references and site configurations** are written,
+ *    in that order, because each needs the uids of the one before it.
  *
  * ## Exit codes
  *
@@ -323,6 +323,12 @@ final class ImportSeedCommand extends Command
             return self::EXIT_INVALID_DEFINITION;
         }
 
+        $undeclaredReference = $this->undeclaredReferenceRecord($definition, $factory);
+        if ($undeclaredReference !== null) {
+            $io->error($undeclaredReference);
+            return self::EXIT_INVALID_DEFINITION;
+        }
+
         $this->describeSeedSet($io, $seedSet, $dryRun);
 
         // Checked whether or not "--force" was given: forcing does not skip the
@@ -414,6 +420,36 @@ final class ImportSeedCommand extends Command
                 $site->identifier,
                 $definition->identifier,
                 $site->rootPage,
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * The message for the first file reference whose record no entity of the
+     * scenario declares, or null when every one of them names a record the set
+     * writes.
+     *
+     * Checked here for the same reason the site root is: the references are
+     * written in the last pass of a run, so a mistyped uid would surface after
+     * the page tree, the content and the files are already in the database.
+     */
+    private function undeclaredReferenceRecord(SeedDefinition $definition, DataHandlerFactory $factory): ?string
+    {
+        $suggestedUids = $factory->getSuggestedIds();
+        foreach ($definition->references as $reference) {
+            if (isset($suggestedUids[$reference->table . ':' . $reference->uid])) {
+                continue;
+            }
+
+            return sprintf(
+                'The seed set "%s" declares a file reference to "%s" on the record %s:%d, which no entity of its'
+                . ' scenario declares as its "id".',
+                $definition->identifier,
+                $reference->file,
+                $reference->table,
+                $reference->uid,
             );
         }
 
@@ -733,6 +769,7 @@ final class ImportSeedCommand extends Command
         $this->reportRecordCounts($io, $this->countRecords($factory), $rootPageId, true);
 
         $io->writeln(sprintf('Files to index: %d', count($definition->files)));
+        $io->writeln(sprintf('File references to attach: %d', count($definition->references)));
         $io->writeln(sprintf(
             'Site configurations to write: %s',
             $writeSiteConfigurations
@@ -765,6 +802,7 @@ final class ImportSeedCommand extends Command
         $this->reportRecordCounts($io, $seedResult->recordCounts, $rootPageId, false);
 
         $io->writeln(sprintf('Files indexed: %d', count($seedResult->fileUids)));
+        $io->writeln(sprintf('File references attached: %d', count($seedResult->referenceUids)));
         $io->writeln(sprintf(
             'Site configurations written: %s',
             $siteResult->writtenSites === [] ? '0' : implode(', ', $siteResult->writtenSites),

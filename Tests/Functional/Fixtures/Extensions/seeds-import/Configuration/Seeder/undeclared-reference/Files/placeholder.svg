@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180">
+  <title>Landscape placeholder</title>
+  <rect width="320" height="180" fill="#d7d7d7"></rect>
+  <text x="160" y="96" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#4a4a4a">320 x 180</text>
+</svg>

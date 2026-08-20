@@ -7,6 +7,7 @@ namespace SBUERK\Seeder\Tests\Unit\Seeding\Parser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use SBUERK\Seeder\Seeding\Definition\SeedFile;
+use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
 use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
@@ -21,8 +22,9 @@ require_once __DIR__ . '/Fixtures/ShadowedIsReadable.php';
  * unknown key fails the import naming the key rather than being skipped.
  *
  * Since the records moved into scenario files, the descriptor describes the
- * **set** only - which scenarios it is written from, which files it brings, and
- * which sites it sets up. That is what this class covers, in three layers:
+ * **set** only - which scenarios it is written from, which files it brings,
+ * which record fields those files hang on, and which sites it sets up. That is
+ * what this class covers, in three layers:
  *
  * - {@see SeedDefinitionParser::parse()} on an array, which is the whole
  *   validation surface and needs no file system;
@@ -155,7 +157,7 @@ final class SeedDefinitionParserTest extends UnitTestCase
         $this->expectExceptionCode(1787072814);
         $this->expectExceptionMessage(
             'The seed definition "config.yml" declares the unknown key "scenario". Known keys are:'
-            . ' identifier, title, description, imports, scenarios, files, sites.',
+            . ' identifier, title, description, imports, scenarios, files, references, sites.',
         );
 
         $this->subject->parse(
@@ -509,6 +511,404 @@ final class SeedDefinitionParserTest extends UnitTestCase
             'title' => 'Demo',
             'scenarios' => ['Pages.yaml'],
             'files' => $files,
+        ]);
+    }
+
+    #[Test]
+    public function aFileReferenceIsParsedWithEverythingItDeclares(): void
+    {
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [
+                ['identifier' => 'teaser', 'source' => 'Files/teaser.svg'],
+            ],
+            'references' => [
+                [
+                    'file' => 'teaser',
+                    'table' => 'tt_content',
+                    'uid' => 2001,
+                    'field' => 'image',
+                    'values' => ['title' => 'Teaser', 'alternative' => 'A teaser image'],
+                ],
+            ],
+        ]);
+
+        $this->assertCount(1, $definition->references);
+        $this->assertEquals(
+            new SeedFileReference(
+                'teaser',
+                'tt_content',
+                2001,
+                'image',
+                ['title' => 'Teaser', 'alternative' => 'A teaser image'],
+            ),
+            $definition->references[0],
+        );
+    }
+
+    #[Test]
+    public function fileReferencesAreKeptInDeclarationOrder(): void
+    {
+        // The order is the order the references are written in, and a field
+        // taking several files takes them in exactly that order - sorting them
+        // would silently reorder a gallery.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [
+                ['identifier' => 'zulu', 'source' => 'Files/zulu.svg'],
+                ['identifier' => 'alpha', 'source' => 'Files/alpha.svg'],
+            ],
+            'references' => [
+                ['file' => 'zulu', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image'],
+                ['file' => 'alpha', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image'],
+                ['file' => 'zulu', 'table' => 'pages', 'uid' => 1000, 'field' => 'media'],
+            ],
+        ]);
+
+        $this->assertEquals(
+            [
+                new SeedFileReference('zulu', 'tt_content', 2001, 'image'),
+                new SeedFileReference('alpha', 'tt_content', 2001, 'image'),
+                new SeedFileReference('zulu', 'pages', 1000, 'media'),
+            ],
+            $definition->references,
+        );
+    }
+
+    #[Test]
+    public function aFileReferenceWithoutValuesWritesNoFieldOfItsOwn(): void
+    {
+        // Attaching a file without titling it is the common case, and an absent
+        // "values" is an empty map rather than an error.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [['identifier' => 'teaser', 'source' => 'Files/teaser.svg']],
+            'references' => [
+                ['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image'],
+            ],
+        ]);
+
+        $this->assertSame([], $definition->references[0]->values);
+    }
+
+    #[Test]
+    public function aDefinitionWithoutReferencesIsAccepted(): void
+    {
+        // A set may bring files without hanging any of them on a record - they
+        // are then simply indexed into the storage.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [['identifier' => 'teaser', 'source' => 'Files/teaser.svg']],
+        ]);
+
+        $this->assertSame([], $definition->references);
+    }
+
+    /**
+     * @return \Generator<string, array{value: scalar|null}>
+     */
+    public static function referenceValuesWrittenVerbatim(): \Generator
+    {
+        yield 'a string' => ['value' => 'A teaser image'];
+        yield 'an empty string' => ['value' => ''];
+        yield 'an integer' => ['value' => 17];
+        yield 'a float' => ['value' => 1.5];
+        yield 'boolean true' => ['value' => true];
+        yield 'boolean false' => ['value' => false];
+        // "alternative:" with nothing behind it decodes to null, and null is a
+        // value a "sys_file_reference" column can carry - so it is passed on
+        // rather than dropped or turned into an empty string.
+        yield 'null' => ['value' => null];
+    }
+
+    #[DataProvider('referenceValuesWrittenVerbatim')]
+    #[Test]
+    public function aFileReferenceValueSurvivesVerbatim(mixed $value): void
+    {
+        // A record value is content: it is written as it was declared, so the
+        // parser neither casts nor normalises it.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [['identifier' => 'teaser', 'source' => 'Files/teaser.svg']],
+            'references' => [
+                [
+                    'file' => 'teaser',
+                    'table' => 'tt_content',
+                    'uid' => 2001,
+                    'field' => 'image',
+                    'values' => ['alternative' => $value],
+                ],
+            ],
+        ]);
+
+        $this->assertSame(['alternative' => $value], $definition->references[0]->values);
+    }
+
+    /**
+     * The key set of a reference is closed for the same reason a file's is:
+     * nothing outside `values` is written verbatim, so an unknown key can only
+     * be a mistake - and `fields:` accepted silently would attach the file
+     * without any of the metadata the set declares.
+     */
+    #[Test]
+    public function anUnknownFileReferenceKeyNamesItselfAndTheKnownKeys(): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787256312);
+        $this->expectExceptionMessage(
+            'A file reference of the seed definition "config.yml" declares the unknown key "fields". Known'
+            . ' keys are: file, table, uid, field, values.',
+        );
+
+        $this->subject->parse(
+            [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'scenarios' => ['Pages.yaml'],
+                'files' => [['identifier' => 'teaser', 'source' => 'Files/teaser.svg']],
+                'references' => [
+                    [
+                        'file' => 'teaser',
+                        'table' => 'tt_content',
+                        'uid' => 2001,
+                        'field' => 'image',
+                        'fields' => ['title' => 'Teaser'],
+                    ],
+                ],
+            ],
+            'config.yml',
+        );
+    }
+
+    #[Test]
+    public function aReferenceToAnUndeclaredFileNamesTheFilesTheSetDeclares(): void
+    {
+        // The "files" list comes out of the same descriptor, so this is a
+        // mistake the parser can name before anything is written - rather than
+        // one that surfaces halfway through a run that has already created a
+        // page tree.
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787256314);
+        $this->expectExceptionMessage(
+            'A file reference of the seed definition "config.yml" names the file "teasre", which the set does'
+            . ' not declare under "files" - it declares: teaser, logo.',
+        );
+
+        $this->subject->parse(
+            [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'scenarios' => ['Pages.yaml'],
+                'files' => [
+                    ['identifier' => 'teaser', 'source' => 'Files/teaser.svg'],
+                    ['identifier' => 'logo', 'source' => 'Files/logo.svg'],
+                ],
+                'references' => [
+                    ['file' => 'teasre', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image'],
+                ],
+            ],
+            'config.yml',
+        );
+    }
+
+    #[Test]
+    public function aReferenceInASetDeclaringNoFilesSaysThatItDeclaresNone(): void
+    {
+        // Worth a wording of its own: listing the declared files is unhelpful
+        // when there are none, and the likely mistake is a missing "files" key
+        // rather than a misspelled identifier.
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787256314);
+        $this->expectExceptionMessage(
+            'A file reference of the seed definition "config.yml" names the file "teaser", which the set does'
+            . ' not declare under "files" - it declares no files at all.',
+        );
+
+        $this->subject->parse(
+            [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'scenarios' => ['Pages.yaml'],
+                'references' => [
+                    ['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image'],
+                ],
+            ],
+            'config.yml',
+        );
+    }
+
+    /**
+     * @return \Generator<string, array{references: mixed, code: int}>
+     */
+    public static function invalidReferenceDeclarations(): \Generator
+    {
+        yield 'references not a list' => ['references' => 'nope', 'code' => 1787256310];
+        yield 'references a map rather than a list' => [
+            'references' => ['teaser' => ['table' => 'tt_content', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256310,
+        ];
+        yield 'a reference that is not a map' => ['references' => ['nope'], 'code' => 1787256311];
+        yield 'a reference that is a number' => ['references' => [17], 'code' => 1787256311];
+        yield 'a reference with an unknown key' => [
+            'references' => [
+                ['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image', 'pid' => 1],
+            ],
+            'code' => 1787256312,
+        ];
+        yield 'a reference without a file' => [
+            'references' => [['table' => 'tt_content', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256313,
+        ];
+        yield 'a reference with an empty file' => [
+            'references' => [['file' => '', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256313,
+        ];
+        yield 'a reference with a file that is not a string' => [
+            'references' => [['file' => 17, 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256313,
+        ];
+        yield 'a reference to a file the set does not declare' => [
+            'references' => [['file' => 'missing', 'table' => 'tt_content', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256314,
+        ];
+        yield 'a reference without a table' => [
+            'references' => [['file' => 'teaser', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256315,
+        ];
+        yield 'a reference with an empty table' => [
+            'references' => [['file' => 'teaser', 'table' => '', 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256315,
+        ];
+        yield 'a reference with a table that is not a string' => [
+            'references' => [['file' => 'teaser', 'table' => 17, 'uid' => 2001, 'field' => 'image']],
+            'code' => 1787256315,
+        ];
+        // "uid" is the uid a scenario entity declares as its "id", so a string
+        // is not "close enough": casting it would look up record 0.
+        yield 'a reference without a uid' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'field' => 'image']],
+            'code' => 1787256316,
+        ];
+        yield 'a reference whose uid is a numeric string' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => '2001', 'field' => 'image']],
+            'code' => 1787256316,
+        ];
+        yield 'a reference whose uid is zero' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => 0, 'field' => 'image']],
+            'code' => 1787256316,
+        ];
+        yield 'a reference whose uid is negative' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => -1, 'field' => 'image']],
+            'code' => 1787256316,
+        ];
+        yield 'a reference whose uid is a float' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001.0, 'field' => 'image']],
+            'code' => 1787256316,
+        ];
+        yield 'a reference whose uid is null' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => null, 'field' => 'image']],
+            'code' => 1787256316,
+        ];
+        yield 'a reference without a field' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001]],
+            'code' => 1787256317,
+        ];
+        yield 'a reference with an empty field' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001, 'field' => '']],
+            'code' => 1787256317,
+        ];
+        yield 'a reference with a field that is not a string' => [
+            'references' => [['file' => 'teaser', 'table' => 'tt_content', 'uid' => 2001, 'field' => 17]],
+            'code' => 1787256317,
+        ];
+        yield 'a reference whose values are a string' => [
+            'references' => [[
+                'file' => 'teaser',
+                'table' => 'tt_content',
+                'uid' => 2001,
+                'field' => 'image',
+                'values' => 'Teaser',
+            ]],
+            'code' => 1787256318,
+        ];
+        yield 'a reference whose values are a number' => [
+            'references' => [[
+                'file' => 'teaser',
+                'table' => 'tt_content',
+                'uid' => 2001,
+                'field' => 'image',
+                'values' => 17,
+            ]],
+            'code' => 1787256318,
+        ];
+        // A list where a map belongs: the fields arrive with integer keys, and
+        // an unnamed field cannot be written to any column.
+        yield 'a reference whose values are a list' => [
+            'references' => [[
+                'file' => 'teaser',
+                'table' => 'tt_content',
+                'uid' => 2001,
+                'field' => 'image',
+                'values' => ['Teaser'],
+            ]],
+            'code' => 1787256319,
+        ];
+        yield 'a reference with a values field whose name is empty' => [
+            'references' => [[
+                'file' => 'teaser',
+                'table' => 'tt_content',
+                'uid' => 2001,
+                'field' => 'image',
+                'values' => ['' => 'Teaser'],
+            ]],
+            'code' => 1787256319,
+        ];
+        // A nested map would reach "DataHandler" as the string "Array".
+        yield 'a reference with a values field that is a map' => [
+            'references' => [[
+                'file' => 'teaser',
+                'table' => 'tt_content',
+                'uid' => 2001,
+                'field' => 'image',
+                'values' => ['crop' => ['default' => ['x' => 0]]],
+            ]],
+            'code' => 1787256320,
+        ];
+        yield 'a reference with a values field that is a list' => [
+            'references' => [[
+                'file' => 'teaser',
+                'table' => 'tt_content',
+                'uid' => 2001,
+                'field' => 'image',
+                'values' => ['title' => ['Teaser']],
+            ]],
+            'code' => 1787256320,
+        ];
+    }
+
+    #[DataProvider('invalidReferenceDeclarations')]
+    #[Test]
+    public function anInvalidFileReferenceDeclarationIsRejected(mixed $references, int $code): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode($code);
+
+        $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [['identifier' => 'teaser', 'source' => 'Files/teaser.svg']],
+            'references' => $references,
         ]);
     }
 

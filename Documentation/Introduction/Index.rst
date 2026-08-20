@@ -11,7 +11,8 @@ What does it do?
 
 The :guilabel:`Seeder` extension rebuilds the content of a TYPO3 installation
 from YAML files that ship inside extensions: pages, content elements, records
-of any table, files and site configurations.
+of any table, the relations between them, files, the references attaching those
+files to records, and site configurations.
 
 That makes the starting state of an installation part of a repository instead
 of something that is clicked together by hand - for a project template, for a
@@ -86,6 +87,16 @@ registered anywhere: the set is available as soon as the extension is installed
 and activated. The complete format is described in
 :ref:`Configuration <configuration>`.
 
+A relation between records needs nothing beyond that. Because every record has
+a uid before it is written, a parent names its children by writing their
+declared ids into its relation field, and :php:`DataHandler` resolves the list
+like any other relation - see
+:ref:`Relations between records <configuration-inline-relations>`. A **file**
+is the exception, and the one place where :file:`config.yml` has to say
+something: the :yaml:`references` of a set attach a seeded file to a seeded
+record, because a :sql:`sys_file_reference` points at its file by a uid the FAL
+indexer only hands out while the file is being placed.
+
 Everything the extension writes goes through the TYPO3 :php:`DataHandler` and
 the file storage API rather than through direct database inserts. Slugs are
 generated, TCA defaults and evaluations are applied, the sorting is computed,
@@ -114,13 +125,13 @@ What it does not do
     reconciled against a definition, and no import is idempotent.
 *   **Nothing is deleted or overwritten.** A uid collision and an existing site
     identifier are both refusals.
-*   **A record cannot attach a file.** A set copies and indexes the files it
-    ships, so a :sql:`sys_file` row exists - but there is no way yet to hang a
-    :sql:`sys_file_reference` onto a record's field from a scenario.
-*   **There is no inline relation construct.** Every record has a uid before it
-    is written, so a relation is expressed by writing that uid into the
-    relation field. What is missing is a nesting construct that creates the
-    child and the relation in one declaration.
+*   **A file reference reaches only the records of its own set.** The record a
+    :yaml:`references` entry names is the one the same run writes; a file
+    cannot be attached to a record that is already in the installation.
+*   **A file reference is declared in** :file:`config.yml`, not in a scenario
+    file. The scenario format has no concept of a file and does not gain one
+    here, because a :sql:`sys_file_reference` points at its file by a uid the
+    FAL indexer hands out while the file is being placed.
 *   **Backend users** written by a set have to declare :yaml:`username` and
     :yaml:`password` themselves, because the import mode that suppresses the
     automatic site configuration also suppresses the generated credentials.

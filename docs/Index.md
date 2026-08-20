@@ -27,7 +27,7 @@ Documentation for people **using** the extension lives in
 | [Dependency injection](architecture/dependency-injection.md)       | Symfony DI attributes, stateless services, the rules that apply.                                    |
 | [Class design](architecture/class-design.md)                       | `final readonly`, method injection in abstract classes, data objects, the accepted PHPStan ignores. |
 | [The scenario engine](architecture/scenario-engine.md)             | The seed format, why its engine is a port of the testing-framework one, and the conformance test.   |
-| [Seeding](architecture/seeding.md)                                 | Why it goes through DataHandler, and every behaviour of it a seed has to work around.               |
+| [Seeding](architecture/seeding.md)                                 | Why it goes through DataHandler, the four writing passes, and every behaviour a seed works around.  |
 | [Site configurations](architecture/site-configuration.md)          | Writing a site from a template, the refusals, the uncovered-site-roots report.                      |
 
 ## [Testing](testing/Index.md)

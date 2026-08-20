@@ -18,16 +18,23 @@ line numbers; line numbers move, the cited method names do not.
 One import runs in this order, and the order is a consequence of what each step
 needs from the one before it:
 
-| Step                     | Class                     | Needs from the previous step                              |
-|--------------------------|---------------------------|-----------------------------------------------------------|
-| Discover the set         | `SeedSetRepository`       | -                                                         |
-| Parse the descriptor     | `SeedDefinitionParser`    | the path of the `config.yml`                              |
-| Compose the scenario     | `ScenarioComposer`        | the parsed descriptor and its `scenarios` list            |
-| Build the maps           | `DataHandlerFactory`      | the merged scenario settings                              |
-| Check the suggested uids | `UidCollisionDetector`    | `getSuggestedIds()` of the factory                        |
-| Copy the files           | `FileSeeder`              | -                                                         |
-| Write the records        | `ScenarioSeeder`          | the factory, an admin backend user, the uids to hold back |
-| Write the sites          | `SiteConfigurationSeeder` | the written uids, for `rootPageId`                        |
+| Step                       | Class                     | Needs from the previous step                                   |
+|----------------------------|---------------------------|----------------------------------------------------------------|
+| Discover the set           | `SeedSetRepository`       | -                                                              |
+| Parse the descriptor       | `SeedDefinitionParser`    | the path of the `config.yml`                                   |
+| Compose the scenario       | `ScenarioComposer`        | the parsed descriptor and its `scenarios` list                 |
+| Build the maps             | `DataHandlerFactory`      | the merged scenario settings                                   |
+| Check the suggested uids   | `UidCollisionDetector`    | `getSuggestedIds()` of the factory                             |
+| Copy the files             | `FileSeeder`              | -                                                              |
+| Write the records          | `ScenarioSeeder`          | the factory, an admin backend user, the uids to hold back      |
+| Attach the file references | `FileReferenceSeeder`     | the `sys_file` uids and the uids the records were written with |
+| Write the sites            | `SiteConfigurationSeeder` | the written uids, for `rootPageId`                             |
+
+The last four rows are the **four writing passes** of a run - files, records,
+file references, site configurations - and their order is not a preference.
+`FileSeeder` and `FileReferenceSeeder` are called by `ScenarioSeeder` around the
+record pass, so the three of them are one `ScenarioSeedResult`; the sites are
+written by the command afterwards, from the uids that result reports.
 
 `ScenarioComposer` and `DataHandlerFactory` run **before** anything is written,
 and they run in the command as well as in the seeder. That is deliberate:
@@ -201,27 +208,118 @@ A record of a later workspace round whose key was already substituted has no
 entry in `substNEWwithIDs`: it updated an existing row rather than inserting
 one, and is passed over.
 
-## Files are seeded, file references are not
+## The file pass
 
-`FileSeeder` runs before the records and is unchanged: it copies the files a set
-declares into a storage through the FAL API - which is what indexes them, a file
-copied into `fileadmin/` with `cp` exists on disk and does not exist for TYPO3 -
-and returns the `sys_file` uid each one was indexed under.
+`FileSeeder` runs **before** the records: it copies the files a set declares into
+a storage through the FAL API - which is what indexes them, a file copied into
+`fileadmin/` with `cp` exists on disk and does not exist for TYPO3 - and returns
+the `sys_file` uid each one was indexed under, keyed by the identifier the
+descriptor gave it.
 
-**`sys_file_reference` rows are not written in this step, and that is a
-deliberate gap rather than an oversight.** The scenario format has no concept of
-a file. The structural reason is in the factory: it emits one flat data map
-entry per item and has no way to write a child's `NEW` id back into a *field* of
-the parent, which is exactly what a file reference needs. Inventing a key for it
-would be inventing a divergence from a format whose whole value is that it is
-not ours, so it is built on top instead - and building it is a step of its own.
+It has to run first because a `sys_file_reference` needs a `uid_local` that
+exists, and because that uid is the one thing about a seeded file that **cannot
+be declared**: the FAL indexer assigns it while the file is being placed. That
+single fact is what keeps files out of the scenario format entirely, and it is
+why `config.yml` carries a `references:` list rather than the scenario carrying a
+relation - see
+[File references](../development/seed-definitions.md#file-references).
 
-The same applies to inline relations. In the scenario format a relation is
-expressed by uid, because every record has a declared or a suggested one; the
-convenience of declaring a child inline is what is missing, not the ability to
-relate two records.
+## The file reference pass
 
-Both are named in the pull request rather than left to be discovered.
+`FileReferenceSeeder` runs **after** the records, in a second `DataHandler` pass
+of its own, and both halves of that sentence are load bearing.
+
+### Why it is a separate pass
+
+A `sys_file_reference` carries the record it belongs to in `uid_foreign`, and
+that column is a plain integer - not a relation DataHandler resolves. A `NEW…`
+placeholder written into it stays a string, is read as `0`, and the reference
+silently belongs to **record 0**, with an empty `errorLog`. Nothing fails, and
+the images are simply not on the record.
+
+There is therefore no data map in which a reference and the record it hangs on
+can be described at the same time: the record has to have been written before
+its references can be expressed at all. That is the reason for the pass, and it
+is the same reason from the other side as the file pass has - the `sys_file` uid
+is not knowable in advance either.
+
+The pass builds one data map from the whole `references:` list, so a set with
+twenty references makes one `process_datamap()` call, and reports the
+`sys_file_reference` uid of every declared reference in declared order.
+
+### Why the relation field of the parent is written too
+
+Two things go into that data map per relation, and the second one is what is
+easy to leave out:
+
+- the `sys_file_reference` row itself, under a `NEW…` placeholder, carrying
+  `uid_local`, `uid_foreign`, `tablenames`, `fieldname` and `pid`;
+- **the relation field of the parent record**, as the comma separated list of
+  those placeholders - a plain update, keyed by the parent's uid.
+
+Without the second, DataHandler sees no relation to resolve,
+`RelationHandler::writeForeignField()` never runs, and every seeded reference
+keeps a `sorting_foreign` of `0`.
+
+What that costs is invisible, which is why it is worth stating: in the frontend
+`FileRepository::findByRelation()` selects the references by
+`uid_foreign`/`tablenames`/`fieldname` and only **orders** by `sorting_foreign`,
+so the files appear either way. All that is lost is the *order* of a multi file
+relation - to whatever the database feels like returning that day. The functional
+test asserts the column for exactly that reason.
+
+Writing the parent field is also what puts the count of the relation into the
+parent's column: DataHandler calls `writeForeignField()` and then
+`countItems(false)`, and stores the result there.
+
+### Two details that cost debugging time
+
+**The placeholder carries no underscore.** It is `NEWsysfilereference-1`, not
+`NEWsys_file_reference_1`, because `DataHandler::processRemapStack()` reads a
+relation value containing an underscore as the `<table>_<uid>` form and splits it
+there. The obvious placeholder would be taken apart into a table
+`NEWsys_file_reference` and an id `1`, neither of which resolves - and the
+relation would be written empty, again with an empty error log.
+
+**The structural columns are merged over the declared ones.** `uid_local`,
+`uid_foreign`, `tablenames`, `fieldname` and `pid` win over anything `values:`
+declares, so a descriptor cannot detach a reference from the record it declares
+it on. `pid` is the parent's page, and for a parent that *is* a page it is that
+page itself - a site root has a `pid` of `0`, and taking it would put the
+reference outside the tree.
+
+### What it refuses
+
+A reference naming a record the run did not write is an error, not a lookup.
+`seeder:import` checks the whole list against the suggested ids of the composed
+scenario **before** anything is written, so a mistyped uid does not surface after
+the page tree, the content and the files are in the database.
+
+`FileReferenceSeeder` asks `ScenarioSeedResult` again, and that call does more
+than check: it *translates*. The `uid` a descriptor declares is what the scenario
+declared, and `--force` gives up the suggestions of a colliding table, so the
+record may well have been written under a different number. The reference is
+attached to the number the run produced, never to the declared one - which is the
+same rule `sites[].rootPage` follows, minus the refusal, because a reference on a
+differently numbered record is still a reference on the right record.
+
+A non-empty `errorLog` after the pass becomes a `SeedingFailedException`, exactly
+as it does for the record pass.
+
+## Inline relations need no pass at all
+
+An inline relation is expressible in the scenario format as it stands, and this
+extension adds nothing for it: the parent declares its relation field as the
+comma separated list of the declared ids of its children, those ids are suggested
+uids, and DataHandler resolves the list exactly as it resolves the one a backend
+form submits. `parentid`, `parenttable` and `sorting_foreign` are written by
+`RelationHandler::writeForeignField()` from the TCA of the parent field.
+
+The mechanism, its order guarantee and the proof are on
+[Seed definitions](../development/seed-definitions.md#inline-relations-need-no-support).
+It is worth knowing here because it is the contrast that explains the reference
+pass: what an inline child has and a file reference does not is a uid that can be
+written down before the run.
 
 ## `isImporting`, and what it costs
 
@@ -255,11 +353,14 @@ returns immediately without a backend request and seeding runs on the CLI; files
 are seeded through the storage API rather than through DataHandler; no
 `sys_file_metadata` record is written; nothing is copied.
 
-The **beneficial** one keeps its value even though no file reference is written
-in this step. Without the flag, a reference to a file in a folder the backend
-user has no file mount for has its entire field array nulled and an error
-logged - which is exactly the situation a seed run from the command line is in,
-and exactly the situation the step that adds file references will be in.
+The **beneficial** one is why `FileReferenceSeeder` sets the same flag on its own
+DataHandler. Without it, `FilePermissionAspect::processDatamap_preProcessFieldArray()`
+nulls the entire field array of a `sys_file_reference` whose `uid_local` sits in
+a folder the backend user has no read file mount for, and logs an error. An admin
+passes that check today, so setting the flag in the reference pass is a guard
+rather than a fix - but the two passes belong to one import, and declaring the
+run an import in only one of them is an inconsistency waiting to be found the
+hard way.
 
 The **caveat** is real and has to be stated in the user documentation: a seed
 set writing a `be_users` record has to declare `username` and `password` itself,
@@ -296,22 +397,24 @@ the loader does not turn a working definition into a failure.
 
 ## The layout of `Classes/Seeding/`
 
-| Directory       | What lives there                                                                                                                                              |
-|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Definition/`   | The parsed **set descriptor** and its parts: `SeedDefinition`, `SeedFile`, `SeedSiteConfiguration`. Data, `#[Exclude]`, no dependencies.                      |
-| `Parser/`       | `SeedDefinitionParser` and the `ThrowOnErrorLogger` it hands to `YamlFileLoader`.                                                                             |
-| `Scenario/`     | The ported engine - `DataHandlerFactory`, `DataHandlerWriter`, `EntityConfiguration` - and `ScenarioComposer`, which is ours and composes the files of a set. |
-| `DataHandling/` | Everything that writes: `ScenarioSeeder`, `FileSeeder`, `SiteConfigurationSeeder`, plus `UidCollisionDetector` and the two result objects.                    |
-| `Exception/`    | `SeedingException` and its five subclasses, so a caller can tell "unknown set" from "invalid definition".                                                     |
-| root            | `SeedSetRepository` and the `SeedSet` it returns - discovery, which is deliberately not parsing.                                                              |
+| Directory       | What lives there                                                                                                                                                  |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Definition/`   | The parsed **set descriptor** and its parts: `SeedDefinition`, `SeedFile`, `SeedFileReference`, `SeedSiteConfiguration`. Data, `#[Exclude]`, no dependencies.     |
+| `Parser/`       | `SeedDefinitionParser` and the `ThrowOnErrorLogger` it hands to `YamlFileLoader`.                                                                                 |
+| `Scenario/`     | The ported engine - `DataHandlerFactory`, `DataHandlerWriter`, `EntityConfiguration` - and `ScenarioComposer`, which is ours and composes the files of a set.     |
+| `DataHandling/` | Everything that writes: `ScenarioSeeder`, `FileSeeder`, `FileReferenceSeeder`, `SiteConfigurationSeeder`, plus `UidCollisionDetector` and the two result objects. |
+| `Exception/`    | `SeedingException` and its five subclasses, so a caller can tell "unknown set" from "invalid definition".                                                         |
+| root            | `SeedSetRepository` and the `SeedSet` it returns - discovery, which is deliberately not parsing.                                                                  |
 
 Three properties of that layout are worth naming because they are easy to erode:
 
 - **`Definition/` depends on nothing.** No service, no TYPO3 API, no other part
   of this extension - which is what would let the descriptor model be extracted
-  into a package of its own later. It models the *set*, not its records, which
-  is why `SeedRecord` and `SeedFileReference` went away with the record format
-  and the other three stayed.
+  into a package of its own later. It models the *set*, not its records, which is
+  why `SeedRecord` went away with the record format and did not come back.
+  `SeedFileReference` did come back, and it is not a counter example: it declares
+  which seeded *file* hangs on which record, which is a statement about the set
+  and not a record of a scenario.
 - **`Scenario/` is a boundary.** Three of its four classes are upstream's and
   are held to what upstream does by a conformance test; anything this extension
   invents belongs beside them, not inside them. `ScenarioComposer` is on the

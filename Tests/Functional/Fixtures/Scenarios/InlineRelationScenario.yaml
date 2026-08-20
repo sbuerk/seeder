@@ -1,0 +1,42 @@
+# An inline relation, two levels deep, written in the scenario format as it is.
+#
+# The mechanism is the one the format already has and nothing here extends: the
+# parent declares its relation field as the comma separated list of the *ids*
+# its children declare, and those ids are the uids the children are written
+# with, because they are suggested. DataHandler resolves that list like any
+# other relation and writes the columns of the relation - "parentid",
+# "parenttable", "sorting_foreign" - onto the children itself.
+#
+# The list of the content element is deliberately "32,31" rather than "31,32":
+# the order of an inline relation comes from the declared list and from nothing
+# else, and a list in uid order could not tell the two apart.
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    columnNames: {title: 'header', type: 'CType'}
+  item:
+    tableName: 'tx_testsinlinerelations_item'
+  link:
+    tableName: 'tx_testsinlinerelations_link'
+
+entities:
+  page:
+    - self: {id: 1, title: 'Root', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 21, title: 'List', type: 'tests_inline_relations_itemlist', tx_testsinlinerelations_items: '32,31'}
+        item:
+          - self: {id: 31, title: 'One', links: '41,42'}
+          - self: {id: 32, title: 'Two'}
+        link:
+          - self: {id: 41, title: 'First link'}
+          - self: {id: 42, title: 'Second link'}

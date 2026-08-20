@@ -3,10 +3,10 @@
 A seed set is written in **two** formats, and keeping them apart is the point of
 the construct:
 
-| File               | Format                                                         | Owner                          |
-|--------------------|----------------------------------------------------------------|--------------------------------|
-| `config.yml`       | the **set descriptor**: identity, scenario files, files, sites | this extension, closed key set |
-| the scenario files | the YAML **scenario format** of `typo3/testing-framework`      | upstream, key for key          |
+| File               | Format                                                                          | Owner                          |
+|--------------------|---------------------------------------------------------------------------------|--------------------------------|
+| `config.yml`       | the **set descriptor**: identity, scenario files, files, file references, sites | this extension, closed key set |
+| the scenario files | the YAML **scenario format** of `typo3/testing-framework`                       | upstream, key for key          |
 
 `SeedDefinitionParser` implements the first, `ScenarioComposer` reads and merges
 the second, and `DataHandlerFactory` turns the merge into the DataHandler maps.
@@ -66,6 +66,7 @@ scenarios:
   - Content.yaml
 
 files: []
+references: []
 sites: []
 ```
 
@@ -77,6 +78,7 @@ sites: []
 | `imports`     | no       | list   | `[]`    | Further YAML files merged into **this descriptor**. Consumed by `YamlFileLoader` before the parser sees it.                                  |
 | `scenarios`   | **yes**  | list   | -       | The scenario files the records come from, in the order they are applied. Non-empty.                                                          |
 | `files`       | no       | list   | `[]`    | Files copied into a storage before any record is written.                                                                                    |
+| `references`  | no       | list   | `[]`    | `sys_file_reference` rows attaching a seeded file to a record, written after the records.                                                    |
 | `sites`       | no       | list   | `[]`    | Site configurations written after the records.                                                                                               |
 
 This list is **closed**: any other key is refused and the message names the
@@ -115,6 +117,17 @@ Everything below is checked before a single row is written.
 | `1787256301` | `scenarios` is missing, is not a list, or is empty                                  |
 | `1787256302` | a `scenarios` entry is not a non-empty string                                       |
 | `1787256303` | a `files` entry declares an unknown key                                             |
+| `1787256310` | `references` is not a list                                                          |
+| `1787256311` | a `references` entry is not a map                                                   |
+| `1787256312` | a `references` entry declares an unknown key                                        |
+| `1787256313` | a reference declares no `file`, or not a non-empty string                           |
+| `1787256314` | a reference names a `file` the set does not declare under `files`                   |
+| `1787256315` | a reference declares no `table`, or not a non-empty string                          |
+| `1787256316` | a reference declares no `uid`, or one that is not an integer >= 1                   |
+| `1787256317` | a reference declares no `field`, or not a non-empty string                          |
+| `1787256318` | the `values` of a reference are not a map                                           |
+| `1787256319` | a `values` field of a reference has no name                                         |
+| `1787256320` | a `values` field of a reference is not a scalar or null                             |
 | `1787256401` | a scenario file does not exist, with the path it was looked for at                  |
 | `1787256402` | a scenario file cannot be read                                                      |
 | `1787256403` | a scenario file is not readable YAML                                                |
@@ -597,9 +610,148 @@ is left alone. A missing source file *is* refused, naming both the declared path
 and the absolute path it resolved to.
 
 Files are written **before** the records, and the `sys_file` uid each one was
-indexed under is reported by the command. A scenario record that wants to point
-at a seeded file has to name that uid, because
-[file references are not part of this format yet](#what-is-not-in-the-format).
+indexed under is reported by the command. Which record a file ends up on is not
+declared here but under [`references`](#file-references) - `files:` is about
+*placing* a file, and the same file may be referenced from several records or
+from none.
+
+## File references
+
+```yaml
+references:
+  - file: placeholder                   # required, an identifier declared under "files"
+    table: tt_content                   # required, the table of the record it hangs on
+    uid: 21                             # required, the uid the SCENARIO declares as "id"
+    field: tx_testsfilefields_media     # required, a TCA "type => file" column of that table
+    values:                             # optional, the fields of the sys_file_reference row
+      title: 'The placeholder'
+      alternative: 'A grey rectangle'
+```
+
+| Key      | Required | Type   | Default | Meaning                                                                                 |
+|----------|----------|--------|---------|-----------------------------------------------------------------------------------------|
+| `file`   | yes      | string | -       | The `identifier` of a file the same descriptor declares under `files`.                  |
+| `table`  | yes      | string | -       | The table of the record the reference is attached to.                                   |
+| `uid`    | yes      | int    | -       | An integer >= 1: the `id` the scenario entity of that record declares.                  |
+| `field`  | yes      | string | -       | The column of `table` the reference hangs on - a TCA `type => 'file'` relation.         |
+| `values` | no       | map    | `[]`    | Fields written on the `sys_file_reference` row itself: `title`, `alternative`, `crop` … |
+
+The key set is **closed** on the entry, exactly like a `files` or a `sites`
+entry. `values` is the one open map of the whole descriptor, because it is the
+one thing here that is written verbatim to a record; only its *shape* is
+checked, and a nested map or a list is refused rather than reaching DataHandler
+as the string `Array`.
+
+**`file` is resolved against the descriptor, `uid` against the run.** That a
+reference names a file the set does not declare is a mistake the parser can name
+before anything happens, so it does. That `table`/`uid` names a record is
+deliberately *not* checked there: the records live in the scenario files, which
+the parser never reads. `seeder:import` checks it against the composed scenario
+before the first row is written - and `FileReferenceSeeder` checks it again
+against what the run actually wrote, because that is the number the reference is
+written with. It is the same rule [`rootPage`](#site-configurations) follows, and
+for the same reason: a scenario record has no symbolic identifier, so its
+declared `id` is its handle.
+
+**The structural columns always win.** `uid_local`, `uid_foreign`, `tablenames`,
+`fieldname` and `pid` are written by the seeder and are merged **over** whatever
+`values` declares. A descriptor may not detach a reference from the record it
+declares it on by naming `uid_foreign` itself. `pid` is the page the parent is
+on - and for a parent that *is* a page, the page itself, which is the convention
+TYPO3 follows for a page's own file fields.
+
+References are written in a **pass of their own, after the records**. Why that
+is not negotiable, and why the relation field of the parent record is written
+along with them, is on
+[Seeding](../architecture/seeding.md#the-file-reference-pass).
+
+A reference to a record no scenario of the set declares is an error, not a
+lookup: `seeder:import` refuses the set with `EXIT_INVALID_DEFINITION`. Seeding
+into an existing tree is not what this key is for.
+
+## Inline relations need no support
+
+An inline relation - a content element with children in a table of its own -
+needs **nothing** from this extension and no key in either format. It is
+expressible in the scenario format as it stands, and the mechanism is the one
+the format already has:
+
+> The parent declares its relation field as the **comma separated list of the
+> declared ids of its children**, and the children are an entity of their own in
+> the same scenario.
+
+```yaml
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    columnNames: {title: 'header', type: 'CType'}
+  item:
+    tableName: 'tx_testsinlinerelations_item'
+  link:
+    tableName: 'tx_testsinlinerelations_link'
+
+entities:
+  page:
+    - self: {id: 1, title: 'Root', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 21, title: 'List', type: 'tests_inline_relations_itemlist', tx_testsinlinerelations_items: '32,31'}
+        item:
+          - self: {id: 31, title: 'One', links: '41,42'}
+          - self: {id: 32, title: 'Two'}
+        link:
+          - self: {id: 41, title: 'First link'}
+          - self: {id: 42, title: 'Second link'}
+```
+
+That is the body of
+[`Tests/Functional/Fixtures/Scenarios/InlineRelationScenario.yaml`](../../Tests/Functional/Fixtures/Scenarios/InlineRelationScenario.yaml),
+its header comment aside, and every sentence below is asserted by
+[`InlineRelationSeedingTest`](../../Tests/Functional/Seeding/DataHandling/InlineRelationSeedingTest.php)
+against the fixture extension
+[`inline-relations`](../testing/fixture-extensions.md).
+
+It works because a declared `id` is a **suggested uid**: the child rows really
+are written under 31 and 32, so the list the parent carries names rows that exist
+by the time `DataHandler::processRemapStack()` resolves it. DataHandler then
+treats that list exactly like the one a backend form submits.
+
+- **The columns that tie a child to its parent are not in the scenario.**
+  `parentid`, `parenttable` and `sorting_foreign` are written by
+  `TYPO3\CMS\Core\Database\RelationHandler::writeForeignField()`, and *which*
+  columns those are comes from the `foreign_field`, `foreign_table_field` and
+  `foreign_sortby` of the **parent field's TCA** - never from the child. A
+  scenario declaring them itself would be describing the relation twice.
+- **The order comes from the declared list, not from the uid order.** The example
+  declares `'32,31'`, and the children come out with a `sorting_foreign` of
+  `32 → 1` and `31 → 2`. Nothing sorts by uid anywhere.
+- **The relation field of the parent ends up as the count of its children**, `2`
+  here, because DataHandler writes the counter back into the relation column.
+- **It works a level deeper.** `links: '41,42'` on the item is resolved against
+  the TCA of `tx_testsinlinerelations_item.links` in exactly the same way, and
+  the link rows carry a `parenttable` of `tx_testsinlinerelations_item`.
+- **The children live where the scenario put them.** The relation ties a child to
+  its parent *record*, not to its page: `pid` still comes from the enclosing node
+  entity, as it does for the content element.
+
+The nesting in the YAML is what puts the children on the page - the `entities:`
+of the page entity - and says nothing about the relation. A child of an inline
+relation is a sibling in the file and a child only in the database.
+
+**The same trick does not work for a file reference**, and that is the entire
+reason [`references`](#file-references) exists. A `sys_file_reference` needs
+`uid_local`, and that is the `sys_file` uid the FAL indexer assigns while the
+file is being placed. Nobody can write it down in advance, so there is no
+declared id for the parent to list.
 
 ## Site configurations
 
@@ -678,14 +830,14 @@ importing loader; see
 
 ## What is not in the format
 
-| Not covered                             | Why                                                                                                                                                                                                                                                      |
-|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| File **references**                     | The scenario format has no concept of a file: the factory emits one flat data map entry per item and cannot write a child's `NEW` id into a field of the parent. File *provisioning* through `files:` works; `sys_file_reference` rows are a later step. |
-| Inline relations                        | Expressed by uid instead. Every record of a scenario has a declared or a suggested uid, so a relation is a value like any other.                                                                                                                         |
-| Updating an existing tree               | Seeding writes. It does not reconcile an existing tree against a definition, and nothing here is idempotent.                                                                                                                                             |
-| Explicit MM relation construction       | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names.                                                                                               |
-| A `be_users` record without credentials | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                                                                                                                           |
-| Deleting or overwriting anything        | An import refuses a uid collision and refuses an existing site identifier. There is no mode in which it removes data.                                                                                                                                    |
+| Not covered                                    | Why                                                                                                                                                                                                                                                   |
+|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| A file reference in a **scenario file**        | The scenario format has no concept of a file and does not gain one. A `sys_file_reference` needs the `sys_file` uid the FAL indexer assigns, which cannot be declared, so it is declared in [`references`](#file-references) of `config.yml` instead. |
+| A reference to a record the run does not write | `uid` is resolved against what the run wrote, not looked up in the installation. Naming a record no scenario of the set declares is refused before anything is written.                                                                               |
+| Updating an existing tree                      | Seeding writes. It does not reconcile an existing tree against a definition, and nothing here is idempotent.                                                                                                                                          |
+| Explicit MM relation construction              | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names.                                                                                            |
+| A `be_users` record without credentials        | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                                                                                                                        |
+| Deleting or overwriting anything               | An import refuses a uid collision and refuses an existing site identifier. There is no mode in which it removes data.                                                                                                                                 |
 
 ## See also
 

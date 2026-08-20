@@ -26,3 +26,18 @@ sites:
   - identifier: import-main
     rootPage: 11
     template: Sites/main
+
+#
+# The file is declared in the imported "Files.yaml" and referenced here, so the
+# reference resolves an identifier that another file of the set brought in.
+# "pages.media" is a "type => file" column of the shipped core TCA, which keeps
+# this set importable by any test loading this extension alone.
+#
+references:
+  - file: placeholder
+    table: pages
+    uid: 11
+    field: media
+    values:
+      title: 'The placeholder'
+      alternative: 'A grey rectangle'

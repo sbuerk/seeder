@@ -32,6 +32,10 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * - **Files are written first.** They are indexed through the FAL API before
  *   any record is written, so a record naming a `sys_file` uid names one that
  *   exists.
+ * - **File references are written last.** A `sys_file_reference` needs the uid
+ *   of the record it hangs on, and `uid_foreign` is a plain integer column in
+ *   which a placeholder would silently become `0` - see
+ *   {@see FileReferenceSeeder}.
  *
  * This is a stateless service; the state of one run lives in the writer and in
  * the result object.
@@ -42,6 +46,7 @@ final readonly class ScenarioSeeder
 {
     public function __construct(
         private FileSeeder $fileSeeder,
+        private FileReferenceSeeder $fileReferenceSeeder,
     ) {}
 
     /**
@@ -104,10 +109,14 @@ final readonly class ScenarioSeeder
             );
         }
 
-        return new ScenarioSeedResult(
+        $result = new ScenarioSeedResult(
             writtenUids: $this->collectWrittenUids($dataMapPerWorkspace, $dataHandler),
             recordCounts: $this->countRecords($dataMapPerWorkspace),
             fileUids: $fileUids,
+        );
+
+        return $result->withReferenceUids(
+            $this->fileReferenceSeeder->seed($definition, $result, $backendUser),
         );
     }
 

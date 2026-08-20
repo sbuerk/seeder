@@ -84,9 +84,10 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
 
     /**
      * The file is copied into the storage and indexed. What it is *referenced*
-     * by is not asserted here, because the scenario format has no concept of a
-     * file: a set provisions files, and nothing writes a `sys_file_reference`
-     * row for one yet.
+     * by is asserted by
+     * {@see theDeclaredFileReferenceIsAttachedToTheSeededRecord}: the two are
+     * separate passes of a run, and a file is provisioned whether or not a
+     * `references` entry names it.
      */
     #[Test]
     public function theFilesOfTheSetAreCopiedAndIndexed(): void
@@ -97,6 +98,36 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $files = $this->rows('sys_file', ['uid', 'name']);
         $this->assertCount(1, $files);
         $this->assertSame('placeholder.svg', $files[0]['name']);
+    }
+
+    /**
+     * The end of the chain a discovered set goes through: the file is declared
+     * in the `Files.yaml` the descriptor imports, the record is declared by the
+     * scenario, and the reference is what joins the two - with a `uid_local`
+     * that only exists once the FAL indexer has run, which is why the scenario
+     * format cannot express it.
+     */
+    #[Test]
+    public function theDeclaredFileReferenceIsAttachedToTheSeededRecord(): void
+    {
+        $this->assertSame(Command::SUCCESS, $this->execute()->getStatusCode());
+
+        $files = $this->rows('sys_file', ['uid', 'name']);
+        $this->assertCount(1, $files);
+
+        $this->assertSame(
+            [
+                [
+                    // Resolved rather than hardcoded: what is under test is
+                    // that the reference points at the file this run indexed.
+                    'uid_local' => (int)$files[0]['uid'],
+                    'uid_foreign' => 11,
+                    'tablenames' => 'pages',
+                    'fieldname' => 'media',
+                ],
+            ],
+            $this->rows('sys_file_reference', ['uid_local', 'uid_foreign', 'tablenames', 'fieldname']),
+        );
     }
 
     #[Test]
@@ -169,6 +200,33 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $this->assertStringContainsString('no file, no record and no site configuration', $display);
     }
 
+    /**
+     * The reference pass is reported on its own line and not folded into the
+     * file count: a set may bring a file nothing references, and a set may
+     * reference the same file from several records.
+     */
+    #[Test]
+    public function theSummaryCountsTheFileReferencesThatWereAttached(): void
+    {
+        $display = $this->normalize($this->execute()->getDisplay());
+
+        $this->assertStringContainsString('Files indexed: 1', $display);
+        $this->assertStringContainsString('File references attached: 1', $display);
+    }
+
+    #[Test]
+    public function aDryRunCountsTheFileReferencesTheSetWouldAttach(): void
+    {
+        $commandTester = $this->execute(['--dry-run' => true]);
+
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString('Files to index: 1', $display);
+        $this->assertStringContainsString('File references to attach: 1', $display);
+        // Counted, not written - the count comes from the definition and not
+        // from anything the run did.
+        $this->assertSame([], $this->rows('sys_file_reference', ['uid']));
+    }
+
     #[Test]
     public function aDryRunListsTheUidsTheSetWouldSuggestWhenVerbose(): void
     {
@@ -180,6 +238,33 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $this->assertStringContainsString('pages 11', $display);
         $this->assertStringContainsString('pages 12', $display);
         $this->assertStringContainsString('tt_content 21', $display);
+    }
+
+    /**
+     * The references are the last pass of a run, so a `uid` that names no
+     * record of the scenario would surface once the page tree and the files
+     * are already in the database - and a run that half wrote a set is worse
+     * than one that refused it. Neither file of the set is malformed on its
+     * own; only the two together are.
+     */
+    #[Test]
+    public function aFileReferenceOnARecordNoScenarioEntityDeclaresIsRefusedBeforeAnythingIsWritten(): void
+    {
+        $commandTester = $this->execute(identifier: 'import-undeclared-reference');
+
+        $this->assertSame(ImportSeedCommand::EXIT_INVALID_DEFINITION, $commandTester->getStatusCode());
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString(
+            'The seed set "import-undeclared-reference" declares a file reference to "placeholder"'
+            . ' on the record pages:42',
+            $display,
+        );
+        $this->assertStringContainsString('which no entity of its scenario declares as its "id"', $display);
+        // Not even the page the scenario does declare, and not the file the
+        // reference names either: the file pass runs before the record pass.
+        $this->assertSame([], $this->pages());
+        $this->assertSame([], $this->rows('sys_file', ['uid']));
+        $this->assertDirectoryDoesNotExist(Environment::getPublicPath() . '/fileadmin/seed-undeclared');
     }
 
     #[Test]
@@ -382,6 +467,32 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
     }
 
     /**
+     * A file reference names its record by the uid the **scenario** declares,
+     * and `--force` is the one run in which that is not the uid the record
+     * ends up with. It resolves the same way a site's `rootPage` does - and
+     * unlike a site, which is refused, a reference survives the forced run,
+     * because it is written after the records rather than into a file naming a
+     * number.
+     */
+    #[Test]
+    public function aFileReferenceFollowsItsRecordToTheUidTheForcedRunGaveIt(): void
+    {
+        $this->importCSVDataSet(dirname(__DIR__) . '/Fixtures/Database/OccupiedUids.csv');
+
+        $commandTester = $this->execute(['--force' => true, '--no-site-config' => true]);
+
+        $this->assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $home = $this->pageTitled('Import home');
+        $this->assertNotSame(11, $home['uid']);
+
+        $references = $this->rows('sys_file_reference', ['uid_foreign', 'tablenames', 'fieldname']);
+        $this->assertSame(
+            [['uid_foreign' => $home['uid'], 'tablenames' => 'pages', 'fieldname' => 'media']],
+            $references,
+        );
+    }
+
+    /**
      * @param array<string, bool|string> $options
      */
     private function execute(
@@ -441,7 +552,7 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
 
         return array_map(
             static function (array $row): array {
-                foreach (['uid', 'pid', 'uid_foreign'] as $column) {
+                foreach (['uid', 'pid', 'uid_local', 'uid_foreign'] as $column) {
                     if (isset($row[$column])) {
                         $row[$column] = (int)$row[$column];
                     }

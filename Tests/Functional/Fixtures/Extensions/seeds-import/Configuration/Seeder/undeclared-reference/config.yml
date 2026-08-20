@@ -1,0 +1,24 @@
+#
+# The reference hangs the file of this set on a page uid the scenario never
+# declares. Neither file is malformed on its own - which is the point: only the
+# two together are wrong, and the import has to say so before it copies the
+# file and writes the page tree the reference would then have nothing to hang
+# on.
+#
+identifier: import-undeclared-reference
+title: 'A file reference on a record the scenario does not write'
+description: 'The "uid" of the reference is no "id" of a "pages" entity.'
+
+scenarios:
+  - Scenario.yaml
+
+files:
+  - identifier: placeholder
+    source: 'Files/placeholder.svg'
+    folder: 'seed-undeclared'
+
+references:
+  - file: placeholder
+    table: pages
+    uid: 42
+    field: media
