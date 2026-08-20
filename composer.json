@@ -38,6 +38,7 @@
         "saschaegerer/phpstan-typo3": "^2.1.1 || ^3.0.1",
         "sbuerk/fixture-packages": "^1.1.3",
         "sbuerk/typo3-site-based-test-trait": "^2.0.1 || ^3.0.0",
+        "typo3/cms-workspaces": "^13.4 || ^14.3",
         "typo3/testing-framework": "^9.6.1"
     },
     "config": {
