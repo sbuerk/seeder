@@ -57,15 +57,16 @@ notice. That cost is paid by a test, see below.
 
 Everything that is not listed here is unchanged.
 
-| Change                                                                | Why                                                                                                                                                    |
-|-----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Namespace `SBUERK\Seeder\Seeding\Scenario`                            | It is our code now.                                                                                                                                    |
-| `final class`, `new self()` instead of `new static()`                 | Repository rule; the classes were never subclassed upstream either.                                                                                    |
-| `#[Exclude]` on all three                                             | They are a builder, a writer and a value object — data, not services. Without it, directory based registration would pick them up.                     |
-| PHPStan level 8 array shapes throughout                               | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |
-| `?int $workspaceId` became `int $workspaceId` on two private methods  | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
-| The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed | See below. This is the one deliberate behavioural divergence.                                                                                          |
-| `DataHandlerWriter::__construct()` gained an optional third parameter | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                          |
+| Change                                                                                           | Why                                                                                                                                                    |
+|--------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Namespace `SBUERK\Seeder\Seeding\Scenario`                                                       | It is our code now.                                                                                                                                    |
+| `final class`, `new self()` instead of `new static()`                                            | Repository rule; the classes were never subclassed upstream either.                                                                                    |
+| `#[Exclude]` on all three                                                                        | They are a builder, a writer and a value object — data, not services. Without it, directory based registration would pick them up.                     |
+| PHPStan level 8 array shapes throughout                                                          | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |
+| `?int $workspaceId` became `int $workspaceId` on two private methods                             | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
+| The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. This is the one deliberate behavioural divergence.                                                                                          |
+| `DataHandlerWriter::__construct()` gained an optional third parameter                            | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                          |
+| `DataHandlerWriter::invokeFactory()` resets `DataHandler::$autoVersionIdMap` per workspace round | See below. Only observable for a scenario declaring more than one workspace.                                                                           |
 
 The original TYPO3 file headers are kept. The code is GPL-2.0-or-later and so is
 this repository; dropping the header to make the files look native would be
@@ -73,8 +74,9 @@ dishonest about where they came from.
 
 ## The deliberate divergences
 
-There are three. Two are forced, the third is additive - it changes nothing for
-a caller that does not use it.
+There are four. Two are forced, one is additive - it changes nothing for a
+caller that does not use it - and one fixes silent data loss that only a
+scenario with two workspaces can reach.
 
 ### The double-indexed identifier list
 
@@ -202,6 +204,41 @@ value the class ever writes, and stating it is what lets PHPStan see the result
 of the `array_diff_key()` above as the same shape rather than as a widened one.
 No code path changed.
 
+### A workspace round that forgets the previous one
+
+`invokeFactory()` resets one property of the `DataHandler` before each round:
+
+```php
+$this->dataHandler->autoVersionIdMap = [];
+$this->dataHandler->start($dataMap, [], $backendUser);
+```
+
+Upstream reuses one `DataHandler` for every round and leaves the map alone.
+`DataHandler::$autoVersionIdMap` remembers which workspace version it
+auto-created for a live uid, `start()` does not reset it, and
+`process_datamap()` reads it **before** it asks whether a version for the
+current workspace exists:
+
+```php
+if (!empty($this->autoVersionIdMap[$table][$id])) {
+    …
+    $id = $this->autoVersionIdMap[$table][$id];
+} elseif (($errorCode = $this->workspaceCannotEditRecord($table, $currentRecord))) {
+```
+
+A second workspace declaring a `versionVariants` entry for the same live record
+therefore writes its values into the version of the **first** workspace and
+creates nothing of its own. Silently: the error log stays empty and the import
+reports success.
+
+The map is per round by nature. It exists so that children versioned along with
+their parent are written to the version rather than to the live record, and
+that is finished when the round is. Nothing upstream reaches this - the format
+has no test at all, and no TYPO3 Core fixture declares two workspaces - so the
+divergence is invisible to every scenario file that exists today.
+`WorkspaceSeedingTest::twoWorkspacesEachGetAVersionOfTheSameRecord()` is the
+test that goes red without the reset.
+
 ## What keeps the port honest
 
 `Tests/Unit/Seeding/Scenario/UpstreamConformanceTest.php` runs the same
@@ -233,8 +270,13 @@ appended after the **first** record rather than after its predecessor. Three
 content elements on one page produce pids of `<page>`, `-<c1>`, `-<c1>`, and
 DataHandler yields the order c1, c3, c2.
 
-This is upstream behaviour, it is carried unchanged, and it is pinned by a test
-so that nobody discovers it from a seeded site instead.
+This is upstream behaviour, it is carried unchanged, and it is pinned twice so
+that nobody discovers it from a seeded site instead: by
+`DataHandlerFactorySortingTest` on the data map, and by
+`ScenarioSeederTest::theThirdRecordOfAnyOtherTableIsSortedBehindTheFirstRatherThanTheSecond()`
+on the rows the seed produces. Repairing it means changing the ported
+`DataHandlerFactory`, which the conformance test holds to the letter, so it
+belongs with the step that narrows that test.
 
 ## What upstream does not do, and the pipeline must
 
@@ -295,6 +337,27 @@ pin behaviour that is arguably wrong and is left alone deliberately:
 
 All three are pinned as they behave today, and all three say so in their
 docblock, so that a later reader changes them on purpose or not at all.
+
+Two more are pinned by the functional tests rather than by the unit tests,
+because they are only visible once a real `DataHandler` has run:
+
+- **`{action: 'discard'}` does nothing.** It produces the command map entry
+  `['clearWSID' => true]`, and `DataHandler::process_cmdmap()` switches over the
+  command name and has no `clearWSID` case - the spelling it still understands
+  is `['version' => ['action' => 'clearWSID']]`, forwarded to `discard()` under
+  a `@todo` naming the testing framework as its last caller. An unknown command
+  falls through with no branch and no log entry.
+- **A translation of a translation loses its source.** The factory builds
+  `l10n_source` correctly, and `DataHandler::processRemapStack()` overwrites it:
+  `$newValue` is declared once outside the loop and never reset, so a remap
+  entry without a resolver - which is what a `passthrough` column such as
+  `l10n_source` produces - writes whatever the entry before it produced. For a
+  translation that is always the `l10n_parent` resolved immediately before it.
+  TYPO3 Core carries the same observation as a `@todo` on the nested
+  `languageVariants` of its own `CommonScenario.yaml`.
+
+Both are TYPO3 Core behaviour rather than engine behaviour, and both are worth
+reporting.
 
 ## See also
 

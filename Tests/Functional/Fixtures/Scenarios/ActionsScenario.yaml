@@ -1,8 +1,10 @@
 ##
 # The same tree as "PageTreeScenario.yaml" plus actions, written by
 # "DataHandlerWriterTest": the two TYPO3 Core uses - "delete" and
-# "move/toPage" - and "move/toTop", which has no consumer in Core and is the
-# only action whose command map value is a "NEW" identifier.
+# "move/toPage" - plus "move/toTop", which has no consumer in Core and is the
+# only action whose command map value is a "NEW" identifier, and
+# "move/afterRecord", which has no consumer either and is the only one that
+# names its target as a negative uid.
 #
 # Every action targets a record this very scenario creates, which is what makes
 # them a statement about ordering: they can only work if every data map was
@@ -42,5 +44,8 @@ entities:
           - self: {id: 303, title: 'Moved to the top of its own page'}
             actions:
               - {action: 'move', type: 'toTop'}
+          - self: {id: 304, title: 'Moved behind the element that went to the top'}
+            actions:
+              - {action: 'move', type: 'afterRecord', target: 303}
       children:
         - self: {id: 110, title: 'First child', slug: '/first'}

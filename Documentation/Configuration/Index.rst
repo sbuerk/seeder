@@ -349,8 +349,23 @@ through :yaml:`columnNames` and written as it stands. A table therefore needs no
 support in this extension to be seedable - declare an entity for it, and if the
 column exists and TYPO3 accepts the value, the seed writes it.
 
-Records come out in the order they are declared. Pages, content elements and
-records of further tables on one page do not disturb each other's sorting.
+Pages come out in the order they are declared, and records of different tables
+on one page do not disturb each other's sorting.
+
+..  warning::
+
+    **From the third record of a table other than** :sql:`pages` **on one
+    page, the declared order is not kept.** The seeder chains each record
+    behind the previous one on its page, and it resolves that chain only
+    through :sql:`pages`: for any other table the second record is invisible to
+    the third, which is placed behind the *first* one instead. Three content
+    elements declared 1, 2, 3 are listed 1, 3, 2.
+
+    This is behaviour of the scenario engine as :php:`typo3/testing-framework`
+    ships it, and it is carried unchanged. Declare an
+    :ref:`actions <configuration-actions>` entry with
+    :yaml:`{action: 'move', type: 'afterRecord', target: <uid>}` when the order
+    of more than two records of one table has to be exact.
 
 ..  warning::
 
@@ -411,14 +426,34 @@ Three things follow from how the variants are written:
 *   **The language columns are structure.** With
     :yaml:`languageColumnNames: ['l10n_parent', 'l10n_source']`, the first
     variant of a record gets both columns pointing at the original. A variant
-    nested inside a variant - a translation of a translation - gets
+    nested inside a variant - a translation of a translation - is built with
     :sql:`l10n_parent` from the first ancestor and :sql:`l10n_source` from the
     one directly above it, which is the chain TYPO3 expects.
+
+    ..  note::
+
+        That chain does **not** survive the write. :sql:`l10n_source` is a
+        :yaml:`passthrough` column, so the reference to a record that does not
+        exist yet is resolved on :php:`DataHandler`'s remap stack - and an
+        entry of that stack without a resolver reuses the value the entry
+        before it produced, which for a translation is always the
+        :sql:`l10n_parent` that was resolved immediately before. A translation
+        of a translation therefore ends up with both columns on the original.
+
+        TYPO3 Core's own scenario fixture carries the same observation as a
+        :yaml:`@todo`. Declare :sql:`l10n_source` explicitly on the variant if
+        the chain matters - a declared value wins, as the next point says.
 *   **A declared value still wins.** A variant declaring :sql:`l10n_source`
     itself overrides what the seeder computed.
 *   **The language itself is an ordinary field.** :yaml:`language` is only a
     column alias for :sql:`sys_language_uid`, declared in
     :yaml:`columnNames`. It is not built into the format.
+*   **A translated page does not follow its original into the tree.** A
+    language variant is written without the parent pointer of the item it
+    translates, so its :sql:`pid` falls back to the :yaml:`defaultValues` of
+    the entity - usually ``0``. Declare :sql:`pid` on the variant to put the
+    translation on the page its original sits on. A nested record such as a
+    content element is not affected: it keeps the node it was declared under.
 
 ..  _configuration-version-variants:
 
@@ -462,8 +497,12 @@ Rules for both:
 *   :yaml:`version` **requires** :yaml:`workspace`, and the workspace has to be
     a :sql:`sys_workspace` record - seed it in the same scenario, as above.
 *   A :yaml:`versionVariants` entry may **not** declare :yaml:`self`, and may
-    **not** declare an :yaml:`id`: it is the same record, so it inherits the
-    uid of the item it hangs under.
+    **not** declare an :yaml:`id`. The overlay is a row of its own with a uid
+    the database assigns, and it is found through :sql:`t3ver_oid`, which holds
+    the uid of the live record - the one the item above it declared. A uid that
+    could be declared for it would therefore be a uid nothing honours: the
+    overlay is created by :php:`DataHandler` while it versions the live record,
+    not inserted by the seed.
 *   :yaml:`languageVariants` and :yaml:`versionVariants` combine. A language
     variant may carry version variants of its own, and a
     :yaml:`languageVariants` entry may itself use :yaml:`version:` instead of
@@ -519,8 +558,13 @@ creates.
     *   -   :yaml:`{action: 'delete'}`
         -   Delete the record.
     *   -   :yaml:`{action: 'discard'}`
-        -   Discard the workspace version. Only in a workspace; in the live
-            workspace it does nothing.
+        -   Meant to discard the workspace version, and **without effect on
+            TYPO3 v13 and v14**. The action produces the command
+            :php:`clearWSID`, which :php:`DataHandler::process_cmdmap()` no
+            longer knows: it is dropped with no branch and no log entry, so the
+            version survives and the import still reports success. The action
+            is one of the three the upstream format declares that nothing in
+            TYPO3 Core uses, which is why nothing noticed.
 
 An unknown :yaml:`action` is ignored rather than refused, in line with the rest
 of the scenario format.

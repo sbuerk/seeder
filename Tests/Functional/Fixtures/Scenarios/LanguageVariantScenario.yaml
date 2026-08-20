@@ -1,0 +1,55 @@
+##
+# Translations, written by "LanguageVariantSeedingTest".
+#
+# Shaped so the positional rule of "languageColumnNames" is visible in the
+# database rather than only in a data map: every entity declares two language
+# columns, every original has a direct translation, and one translation has a
+# translation of its own - which is the only constellation in which the two
+# columns of a record hold different ids.
+#
+# "language" is mapped rather than declared as "sys_language_uid" because that
+# is what every scenario file of TYPO3 Core does, and it keeps the fixture a
+# statement about "columnNames" as well.
+##
+entitySettings:
+  '*':
+    defaultValues:
+      hidden: 0
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    languageColumnNames: ['l10n_parent', 'l10n_source']
+    columnNames:
+      language: 'sys_language_uid'
+    defaultValues:
+      pid: 0
+      doktype: 1
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    languageColumnNames: ['l18n_parent', 'l10n_source']
+    columnNames:
+      title: 'header'
+      language: 'sys_language_uid'
+    defaultValues:
+      CType: 'text'
+
+entities:
+  page:
+    - self: {id: 100, title: 'EN: Root', slug: '/'}
+      languageVariants:
+        - self: {id: 101, title: 'DE: Root', language: 1, slug: '/de'}
+          languageVariants:
+            - self: {id: 102, title: 'CH: Root', language: 2, slug: '/ch'}
+      entities:
+        content:
+          - self: {id: 300, title: 'EN: Content'}
+            languageVariants:
+              - self: {id: 301, title: 'DE: Content', language: 1}
+                languageVariants:
+                  - self: {id: 302, title: 'CH: Content', language: 2}
+      children:
+        - self: {id: 110, title: 'EN: Child', slug: '/child'}
+          languageVariants:
+            - self: {id: 111, title: 'DE: Child', language: 1, slug: '/de/child'}

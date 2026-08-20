@@ -47,12 +47,13 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * ## What is not covered here, and why
  *
- * `EXT:workspaces` is not installed in this test instance, so `sys_workspace`
- * does not exist and a data map for workspace 1 cannot be written at all. The
- * per workspace loop is therefore covered for the round it can run - the clone
- * of the backend user is asserted on the live workspace - while "two workspaces
- * produce two rounds in ascending order" is not. Adding the dependency for it
- * is a decision for the maintainer, not for a test.
+ * `EXT:workspaces` is not loaded in this test instance, so `sys_workspace` does
+ * not exist and a data map for a workspace other than the live one cannot be
+ * written at all. The per workspace loop is covered here for the round it can
+ * run - the clone of the backend user is asserted on the live workspace - and
+ * what needs more than one round is covered by
+ * {@see \SBUERK\Seeder\Tests\Functional\Seeding\DataHandling\WorkspaceSeedingTest},
+ * which loads the extension and pays the setup cost once.
  */
 final class DataHandlerWriterTest extends AbstractFunctionalTestCase
 {
@@ -244,9 +245,27 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
                 ['uid' => 301, 'pid' => 100, 'deleted' => 1],
                 ['uid' => 302, 'pid' => 110, 'deleted' => 0],
                 ['uid' => 303, 'pid' => 100, 'deleted' => 0],
+                ['uid' => 304, 'pid' => 100, 'deleted' => 0],
             ],
             $this->rows('tt_content', ['uid', 'pid', 'deleted'])
         );
+    }
+
+    #[Test]
+    public function aMoveActionPutsTheRecordWhereItNamesAndNotWhereItWasWritten(): void
+    {
+        $writer = $this->recording(DataHandlerWriter::withBackendUser($this->backendUser(1)));
+
+        $writer->invokeFactory($this->factory('ActionsScenario.yaml'));
+
+        $this->assertSame([], $writer->getErrors());
+        // "301" was deleted and "302" moved away, so three elements are left
+        // on the page. Then "303" went to the top of it and "304" behind
+        // "303" - and the second of those is the assertion that matters: the
+        // sequential ordering the factory builds already leaves "304" right
+        // behind "300", so an "afterRecord" that never reached the command map
+        // would produce 303, 300, 304 and look just as deliberate.
+        $this->assertSame([303, 304, 300], $this->uidsInSortingOrder('tt_content', 100));
     }
 
     #[Test]
@@ -268,6 +287,7 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
                     301 => ['delete' => true],
                     302 => ['move' => 110],
                     303 => ['move' => 100],
+                    304 => ['move' => '-303'],
                 ],
             ],
             RecordingDataHandlerHook::$commandMaps[0] ?? []
@@ -472,6 +492,20 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
         $this->assertSame(
             [['title' => 'First child', 'pid' => 100], ['title' => 'Second child', 'pid' => 100]],
             $this->rows('pages', ['title', 'pid'], 'sorting', 'pid = 100')
+        );
+    }
+
+    /**
+     * The uids of the records on one page in the order the backend and the
+     * frontend list them, which is `sorting` and not `uid`.
+     *
+     * @return list<int>
+     */
+    private function uidsInSortingOrder(string $table, int $pageId): array
+    {
+        return array_map(
+            static fn(array $row): int => (int)$row['uid'],
+            $this->rows($table, ['uid'], 'sorting', sprintf('pid = %d AND deleted = 0', $pageId))
         );
     }
 

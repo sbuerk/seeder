@@ -76,6 +76,20 @@ thing to get right:
   `uid_local`, the `sys_file` uid the FAL indexer assigns while the file is
   placed, which no set author can write down. That, and only that, is why
   `references:` is a key of `config.yml`.
+- **Four behaviours of the format only appear once a real `DataHandler` has
+  run**, and none of them is visible in a data map. A translation of a
+  translation is built with the right `l10n_source` and reaches the database
+  with the original in it. A translated **page** is written without its
+  original's parent pointer, so its `pid` falls back to `defaultValues` -
+  usually `0`. From the third record of a table other than `pages` on one page,
+  the declared order is not kept. And `{action: 'discard'}` produces a
+  `clearWSID` command that `DataHandler::process_cmdmap()` no longer knows, so
+  it is dropped with no branch and no log entry. All four are pinned by
+  functional tests and documented on
+  [The scenario engine](docs/architecture/scenario-engine.md) and in
+  [Documentation/Configuration](Documentation/Configuration/Index.rst); none of
+  them may be "fixed" by changing the ported classes without narrowing the
+  conformance test first.
 - **Two traps of the upstream engine cost real debugging time.** The `'*'`
   entity is merged into each entity with `array_merge_recursive()`, so a key
   declared on both sides becomes a **list** and a `hidden` of `[0, 0]` reaches
