@@ -8,8 +8,8 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
  * A parsed seed set descriptor: what the set is called, which scenario files
- * describe its records, the files it brings, and the site configurations it
- * sets up afterwards.
+ * describe its records, the files it brings, where those files are referenced
+ * from, and the site configurations it sets up afterwards.
  *
  * The records themselves are **not** in here. They live in the scenario files
  * this names, in the YAML scenario format of `typo3/testing-framework`, and are
@@ -46,6 +46,11 @@ final readonly class SeedDefinition
      *        earlier ones in.
      * @param list<SeedFile> $files Files copied into a storage before the
      *        records are written.
+     * @param list<SeedFileReference> $references File references attached to
+     *        the seeded records once their uids are known, in a pass of their
+     *        own. They are declared here rather than in a scenario file
+     *        because a `sys_file_reference` needs the `sys_file` uid the FAL
+     *        indexer assigns, which nothing can write down in advance.
      * @param list<SeedSiteConfiguration> $sites Site configurations written
      *        after the records, when their root page has a uid.
      */
@@ -56,6 +61,7 @@ final readonly class SeedDefinition
         public string $basePath = '',
         public array $scenarios = [],
         public array $files = [],
+        public array $references = [],
         public array $sites = [],
     ) {}
 }

@@ -1,7 +1,8 @@
 # TYPO3 extension `seeder`
 
 Seeds a TYPO3 installation - pages, content elements, records of any table,
-files and site configurations - from YAML definitions that ship inside the
+the relations between them, files, the references attaching those files to
+records, and site configurations - from YAML definitions that ship inside the
 extensions themselves, so an instance can be rebuilt from a repository instead
 of being clicked together by hand. The records are written in the **scenario
 format** of `typo3/testing-framework`, the one TYPO3 Core's own functional
@@ -31,8 +32,8 @@ be registered anywhere. Every path inside a set is resolved relative to that
 directory; `EXT:` paths are accepted as well.
 
 `config.yml` describes the *set*: its `identifier`, `title` and `description`,
-the scenario files it is built from, the files it provisions and the site
-configurations it writes. The records themselves live in the scenario files it
+the scenario files it is built from, the files it provisions, the records those
+files are attached to and the site configurations it writes. The records themselves live in the scenario files it
 names.
 
 A set can describe:
@@ -42,11 +43,16 @@ A set can describe:
 - **workspace records**, through `versionVariants`,
 - **`DataHandler` commands** - move, delete, discard - through `actions`,
 - **files**, copied into a storage,
+- **file references**, attaching a seeded file to a field of a seeded record,
 - **site configurations**, written from a template with a seeded page as root.
 
-What it cannot do yet: attach a **file reference** to a record, and express a
-relation as an **inline child**. A relation is expressed by uid instead, which
-every record has.
+A **relation between records** needs no construct of its own: every record has
+a uid before it is written, so a parent names its children by writing their
+declared ids into its relation field, and `DataHandler` resolves that list -
+including the `parentid`, `parenttable` and `sorting_foreign` of an inline
+relation. A file is the exception, and the reason `config.yml` has a
+`references` key: a `sys_file_reference` points at its file by a uid the FAL
+indexer only hands out while the file is being placed.
 
 Everything is written through the TYPO3 `DataHandler` rather than through
 direct database inserts, so slugs, TCA defaults and evaluations, `sorting`, the
@@ -74,9 +80,9 @@ covered by no site configuration.
 ## Status
 
 **Feature complete, and pre-1.0.** Both commands, the set descriptor, the
-scenario format, record seeding, file seeding and site configurations are
-implemented, covered by unit and functional tests, and green on TYPO3 v13.4 and
-v14.3.
+scenario format, record seeding, file seeding, file references and site
+configurations are implemented, covered by unit and functional tests, and green
+on TYPO3 v13.4 and v14.3.
 
 What that does *not* mean: the seed definition format and the public API may
 still change without a deprecation phase until the first stable release, and the
@@ -89,11 +95,11 @@ Deliberate limitations, worth knowing before adopting it:
   definition, and no import is idempotent.
 - Nothing is deleted or overwritten. A uid collision and an existing site
   identifier are refusals, not merges.
-- A record cannot carry a **file reference**. Files are provisioned into a
-  storage, but nothing writes the `sys_file_reference` row that attaches one to
-  a record; that is a later feature.
-- There is no **inline-relation construct**. A relation is expressed by uid,
-  which every record has.
+- A **file reference** reaches only the records of its own set. The `uid` it
+  names is resolved against what the run writes, so a file cannot be attached
+  to a record that is already in the installation.
+- A file reference is declared in `config.yml`, never in a scenario file - the
+  scenario format has no concept of a file and does not gain one here.
 - A seeded `be_users` record has to declare `username` and `password` itself.
 
 ## Compatibility

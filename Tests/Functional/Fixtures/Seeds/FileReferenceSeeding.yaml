@@ -1,0 +1,37 @@
+# The seed set of "FileReferenceSeedingTest".
+#
+# It is read from disk rather than built in the test because "references" is a
+# key of "config.yml", and what is under test is that a set declaring it in the
+# way an extension ships it ends up with the relations it describes.
+identifier: file-reference-seeding
+title: 'Files attached to the records of the set'
+
+scenarios:
+  - FileReferenceSeeding/Scenario.yaml
+
+files:
+  - identifier: landscape
+    source: 'Files/placeholder.svg'
+    folder: 'seed-files'
+  - identifier: portrait
+    source: 'Files/placeholder-portrait.svg'
+    folder: 'seed-files'
+
+references:
+  # Two references on one field, so the order of a multi file relation - and
+  # with it "sorting_foreign" - is the declared one and not the database's.
+  - file: landscape
+    table: tt_content
+    uid: 21
+    field: tx_testsfilefields_media
+    values: {title: 'Landscape', alternative: 'The wide one'}
+  - file: portrait
+    table: tt_content
+    uid: 21
+    field: tx_testsfilefields_media
+  # The same file a second time, and on a page: a reference of a page lives on
+  # that page rather than on the page above it.
+  - file: landscape
+    table: pages
+    uid: 1
+    field: media

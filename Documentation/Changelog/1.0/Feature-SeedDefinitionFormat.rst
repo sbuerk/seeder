@@ -30,15 +30,22 @@ it is made of two kinds of file.
         source: 'Files/placeholder.svg'
         folder: 'demo'
 
+    references:
+      - file: placeholder
+        table: tt_content
+        uid: 2000
+        field: assets
+
     sites:
       - identifier: main
         rootPage: 1000
 
 Every key set of the descriptor is **closed** - at the top level, on a
-:yaml:`files` entry and on a :yaml:`sites` entry alike. An unknown key is
-refused, naming the known ones, because :yaml:`scenario:` instead of
-:yaml:`scenarios:` would otherwise be an import that reports success and writes
-nothing. :yaml:`identifier`, :yaml:`title` and :yaml:`scenarios` are required.
+:yaml:`files` entry, on a :yaml:`references` entry and on a :yaml:`sites` entry
+alike. An unknown key is refused, naming the known ones, because
+:yaml:`scenario:` instead of :yaml:`scenarios:` would otherwise be an import
+that reports success and writes nothing. :yaml:`identifier`, :yaml:`title` and
+:yaml:`scenarios` are required.
 
 The scenario files it names describe the **records**, in the YAML scenario
 format of :php:`typo3/testing-framework`:

@@ -1,0 +1,26 @@
+# The records of "FileReferenceSeeding.yaml".
+#
+# Nothing in here knows about a file. The scenario format has no concept of one,
+# and this extension does not give it one: the files and the references to them
+# are declared in "config.yml" and written in passes of their own, before and
+# after this.
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    columnNames: {title: 'header', type: 'CType'}
+
+entities:
+  page:
+    - self: {id: 1, title: 'Image elements', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 21, title: 'Teaser', type: 'tests_file_fields_teaser'}

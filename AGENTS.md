@@ -15,10 +15,10 @@ handful of things that are easy to get wrong and expensive to discover later.
 `seeder` seeds a TYPO3 installation from YAML definitions that ship inside the
 extensions themselves. Its entire surface is two console commands:
 
-| Command                      | Does                                                                    |
-|------------------------------|-------------------------------------------------------------------------|
-| `seeder:list`                | List every discovered seed set: identifier, title, providing extension. |
-| `seeder:import <identifier>` | Import one seed set: pages, records of any table, files, site configs.  |
+| Command                      | Does                                                                                    |
+|------------------------------|-----------------------------------------------------------------------------------------|
+| `seeder:list`                | List every discovered seed set: identifier, title, providing extension.                 |
+| `seeder:import <identifier>` | Import one seed set: pages, records of any table, files, file references, site configs. |
 
 A **seed set** is a directory `Configuration/Seeder/<name>/` in any active
 package, with `config.yml` as its entry point. `config.yml` describes the set
@@ -38,10 +38,10 @@ is rule 8 below, and it is not a preference.
 A seed set is written in two YAML formats, and the line between them is the
 thing to get right:
 
-| File               | Format                                                      | Owner                          |
-|--------------------|-------------------------------------------------------------|--------------------------------|
-| `config.yml`       | the set descriptor: identity, `scenarios`, `files`, `sites` | this extension, closed key set |
-| the scenario files | the scenario format of `typo3/testing-framework`            | upstream, key for key          |
+| File               | Format                                                                    | Owner                          |
+|--------------------|---------------------------------------------------------------------------|--------------------------------|
+| `config.yml`       | the set descriptor: identity, `scenarios`, `files`, `references`, `sites` | this extension, closed key set |
+| the scenario files | the scenario format of `typo3/testing-framework`                          | upstream, key for key          |
 
 - **The scenario format is not ours to extend.** `entitySettings`, `entities`
   and `__variables`, and nothing else, is what a scenario file may declare. Its
@@ -61,10 +61,21 @@ thing to get right:
   verbatim. That is what lets a table be seeded without support in this
   extension, and it means no further key may ever be special-cased there.
 - **A record's handle is its uid.** A scenario record has no symbolic
-  identifier, so a site's `rootPage` is a page uid, and it is resolved against
-  what the run actually wrote rather than trusted. `--force` gives up the uid
-  suggestions of a colliding table, so a set declaring sites is refused rather
-  than forced past a collision in `pages`.
+  identifier, so a site's `rootPage` is a page uid, a file reference names its
+  record by uid, and both are resolved against what the run actually wrote
+  rather than trusted. `--force` gives up the uid suggestions of a colliding
+  table, so a set declaring sites is refused rather than forced past a
+  collision in `pages`.
+- **An inline relation needs nothing from this extension, a file reference
+  needs everything.** Because a declared `id` *is* the uid the record is
+  written with, a parent can name its children by listing their ids in its
+  relation field, and `DataHandler` resolves that list like any other -
+  `parentid`, `parenttable` and `sorting_foreign` come from the TCA of the
+  parent field, and the order of the relation is the order of the declared
+  list. A `sys_file_reference` cannot be written that way: it needs
+  `uid_local`, the `sys_file` uid the FAL indexer assigns while the file is
+  placed, which no set author can write down. That, and only that, is why
+  `references:` is a key of `config.yml`.
 - **Two traps of the upstream engine cost real debugging time.** The `'*'`
   entity is merged into each entity with `array_merge_recursive()`, so a key
   declared on both sides becomes a **list** and a `hidden` of `[0, 0]` reaches
@@ -290,9 +301,15 @@ violation of any of them is a rejected change, not a review comment.
    backend and the frontend. Reading with a `QueryBuilder`, to check what is
    already there, is fine; writing is not.
 
-   **Files need a pass of their own before the records.** They are created and
-   indexed through the FAL API first, so that a `sys_file_reference` row in the
-   data map can point at a `sys_file` uid that exists.
+   **Files need a pass of their own before the records, and their references
+   one after them.** A file is created and indexed through the FAL API first,
+   so a `sys_file_reference` can point at a `sys_file` uid that exists; the
+   reference itself is written last, because `uid_foreign` is a plain integer
+   column in which a `NEW…` placeholder stays a string, is read as `0`, and
+   puts the reference on record 0 with an empty error log. The field of the
+   parent is written in that same pass — without it
+   `RelationHandler::writeForeignField()` never runs and every reference keeps
+   a `sorting_foreign` of `0`.
 
 ## Verify against the TYPO3 changelogs
 

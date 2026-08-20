@@ -6,6 +6,7 @@ namespace SBUERK\Seeder\Seeding\Parser;
 
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedFile;
+use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
 use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
@@ -29,6 +30,11 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *       - identifier: placeholder
  *         source: 'Files/placeholder.svg'
  *         folder: 'demo'
+ *     references:
+ *       - file: placeholder
+ *         table: tt_content
+ *         uid: 2001
+ *         field: image
  *     sites:
  *       - identifier: main
  *         rootPage: 1000
@@ -41,10 +47,10 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * adds is mixed into a scenario file, and nothing a scenario file declares has
  * to be understood here.
  *
- * The key set is **closed**, at the top level and on a site. An unknown key is
- * a typo, not a field of anything; accepting it silently is how `scenario:`
- * instead of `scenarios:` becomes an import that reports success and writes
- * nothing.
+ * The key set is **closed**, at the top level and on every entry of `files`,
+ * `references` and `sites`. An unknown key is a typo, not a field of anything;
+ * accepting it silently is how `scenario:` instead of `scenarios:` becomes an
+ * import that reports success and writes nothing.
  *
  * @internal Part of the seeding implementation, not public API.
  */
@@ -56,7 +62,13 @@ final readonly class SeedDefinitionParser
     private const IMPORTS = 'imports';
     private const SCENARIOS = 'scenarios';
     private const FILES = 'files';
+    private const REFERENCES = 'references';
     private const SITES = 'sites';
+    private const FILE = 'file';
+    private const TABLE = 'table';
+    private const UID = 'uid';
+    private const FIELD = 'field';
+    private const VALUES = 'values';
     private const SOURCE = 'source';
     private const FOLDER = 'folder';
     private const NAME = 'name';
@@ -80,6 +92,7 @@ final readonly class SeedDefinitionParser
         self::IMPORTS,
         self::SCENARIOS,
         self::FILES,
+        self::REFERENCES,
         self::SITES,
     ];
 
@@ -96,6 +109,20 @@ final readonly class SeedDefinitionParser
         self::FOLDER,
         self::NAME,
         self::STORAGE,
+    ];
+
+    /**
+     * The keys a `references` entry may carry - closed for the same reason as
+     * {@see self::SET_KEYS}. The fields of the `sys_file_reference` row are
+     * the one thing here that is written verbatim, and they have a key of
+     * their own, `values`, so that everything outside it can be checked.
+     */
+    private const REFERENCE_KEYS = [
+        self::FILE,
+        self::TABLE,
+        self::UID,
+        self::FIELD,
+        self::VALUES,
     ];
 
     /**
@@ -228,13 +255,16 @@ final readonly class SeedDefinitionParser
             );
         }
 
+        $files = $this->parseFiles($definition[self::FILES] ?? [], $source);
+
         return new SeedDefinition(
             identifier: $identifier,
             title: $title,
             description: $description,
             basePath: rtrim($basePath, '/'),
             scenarios: $this->parseScenarios($definition[self::SCENARIOS] ?? null, $source),
-            files: $this->parseFiles($definition[self::FILES] ?? [], $source),
+            files: $files,
+            references: $this->parseReferences($definition[self::REFERENCES] ?? [], $files, $source),
             sites: $this->parseSites($definition[self::SITES] ?? [], $source),
         );
     }
@@ -344,6 +374,187 @@ final readonly class SeedDefinitionParser
                 is_string($name) ? $name : null,
                 is_int($storage) ? $storage : null,
             );
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * The file references of the set.
+     *
+     * Everything but `values` is checked here, including that `file` names a
+     * file the set declares: the `files` list is parsed from the same
+     * descriptor, so a reference to a file that is not there is a mistake this
+     * can name at the earliest possible moment rather than one that surfaces
+     * halfway through a run that has already written a page tree.
+     *
+     * That the `table`/`uid` pair names a record is *not* checked here. The
+     * records live in the scenario files, which this parser deliberately never
+     * reads; the check happens against what the run actually wrote.
+     *
+     * @param list<SeedFile> $files
+     * @return list<SeedFileReference>
+     */
+    private function parseReferences(mixed $references, array $files, string $source): array
+    {
+        if (!$this->isList($references)) {
+            throw new InvalidSeedDefinitionException(
+                sprintf('The "references" of the seed definition "%s" are not a list.', $source),
+                1787256310,
+            );
+        }
+
+        $declaredFiles = [];
+        foreach ($files as $file) {
+            $declaredFiles[$file->identifier] = true;
+        }
+
+        $parsed = [];
+        foreach ($references as $reference) {
+            if (!is_array($reference)) {
+                throw new InvalidSeedDefinitionException(
+                    sprintf('A file reference of the seed definition "%s" is not a map.', $source),
+                    1787256311,
+                );
+            }
+            foreach (array_keys($reference) as $key) {
+                if (!in_array($key, self::REFERENCE_KEYS, true)) {
+                    throw new InvalidSeedDefinitionException(
+                        sprintf(
+                            'A file reference of the seed definition "%s" declares the unknown key "%s". Known'
+                            . ' keys are: %s.',
+                            $source,
+                            (string)$key,
+                            implode(', ', self::REFERENCE_KEYS),
+                        ),
+                        1787256312,
+                    );
+                }
+            }
+
+            $file = $reference[self::FILE] ?? null;
+            if (!is_string($file) || $file === '') {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'A file reference of the seed definition "%s" declares no "file". It is the identifier of'
+                        . ' a file the set declares under "files".',
+                        $source,
+                    ),
+                    1787256313,
+                );
+            }
+            if (!isset($declaredFiles[$file])) {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'A file reference of the seed definition "%s" names the file "%s", which the set does not'
+                        . ' declare under "files"%s.',
+                        $source,
+                        $file,
+                        $declaredFiles === []
+                            ? ' - it declares no files at all'
+                            : sprintf(' - it declares: %s', implode(', ', array_keys($declaredFiles))),
+                    ),
+                    1787256314,
+                );
+            }
+
+            $table = $reference[self::TABLE] ?? null;
+            if (!is_string($table) || $table === '') {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'The file reference to "%s" in "%s" declares no "table". It is the table of the record the'
+                        . ' reference hangs on.',
+                        $file,
+                        $source,
+                    ),
+                    1787256315,
+                );
+            }
+
+            $uid = $reference[self::UID] ?? null;
+            if (!is_int($uid) || $uid < 1) {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'The file reference to "%s" in "%s" declares no usable "uid". It is the uid a scenario'
+                        . ' entity declares as its "id" for the record the reference hangs on.',
+                        $file,
+                        $source,
+                    ),
+                    1787256316,
+                );
+            }
+
+            $field = $reference[self::FIELD] ?? null;
+            if (!is_string($field) || $field === '') {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'The file reference to "%s" in "%s" declares no "field". It is the column of "%s" the'
+                        . ' reference is attached to, and that column is a TCA "file" relation.',
+                        $file,
+                        $source,
+                        $table,
+                    ),
+                    1787256317,
+                );
+            }
+
+            $parsed[] = new SeedFileReference(
+                $file,
+                $table,
+                $uid,
+                $field,
+                $this->parseReferenceValues($reference[self::VALUES] ?? [], $file, $source),
+            );
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * The fields written on the `sys_file_reference` row itself.
+     *
+     * A record value, unlike everything else in this descriptor, is content:
+     * it is written verbatim, so the key set is open and only the *shape* is
+     * checked. A nested map or a list would reach `DataHandler` as the string
+     * "Array", which is the failure this rejects.
+     *
+     * @return array<string, scalar|null>
+     */
+    private function parseReferenceValues(mixed $values, string $file, string $source): array
+    {
+        if (!is_array($values)) {
+            throw new InvalidSeedDefinitionException(
+                sprintf('The "values" of the file reference to "%s" in "%s" are not a map.', $file, $source),
+                1787256318,
+            );
+        }
+
+        $parsed = [];
+        foreach ($values as $name => $value) {
+            if (!is_string($name) || $name === '') {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'The "values" of the file reference to "%s" in "%s" declare a field without a name.',
+                        $file,
+                        $source,
+                    ),
+                    1787256319,
+                );
+            }
+            if ($value !== null && !is_scalar($value)) {
+                throw new InvalidSeedDefinitionException(
+                    sprintf(
+                        'The field "%s" of the file reference to "%s" in "%s" is not a single value. A field of a'
+                        . ' "sys_file_reference" is written as it is declared, so it has to be a string, a number,'
+                        . ' a boolean or null.',
+                        $name,
+                        $file,
+                        $source,
+                    ),
+                    1787256320,
+                );
+            }
+            $parsed[$name] = $value;
         }
 
         return $parsed;
