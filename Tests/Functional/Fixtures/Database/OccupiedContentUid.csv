@@ -1,0 +1,6 @@
+"pages",,,,,,
+,"uid","pid","doktype","is_siteroot","title","slug"
+,5,0,1,1,"An unrelated page","/unrelated"
+"tt_content",,,,,,
+,"uid","pid","colPos","CType","header",
+,21,5,0,"header","An existing element",

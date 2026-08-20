@@ -331,6 +331,57 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         );
     }
 
+    /**
+     * The boundary of the refusal above, and the reason it is spelled
+     * `$writeSiteConfigurations && $definition->sites !== [] && …` rather than
+     * "the set declares sites".
+     *
+     * What makes a forced run unsafe for a site is a **page** uid being given
+     * up, because a site configuration is a file naming a number. A collision
+     * in another table gives up the suggestions of that table alone, the page
+     * tree is written exactly as declared, and the site is written for the uid
+     * it names - so this run is refused by nothing.
+     */
+    #[Test]
+    public function aCollisionOutsidePagesDoesNotStopAForcedRunFromWritingItsSites(): void
+    {
+        $this->importCSVDataSet(dirname(__DIR__) . '/Fixtures/Database/OccupiedContentUid.csv');
+
+        $commandTester = $this->execute(['--force' => true]);
+
+        $this->assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $this->assertSame(11, $this->pageTitled('Import home')['uid']);
+        $this->assertSame(11, $this->writtenSiteConfiguration('import-main')['rootPageId']);
+
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString('"--force" was given', $display);
+        $this->assertStringContainsString('tt_content:21 is occupied by "An existing element"', $display);
+    }
+
+    /**
+     * The one combination the migration changed the meaning of on both sides:
+     * `--root-page` moves the whole tree, and a site names its root page by
+     * the uid the scenario declares rather than by a name.
+     *
+     * The two are independent, and that is what is asserted. `--root-page`
+     * rewrites the `pid` of the top level items only, so the declared uid of
+     * the root page is untouched and the site configuration points at the same
+     * page it would have pointed at without the option - which is now a page
+     * inside another tree, and a perfectly legal site root for TYPO3.
+     */
+    #[Test]
+    public function aSiteOfASetWrittenBelowARootPageStillNamesItsDeclaredRootPage(): void
+    {
+        $this->importCSVDataSet(dirname(__DIR__) . '/Fixtures/Database/OccupiedUids.csv');
+
+        $commandTester = $this->execute(['--root-page' => '11'], identifier: 'demo-pages');
+
+        $this->assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $this->assertSame(11, $this->pageTitled('Home')['pid']);
+        $this->assertSame(1000, $this->pageTitled('Home')['uid']);
+        $this->assertSame(1000, $this->writtenSiteConfiguration('main')['rootPageId']);
+    }
+
     #[Test]
     public function aUidTheInstallationAlreadyUsesRefusesTheImportAndNamesIt(): void
     {
