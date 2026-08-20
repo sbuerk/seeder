@@ -12,7 +12,7 @@ TYPO3 behaviour on them was read out of the core on disk.
 | [Dependency injection](dependency-injection.md)       | Symfony DI attributes instead of `Services.yaml`, stateless services, private by default, `#[AsAlias]`, non-shared services.                            |
 | [Class design](class-design.md)                       | `final readonly` and what it implies for hierarchies, method injection in abstract classes, data objects vs services, the two accepted PHPStan ignores. |
 | [The scenario engine](scenario-engine.md)             | Why the seed format is the testing-framework scenario format, why the engine is a port and not a dependency, and the test that keeps it honest.         |
-| [Seeding](seeding.md)                                 | Why seeding goes through DataHandler, the admin user, declaration order, suggested uids, placeholders, the two-pass file write, `isImporting`.          |
+| [Seeding](seeding.md)                                 | Why seeding goes through DataHandler, the admin user, declaration order, suggested uids, what is no longer defaulted, `isImporting`.                    |
 | [Site configurations](site-configuration.md)          | Writing a site from a template, why `rootPageId` always wins, the refusal of an existing identifier, the uncovered-site-roots report.                   |
 
 ## The short version

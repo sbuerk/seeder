@@ -112,7 +112,34 @@ final class ImportSeedCommandSelectionTest extends AbstractFunctionalTestCase
         $commandTester = $this->execute(['identifier' => 'import-broken']);
 
         $this->assertSame(ImportSeedCommand::EXIT_INVALID_DEFINITION, $commandTester->getStatusCode());
-        $this->assertStringContainsString('are not a list', $this->normalize($commandTester->getDisplay()));
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString('declares no "scenarios"', $display);
+        $this->assertStringContainsString('It is a non-empty list of the scenario files', $display);
+        $this->assertSame(0, $this->countPages());
+    }
+
+    /**
+     * A site names its root page by the uid the scenario declares, and neither
+     * file is wrong on its own - only the two together are. The import says so
+     * before it writes anything, because the alternative is a run that seeds
+     * the whole page tree and then refuses to write the site it was imported
+     * for.
+     */
+    #[Test]
+    public function aSiteOnARootPageNoScenarioEntityDeclaresIsRefusedBeforeAnythingIsWritten(): void
+    {
+        $this->setUpBackendUser(1);
+
+        $commandTester = $this->execute(['identifier' => 'import-undeclared-root']);
+
+        $this->assertSame(ImportSeedCommand::EXIT_INVALID_DEFINITION, $commandTester->getStatusCode());
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString(
+            'The site "import-orphan" of the seed set "import-undeclared-root" declares the root page 32',
+            $display,
+        );
+        $this->assertStringContainsString('which no entity of the "pages" table of its scenario declares', $display);
+        // Not even the page the scenario does declare.
         $this->assertSame(0, $this->countPages());
     }
 

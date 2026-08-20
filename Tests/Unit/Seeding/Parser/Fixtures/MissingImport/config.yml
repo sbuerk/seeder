@@ -1,9 +1,11 @@
+# Imports a resource that is not there. "YamlFileLoader" reports that to its
+# logger and carries on, so this file is what proves the report is turned back
+# into an exception rather than losing the scenarios of the missing file.
 identifier: missing-import
 title: 'A set importing a file that is not there'
 
 imports:
   - { resource: DoesNotExist.yaml }
 
-pages:
-  - identifier: home
-    title: 'Home'
+scenarios:
+  - Pages.yaml

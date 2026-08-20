@@ -1,0 +1,6 @@
+# A list of titles rather than a list of item maps - the shape a scenario ends
+# up with when "self:" is left out.
+entities:
+  page:
+    - 'Root'
+    - 'Second'

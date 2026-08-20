@@ -413,6 +413,68 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
      * A backend user for the DataHandler, plus the language service its
      * messages are rendered with.
      */
+    /**
+     * The third constructor parameter is this repository's own, additive
+     * divergence from `typo3/testing-framework`: without it the writer assigns
+     * every suggested id, which is what upstream does and what every other test
+     * here relies on.
+     */
+    #[Test]
+    public function everySuggestedIdOfTheFactoryIsAssignedByDefault(): void
+    {
+        $factory = $this->factory('PageTreeScenario.yaml');
+        $writer = new DataHandlerWriter(
+            GeneralUtility::makeInstance(DataHandler::class),
+            $this->backendUser(1)
+        );
+
+        $writer->invokeFactory($factory);
+
+        $this->assertSame(
+            $factory->getSuggestedIds(),
+            $this->dataHandlerOf($writer)->suggestedInsertUids
+        );
+    }
+
+    /**
+     * A held back suggestion is not a record that is skipped: the row is still
+     * written, DataHandler just assigns the uid instead of honouring the
+     * declared one. That is what `seeder:import --force` needs - the uid of a
+     * table this installation already uses has to be given up, and giving up
+     * the record would mean importing half a set.
+     */
+    #[Test]
+    public function aHeldBackSuggestionIsNotAssignedAndTheRecordIsStillWritten(): void
+    {
+        $factory = $this->factory('PageTreeScenario.yaml');
+        $writer = new DataHandlerWriter(
+            GeneralUtility::makeInstance(DataHandler::class),
+            $this->backendUser(1),
+            ['pages:110' => true]
+        );
+
+        $writer->invokeFactory($factory);
+
+        $this->assertSame([], $writer->getErrors());
+        $this->assertArrayNotHasKey(
+            'pages:110',
+            $this->dataHandlerOf($writer)->suggestedInsertUids
+        );
+        $titles = array_column($this->rows('pages', ['uid', 'title']), 'title', 'uid');
+        $this->assertContains('First child', $titles);
+        $this->assertArrayNotHasKey(110, $titles);
+        // The sibling after it chains its "pid" to "-NEW<first child>", so this
+        // is what proves the identifier still resolves to the row that exists.
+        // On PostgreSQL it did not until the "uid" was dropped along with the
+        // suggestion: DataHandler returns the suggested number from
+        // postProcessDatabaseInsert() whether it honoured it or not, and the
+        // whole tree below a held back record then hangs off nothing.
+        $this->assertSame(
+            [['title' => 'First child', 'pid' => 100], ['title' => 'Second child', 'pid' => 100]],
+            $this->rows('pages', ['title', 'pid'], 'sorting', 'pid = 100')
+        );
+    }
+
     private function backendUser(int $uid): BackendUserAuthentication
     {
         $backendUser = $this->setUpBackendUser($uid);

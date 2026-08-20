@@ -1,0 +1,16 @@
+#
+# The site names a page uid the scenario of this set never declares. Nothing
+# about either file is malformed - which is the point: only the two together
+# are wrong, and the import has to say so before it writes the page tree it
+# would then have no site for.
+#
+identifier: import-undeclared-root
+title: 'A site on a page the scenario does not write'
+description: 'The "rootPage" of the site is no "id" of a "pages" entity.'
+
+scenarios:
+  - Scenario.yaml
+
+sites:
+  - identifier: import-orphan
+    rootPage: 32

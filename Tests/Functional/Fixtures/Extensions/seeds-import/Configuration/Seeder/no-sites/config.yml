@@ -1,0 +1,11 @@
+#
+# The records of "import-full" without the site configuration, which is what
+# makes this set forceable: a set declaring sites cannot be imported past a
+# collision in "pages", because every site names its root page by that uid.
+#
+identifier: import-no-sites
+title: 'The records of the full set without its site'
+description: 'The same page tree and content element, and no "sites" key.'
+
+scenarios:
+  - Scenario.yaml

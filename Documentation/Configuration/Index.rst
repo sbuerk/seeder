@@ -10,7 +10,17 @@ The extension itself has nothing to configure. What is configured is the data:
 a **seed set**, written in YAML, shipped by an extension, and read by the two
 console commands.
 
-This chapter is the reference for that format and for the commands.
+A set is made of two kinds of file, and keeping them apart is the whole layout
+of the format:
+
+*   :file:`config.yml` describes the **set** - what it is called, which scenario
+    files it is written from, which files it brings and which site
+    configurations it writes.
+*   One or more **scenario files** describe the **records**. They are written in
+    the YAML scenario format of :php:`typo3/testing-framework`, the format the
+    TYPO3 Core writes its own functional test fixtures in.
+
+This chapter is the reference for both, and for the commands.
 
 ..  contents::
     :local:
@@ -28,7 +38,10 @@ active extension, with :file:`config.yml` as its entry file:
 
     packages/my_extension/Configuration/Seeder/demo/
     ├── config.yml               entry file, and the only mandatory one
-    ├── Pages.yaml               optional, pulled in through "imports"
+    ├── Scenario/
+    │   ├── Pages.yaml           the records, named by "scenarios"
+    │   └── Content.yaml
+    ├── Files.yaml               optional, pulled in through "imports"
     ├── Files/
     │   └── placeholder.svg      resources named by "files"
     └── Sites/
@@ -36,11 +49,12 @@ active extension, with :file:`config.yml` as its entry file:
             ├── config.yaml      site configuration template
             └── settings.yaml    optional site settings
 
-Every relative path inside a set — a file :yaml:`source`, a site
-:yaml:`template`, an :yaml:`imports` resource — is resolved against the
-directory holding the **entry file**, not against the file declaring it. A set
-can therefore be moved or renamed without touching a single path inside it.
-:file:`EXT:` paths are accepted everywhere a path is.
+Every relative path inside a set - a :yaml:`scenarios` entry, a file
+:yaml:`source`, a site :yaml:`template`, an :yaml:`imports` resource - is
+resolved against the directory holding the **entry file**, not against the file
+declaring it. A set can therefore be moved or renamed without touching a single
+path inside it. :file:`EXT:` paths are accepted everywhere a path is, and an
+absolute path is taken as it stands.
 
 A set is found because the extension providing it is installed and activated.
 There is no path to configure and nothing to register. A directory below
@@ -49,22 +63,32 @@ passed over, which is what lets a set keep partials next to itself.
 
 ..  _configuration-set-level:
 
-The set level
-=============
+The set descriptor
+==================
 
 ..  code-block:: yaml
-    :caption: Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
 
     identifier: demo
     title: 'Demo page tree'
-    description: 'Pages, content elements and the site they are reachable through.'
+    description: 'Pages, content elements, a file and the site they are reachable through.'
 
     imports:
-      - { resource: Pages.yaml }
+      - { resource: Files.yaml }
 
-    files: []
-    pages: []
-    sites: []
+    scenarios:
+      - Scenario/Pages.yaml
+      - Scenario/Content.yaml
+
+    files:
+      - identifier: placeholder
+        source: 'Files/placeholder.svg'
+        folder: 'demo'
+
+    sites:
+      - identifier: main
+        rootPage: 1000
+        template: 'Sites/main'
 
 ..  list-table::
     :header-rows: 1
@@ -75,7 +99,7 @@ The set level
     *   -   :yaml:`identifier`
         -   yes
         -   Globally unique across all active extensions. It is declared, never
-            derived from the directory name — otherwise a collision between two
+            derived from the directory name - otherwise a collision between two
             extensions would be silent.
     *   -   :yaml:`title`
         -   yes
@@ -85,159 +109,438 @@ The set level
         -   Free text describing the set.
     *   -   :yaml:`imports`
         -   no
-        -   Further YAML files merged into this one.
+        -   Further YAML files merged into this descriptor.
+    *   -   :yaml:`scenarios`
+        -   yes
+        -   The scenario files the records of the set are written from, in the
+            order they are applied. A non-empty list of paths.
     *   -   :yaml:`files`
         -   no
         -   Files copied into a file storage before any record is written.
-    *   -   :yaml:`pages`
-        -   no
-        -   The page tree of the set.
     *   -   :yaml:`sites`
         -   no
         -   Site configurations written after the records.
 
 This list is **closed**: any other key at this level is refused, naming the
-known ones. That is deliberate — :yaml:`page:` instead of :yaml:`pages:` would
-otherwise be an import that reports success and writes nothing.
+known ones. That is deliberate - :yaml:`scenario:` instead of :yaml:`scenarios:`
+would otherwise be an import that reports success and writes nothing.
+
+The descriptor carries **no** :yaml:`entitySettings` and **no** :yaml:`entities`.
+One rule, no ambiguity: :file:`config.yml` describes the set, a scenario file
+describes records. Nothing this extension invents is mixed into a scenario file,
+and nothing a scenario file declares has to be understood by the descriptor.
 
 The three metadata keys have to be declared in :file:`config.yml` itself. They
 cannot be pulled in through :yaml:`imports`, because listing the sets of an
 installation reads them without following imports.
 
-..  _configuration-records:
+..  _configuration-scenarios:
 
-Records
-=======
+The scenario format
+===================
+
+A scenario file is a map of at most three keys. Anything else at the top level
+is refused, naming the file:
+
+..  list-table::
+    :header-rows: 1
+
+    *   -   Key
+        -   Meaning
+    *   -   :yaml:`entitySettings`
+        -   How a table is written: its name, its pointer columns, its column
+            aliases, its default values.
+    *   -   :yaml:`entities`
+        -   The records themselves, per entity.
+    *   -   :yaml:`__variables`
+        -   A place to hang YAML anchors. It is read and dropped - anchors are
+            resolved by the YAML parser and never cross a file.
+
+..  _configuration-entity-settings:
+
+entitySettings
+--------------
+
+An **entity** is a name a scenario writes records under. It is not a table: the
+table is named by :yaml:`tableName`, which is what lets one table be written
+under two names with different defaults - :yaml:`page` and :yaml:`folder` both
+writing :sql:`pages`.
 
 ..  code-block:: yaml
 
-    pages:
-      - identifier: home            # required, unique across the whole set
-        uid: 1                      # optional, the uid to write
-        title: 'Demo'               # any non-structural key is a field
-        slug: '/'
-        is_siteroot: 1
-        files:                      # file references, per field
-          media:
-            - placeholder
-        content:                    # tt_content records on this page
-          - identifier: home-heading
-            CType: header
-            header: 'A frontend to look at'
-        records:                    # records of any table on this page
-          - identifier: category-news
-            table: sys_category
-            title: 'News'
-        inline:                     # children of a relation, per parent field
-          tx_example_items:
-            - identifier: item-docs
-              table: tx_example_item
-              title: 'Documentation'
-        children:                   # sub pages
-          - identifier: about
-            title: 'About'
-            slug: '/about'
-
-**Every key that is not structural is a field of the record and is written as
-it stands.** A table needs no support in this extension to be seedable: if the
-column exists and TYPO3 accepts the value, the seed can write it. There is no
-allow list to extend and no mapping to maintain.
-
-The structural keys are:
+    entitySettings:
+      '*':
+        nodeColumnName: 'pid'
+        columnNames: {id: 'uid', language: 'sys_language_uid'}
+        defaultValues: {pid: 0}
+      page:
+        isNode: true
+        tableName: 'pages'
+        parentColumnName: 'pid'
+        languageColumnNames: ['l10n_parent', 'l10n_source']
+        columnNames: {type: 'doktype', root: 'is_siteroot'}
+        defaultValues: {hidden: 0, doktype: 1}
+        valueInstructions:
+          shortcut:
+            first: {shortcut: 0, shortcut_mode: 1}
+      content:
+        tableName: 'tt_content'
+        languageColumnNames: ['l18n_parent', 'l10n_source']
+        columnNames: {title: 'header', type: 'CType'}
+        defaultValues: {hidden: 0, CType: 'text', colPos: 0}
+      category:
+        tableName: 'sys_category'
 
 ..  list-table::
     :header-rows: 1
 
     *   -   Key
-        -   Structural on
         -   Meaning
-    *   -   :yaml:`identifier`
-        -   every record
-        -   Names the record inside the set. Letters, digits and dashes only,
-            starting with a letter or a digit, and unique across the whole
-            definition.
-    *   -   :yaml:`uid`
-        -   every record
-        -   The uid to write. A positive integer.
-    *   -   :yaml:`children`
-        -   every record
-        -   Sub pages of the declaring page.
-    *   -   :yaml:`content`
-        -   every record
-        -   :sql:`tt_content` records on the declaring page.
-    *   -   :yaml:`files`
-        -   every record
-        -   File references, as a map of field name to references.
-    *   -   :yaml:`inline`
-        -   every record
-        -   Inline children, as a map of the parent field to child records.
-    *   -   :yaml:`table`
-        -   an :yaml:`inline` or :yaml:`records` child
-        -   The table the child belongs to. It is never inferred.
-    *   -   :yaml:`records`
-        -   a record of the :sql:`pages` table
-        -   Records of any table on the declaring page.
+    *   -   :yaml:`isNode`
+        -   The records of this entity can carry nested :yaml:`entities`, and
+            become their node. In practice: the entity writing :sql:`pages`.
+    *   -   :yaml:`tableName`
+        -   The table the entity writes into. Defaults to the entity name, so
+            an entity called :yaml:`sys_category` needs no setting at all.
+    *   -   :yaml:`nodeColumnName`
+        -   The column that receives the uid of the node a record sits on -
+            :sql:`pid` for everything that lives on a page.
+    *   -   :yaml:`parentColumnName`
+        -   The column that receives the uid of the parent a :yaml:`children`
+            entry hangs under - :sql:`pid` for a sub page.
+    *   -   :yaml:`columnNames`
+        -   Aliases: the key a record writes on the left, the real column on
+            the right. :yaml:`{id: 'uid'}` is what makes :yaml:`id` the
+            declared uid.
+    *   -   :yaml:`languageColumnNames`
+        -   The columns a :yaml:`languageVariants` entry gets its ancestor uids
+            written into, in order - :yaml:`['l10n_parent', 'l10n_source']`.
+    *   -   :yaml:`defaultValues`
+        -   Written to every record of the entity unless the record declares
+            the value itself.
+    *   -   :yaml:`valueInstructions`
+        -   A declared value expanded into several columns, see below.
 
-The last two are decided per level rather than once, because both names exist as
-real columns elsewhere: :sql:`tt_content` and :sql:`pages` carry fields whose
-name begins with ``table``, and :sql:`tt_content` has a :sql:`records` column —
-the one the *Insert records* element uses. On any other record, those two keys
-are ordinary fields.
-
-A field value has to be a scalar or empty. A relation is expressed with
-:yaml:`inline`, with :yaml:`files`, or by writing the uid of the target into the
-relation field like any other value.
+Those eight keys are the whole vocabulary of an entity. The entry :yaml:`'*'` is
+not an entity but the **defaults for the declared entities**, merged into each
+of them.
 
 ..  warning::
 
-    An identifier may contain **no underscore**. It becomes part of the
-    placeholder TYPO3 resolves relations by, and an underscore in that
-    placeholder makes the relation resolve to nothing — without an error. The
-    seed is refused with a message instead. Site identifiers are exempt: they
-    never reach such a placeholder.
+    The :yaml:`'*'` entry is merged with :php:`array_merge_recursive()`, which
+    does not override - it **appends**. A key declared on both sides becomes a
+    list. Declaring :yaml:`defaultValues: {hidden: 0}` in :yaml:`'*'` *and*
+    :yaml:`defaultValues: {hidden: 1}` in an entity does not produce
+    :yaml:`hidden: 1`, it produces :yaml:`hidden: [0, 1]`, which reaches the
+    database as the string ``Array``.
 
-Nesting
--------
+    Declare a given key on one side only. Where both sides need something,
+    split it: put :yaml:`pid` in :yaml:`'*'` and :yaml:`doktype` in
+    :yaml:`page`, never :yaml:`hidden` in both.
+
+..  warning::
+
+    The :yaml:`'*'` defaults reach only entities that are **listed** in
+    :yaml:`entitySettings`. An entity that appears in :yaml:`entities:` and
+    nowhere in :yaml:`entitySettings:` is built from nothing: its table is its
+    own name, it has no aliases, no defaults and no :yaml:`nodeColumnName` - so
+    its records get no :sql:`pid` and land on the page tree root.
+
+    An entity that needs nothing but the wildcard defaults still has to be
+    listed. An empty declaration is enough:
+
+    ..  code-block:: yaml
+
+        entitySettings:
+          '*':
+            nodeColumnName: 'pid'
+            columnNames: {id: 'uid'}
+          category:
+            tableName: 'sys_category'
+
+:yaml:`defaultValues` are written with the column names they are **declared**
+with. Aliases from :yaml:`columnNames` are not applied to them, so a default
+belongs under the real column name - :yaml:`{CType: 'text'}`, not
+:yaml:`{type: 'text'}`.
+
+A :yaml:`valueInstructions` block turns one declared value into several columns.
+It is keyed by the name the record declares, then by the value it declares, and
+its own keys are real column names:
+
+..  code-block:: yaml
+
+    page:
+      valueInstructions:
+        shortcut:
+          first: {shortcut: 0, shortcut_mode: 1}
+
+A page declaring :yaml:`shortcut: 'first'` is then written with
+:yaml:`shortcut: 0` and :yaml:`shortcut_mode: 1` - "shortcut to the first sub
+page" spelled once instead of on every page that wants it.
+
+..  _configuration-entities:
+
+entities
+--------
+
+..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/demo/Scenario/Pages.yaml
+
+    entities:
+      page:
+        - self: {id: 1000, title: 'Demo', root: true, slug: '/'}
+          entities:
+            content:
+              - self: {id: 2000, title: 'A frontend to look at', type: 'header'}
+              - self: {id: 2001, bodytext: '<p>Seeded, not clicked together.</p>'}
+          children:
+            - self: {id: 1100, title: 'About', slug: '/about'}
+              entities:
+                content:
+                  - self: {id: 2100, title: 'About us'}
+            - self: {id: 1200, title: 'Contact', slug: '/contact'}
+        - self: {id: 1900, title: 'Storage', type: 254, slug: '/storage'}
+          entities:
+            category:
+              - self: {id: 3000, title: 'News'}
+
+:yaml:`entities` is a map of entity name to a **list of items**. Every item is a
+map, and the keys it may carry are:
 
 ..  list-table::
     :header-rows: 1
 
     *   -   Key
-        -   Where the records end up
+        -   Meaning
+    *   -   :yaml:`self`
+        -   The record itself, as a map of declared names to values. Required,
+            unless :yaml:`version` takes its place.
+    *   -   :yaml:`version`
+        -   The record itself, written into a workspace instead of live. It
+            requires a :yaml:`workspace`, and it cannot be combined with
+            :yaml:`self`.
     *   -   :yaml:`children`
-        -   As :sql:`pages` records below the declaring page.
-    *   -   :yaml:`content`
-        -   As :sql:`tt_content` records on the declaring page.
-    *   -   :yaml:`records`
-        -   As records of the declared table on the declaring page.
-    *   -   :yaml:`inline`
-        -   Tied to the parent through the named field. Their page is the page
-            the **parent** sits on, because a relation is not a containment.
+        -   Further items of the **same entity**, hung under this one through
+            :yaml:`parentColumnName`.
+    *   -   :yaml:`entities`
+        -   Records of **other entities** placed on this one through
+            :yaml:`nodeColumnName`. Only an entity with :yaml:`isNode: true`
+            processes them.
+    *   -   :yaml:`languageVariants`
+        -   Translations of this record, see below.
+    *   -   :yaml:`versionVariants`
+        -   Workspace versions of this record, see below.
+    *   -   :yaml:`actions`
+        -   Commands run on this record after every record was written, see
+            below.
 
-Records come out in the order they are declared, and pages, content elements and
-records of further tables on one page do not disturb each other's sorting. The
-order of inline children comes from the order they are declared in as well.
+Everything inside :yaml:`self` that is not :yaml:`id` is a field: it is resolved
+through :yaml:`columnNames` and written as it stands. A table therefore needs no
+support in this extension to be seedable - declare an entity for it, and if the
+column exists and TYPO3 accepts the value, the seed writes it.
 
-An inline child may itself declare :yaml:`files` and :yaml:`inline`, and nests
-arbitrarily deep that way. It may **not** nest records onto itself:
-:yaml:`children`, :yaml:`content` and :yaml:`records` nest onto the page
-declaring them, and an inline child sits in a relation rather than on a page.
-Such a definition is refused, naming the child and the key. Where :yaml:`records`
-is a field rather than structure — on any child that is not a page — it is
-written as a field as usual.
+Records come out in the order they are declared. Pages, content elements and
+records of further tables on one page do not disturb each other's sorting.
+
+..  warning::
+
+    The scenario format is not key checked beyond its three top level keys. An
+    item key that is not one of the seven above is **silently ignored** - a
+    misspelled :yaml:`childern:` writes nothing and reports nothing. Only
+    :file:`config.yml` refuses an unknown key.
+
+    A dry run is the cheapest guard against that: :bash:`seeder:import demo
+    --dry-run -v` lists every record the scenario builds, per table and with
+    its uid.
+
+..  _configuration-language-variants:
+
+Translations
+------------
+
+:yaml:`languageVariants` is the first-class translation construct of the format.
+A variant is an ordinary item of the same entity, and the seeder fills the
+columns named by :yaml:`languageColumnNames` with the uids of its ancestors:
+
+..  code-block:: yaml
+
+    entitySettings:
+      '*':
+        nodeColumnName: 'pid'
+        columnNames: {id: 'uid', language: 'sys_language_uid'}
+        defaultValues: {pid: 0}
+      page:
+        isNode: true
+        tableName: 'pages'
+        parentColumnName: 'pid'
+        languageColumnNames: ['l10n_parent', 'l10n_source']
+        columnNames: {type: 'doktype', root: 'is_siteroot'}
+        defaultValues: {hidden: 0, doktype: 1}
+      content:
+        tableName: 'tt_content'
+        languageColumnNames: ['l18n_parent', 'l10n_source']
+        columnNames: {title: 'header', type: 'CType'}
+        defaultValues: {hidden: 0, CType: 'text', colPos: 0}
+
+    entities:
+      page:
+        - self: {id: 1000, title: 'EN: Demo', root: true, slug: '/'}
+          children:
+            - self: {id: 1100, title: 'EN: About', slug: '/about'}
+              languageVariants:
+                - self: {id: 1101, title: 'DE: Über uns', language: 1, slug: '/ueber-uns'}
+                - self: {id: 1102, title: 'FR: À propos', language: 2, slug: '/a-propos'}
+              entities:
+                content:
+                  - self: {id: 2100, title: 'EN: About us'}
+                    languageVariants:
+                      - self: {id: 2101, title: 'DE: Über uns', language: 1}
+
+Three things follow from how the variants are written:
+
+*   **The language columns are structure.** With
+    :yaml:`languageColumnNames: ['l10n_parent', 'l10n_source']`, the first
+    variant of a record gets both columns pointing at the original. A variant
+    nested inside a variant - a translation of a translation - gets
+    :sql:`l10n_parent` from the first ancestor and :sql:`l10n_source` from the
+    one directly above it, which is the chain TYPO3 expects.
+*   **A declared value still wins.** A variant declaring :sql:`l10n_source`
+    itself overrides what the seeder computed.
+*   **The language itself is an ordinary field.** :yaml:`language` is only a
+    column alias for :sql:`sys_language_uid`, declared in
+    :yaml:`columnNames`. It is not built into the format.
+
+..  _configuration-version-variants:
+
+Workspace records
+-----------------
+
+There are two ways into a workspace, and they mean different things.
+
+:yaml:`version:` **in place of** :yaml:`self:` writes the record itself into a
+workspace. There is no live record - it is a record that was created in a
+workspace and never published:
+
+..  code-block:: yaml
+
+    entitySettings:
+      workspace:
+        tableName: 'sys_workspace'
+
+    entities:
+      workspace:
+        - self: {id: 1, title: 'Draft'}
+      page:
+        - self: {id: 1000, title: 'Demo', root: true, slug: '/'}
+          children:
+            - version: {id: 1300, title: 'EN: Coming soon', slug: '/soon', workspace: 1}
+
+:yaml:`versionVariants:` writes a workspace **overlay of a live record**: the
+record exists live as its :yaml:`self` declares, and the variant is the changed
+version an editor would see in that workspace:
+
+..  code-block:: yaml
+
+    entities:
+      page:
+        - self: {id: 1100, title: 'EN: About', slug: '/about'}
+          versionVariants:
+            - version: {title: 'EN: About us, revised', workspace: 1}
+
+Rules for both:
+
+*   :yaml:`version` **requires** :yaml:`workspace`, and the workspace has to be
+    a :sql:`sys_workspace` record - seed it in the same scenario, as above.
+*   A :yaml:`versionVariants` entry may **not** declare :yaml:`self`, and may
+    **not** declare an :yaml:`id`: it is the same record, so it inherits the
+    uid of the item it hangs under.
+*   :yaml:`languageVariants` and :yaml:`versionVariants` combine. A language
+    variant may carry version variants of its own, and a
+    :yaml:`languageVariants` entry may itself use :yaml:`version:` instead of
+    :yaml:`self:` - a translation that only exists in a workspace.
+
+The workspaces are written one after another, in the order they first appear in
+the scenario, and a :yaml:`versionVariants` entry is reached after the live
+record it hangs under. A workspace overlay therefore always finds the live
+record it belongs to.
+
+..  _configuration-actions:
+
+actions
+-------
+
+An :yaml:`actions` list is not written with the record: it becomes a
+:php:`DataHandler` **command**, and the commands run after every record of every
+workspace exists. That is what lets an action name a record the same scenario
+creates.
+
+..  code-block:: yaml
+
+    entities:
+      page:
+        - self: {id: 1000, title: 'Demo', root: true, slug: '/'}
+          children:
+            - self: {id: 1100, title: 'About', slug: '/about'}
+            - self: {id: 1200, title: 'Archive', slug: '/archive'}
+              versionVariants:
+                # In workspace 1 the page was moved below "About".
+                - version: {workspace: 1}
+                  actions:
+                    - {action: 'move', type: 'toPage', target: 1100}
+            - self: {id: 1300, title: 'Draft only', slug: '/draft'}
+              versionVariants:
+                # In workspace 1 the page was deleted.
+                - version: {workspace: 1}
+                  actions:
+                    - {action: 'delete'}
+
+..  list-table::
+    :header-rows: 1
+
+    *   -   Action
+        -   Effect
+    *   -   :yaml:`{action: 'move', type: 'toPage', target: <uid>}`
+        -   Move the record onto the page :yaml:`target`.
+    *   -   :yaml:`{action: 'move', type: 'toTop'}`
+        -   Move the record to the top of the node it sits on. It needs a node,
+            so it applies to a nested record rather than to a top level page.
+    *   -   :yaml:`{action: 'move', type: 'afterRecord', target: <uid>}`
+        -   Move the record directly behind :yaml:`target`.
+    *   -   :yaml:`{action: 'delete'}`
+        -   Delete the record.
+    *   -   :yaml:`{action: 'discard'}`
+        -   Discard the workspace version. Only in a workspace; in the live
+            workspace it does nothing.
+
+An unknown :yaml:`action` is ignored rather than refused, in line with the rest
+of the scenario format.
 
 ..  _configuration-uids:
 
-Declared uids
--------------
+Declared uids, and what makes a seed reproducible
+=================================================
 
-A declared :yaml:`uid` makes a seeded page tree reproducible: the same set
-produces the same uids in every installation, so a site configuration, a
-TypoScript condition or a test may refer to a page by its number.
+**Every record of a scenario has a uid before it is written.** Either the item
+declares one as :yaml:`id`, or the seeder hands out a dynamic one from ``10000``
+upwards. Both are suggested to :php:`DataHandler`, so a seeded page tree is the
+*same* page tree in every installation - a site configuration, a TypoScript
+condition or a test may refer to a page by its number.
 
-TYPO3 treats such a uid as a *suggestion*. If the uid is already used in its
-table, the record is not written elsewhere — the insert fails. The import
-therefore checks every declared uid up front and refuses when one is taken,
+Declare the uid of everything that is referred to from outside the set: a site
+root, a shortcut target, a storage folder. Let the rest be dynamic.
+
+..  note::
+
+    The dynamic uids are handed out **per entity name**, not per table. Two
+    entities writing the same table - :yaml:`page` and :yaml:`folder` both on
+    :sql:`pages` - each start counting at ``10000``, and the second collides
+    with the first. The import refuses that before writing anything, naming the
+    identifier. Declare :yaml:`id` on the records of the second entity, or give
+    the two a single entity.
+
+TYPO3 treats a suggested uid as a *suggestion*. If the uid is already used in
+its table, the record is not written elsewhere - the insert fails. The import
+therefore checks every suggested uid up front and refuses when one is taken,
 naming the records in the way:
 
 ..  code-block:: none
@@ -247,17 +550,36 @@ naming the records in the way:
      ---------- ----- -------------------
       Table      Uid   Occupied by
      ---------- ----- -------------------
-      pages      1     Company site
-      pages      2     Products
+      pages      1000  Company site
+      pages      1100  Products
      ---------- ----- -------------------
 
 Nothing is written in that case. :bash:`--force` imports anyway: every record of
 a **table something collides in** is written with a free uid instead of the
-declared one, a table nothing collides in keeps its declared uids, and nothing
-that is in the way is deleted or changed.
+suggested one, a table nothing collides in keeps its uids, and nothing that is
+in the way is deleted or changed.
 
-A deleted record occupies its uid as much as any other one — the row is still
+A deleted record occupies its uid as much as any other one - the row is still
 there.
+
+..  note::
+
+    A forced run writes the records of a colliding table with the uid the
+    database assigns, on every supported DBMS - PostgreSQL included. What the
+    set declares for that table is given up entirely; the relations between its
+    records are not.
+
+..  warning::
+
+    :bash:`--force` is refused for a set that declares :yaml:`sites` and
+    collides in :sql:`pages`. Every site names its root page by uid, so giving
+    up the page uids would point the site at a different page, or at none.
+    Free the uids, or import with :bash:`--no-site-config`.
+
+Suggested uids are honoured for an **administrator** backend user only.
+:php:`DataHandler` ignores them silently for anybody else, so the import refuses
+to run as a non-admin rather than write a set whose uids are not the ones it
+declares.
 
 ..  _configuration-files:
 
@@ -273,33 +595,43 @@ Files
         name: 'placeholder.svg'             # optional, default the source basename
         storage: 1                          # optional, default the default storage
 
+..  list-table::
+    :header-rows: 1
+
+    *   -   Key
+        -   Required
+        -   Meaning
+    *   -   :yaml:`identifier`
+        -   yes
+        -   Unique among the files of the set.
+    *   -   :yaml:`source`
+        -   yes
+        -   Where the file comes from: a path relative to the directory holding
+            the set, or an :file:`EXT:` path.
+    *   -   :yaml:`folder`
+        -   no
+        -   Target folder inside the storage. Defaults to the storage root.
+    *   -   :yaml:`name`
+        -   no
+        -   The name the file is written under. Defaults to the base name of
+            the :yaml:`source`.
+    *   -   :yaml:`storage`
+        -   no
+        -   The uid of the storage to write into. Defaults to the default
+            storage of the installation.
+
+This list is **closed** as well: any other key on a file is refused, naming the
+known ones - :yaml:`foldr:` instead of :yaml:`folder:` would otherwise put the
+file in the storage root and report success.
+
 Files are copied before the records are written, through the file storage API,
-which is what indexes them — a file copied into :file:`fileadmin/` by hand
+which is what indexes them - a file copied into :file:`fileadmin/` by hand
 exists on disk and does not exist for TYPO3. A missing target folder is created,
 an existing file of the same name is replaced, and the source file in the
 extension is left where it is.
 
-A record points at a seeded file per field:
-
-..  code-block:: yaml
-
-    files:
-      media:
-        - placeholder
-        - identifier: portrait
-          alternative: 'A portrait placeholder'
-          description: 'Shown as the caption'
-
-The short form is the identifier of a declared file. The long form adds the
-fields of the file *reference* — :yaml:`alternative`, :yaml:`title`,
-:yaml:`description`, :yaml:`link`, :yaml:`crop`: exactly what an editor fills in
-on a file relation in the backend. They belong to the reference rather than to
-the file, which is what lets the same image carry a different alternative text
-in two places.
-
-Referencing a file the set does not declare is refused before anything is
-written. A field declared with an empty list creates no reference and leaves the
-field alone.
+This version seeds files, and it does not attach them to records - see
+:ref:`What this version does not do <configuration-limits>`.
 
 ..  _configuration-sites:
 
@@ -310,7 +642,7 @@ Site configurations
 
     sites:
       - identifier: main                    # required, the directory in config/sites/
-        rootPage: home                      # required, the identifier of a seeded page
+        rootPage: 1000                      # required, the uid of a seeded page
         template: 'Sites/main'              # optional, default Sites/<identifier>
         base: 'https://example.com/'        # optional, overrides the template
 
@@ -328,11 +660,11 @@ copying a working site out of an installation.
     *   -   :yaml:`identifier`
         -   yes
         -   Becomes the directory name below :file:`config/sites/`. Letters,
-            digits, dashes and underscores.
+            digits, dashes and underscores, starting with a letter or a digit.
     *   -   :yaml:`rootPage`
         -   yes
-        -   The **seed** identifier of the page that becomes the site root. It
-            has to name a page of the same set.
+        -   The **uid** of the page that becomes the site root. It has to be the
+            :yaml:`id` an entity of the :sql:`pages` table of this set declares.
     *   -   :yaml:`template`
         -   no
         -   The template directory, relative to the set or an :file:`EXT:` path.
@@ -340,60 +672,132 @@ copying a working site out of an installation.
         -   no
         -   Replaces the ``base`` of the template.
 
+This list is **closed** too: a site is configuration rather than a record, so
+nothing on it is written verbatim and an unknown key can only be a mistake.
+
+A scenario record carries no symbolic name, so its stable handle is the uid it
+declares - which is why :yaml:`rootPage` is a number here and not a name. A site
+naming a uid that no :sql:`pages` entity of the scenario declares is refused
+before anything is written, rather than after the whole tree exists.
+
 Three rules apply to the result:
 
 *   **The root page always wins.** ``rootPageId`` is taken from the uid the
-    declared page was written with, whatever the template says. That is the
-    whole reason the set names the page by its seed identifier.
+    declared page was actually written with, whatever the template says.
 *   **An existing site identifier is refused.** TYPO3 *merges* an incoming site
     configuration into an existing one, so seeding over it would produce neither
     the template nor the previous configuration but a mixture of both. Remove
     the site first if the seed is meant to replace it.
 *   **A minimal template needs almost nothing.** ``base`` and ``languages`` are
     worth declaring, because their defaults are a site on ``/`` in
-    "Default / en_US.UTF-8". ``dependencies`` — the site sets a site pulls in —
+    "Default / en_US.UTF-8". ``dependencies`` - the site sets a site pulls in -
     is written unchanged and works on TYPO3 v13 and v14 alike.
 
 Placeholders such as ``%env(...)%`` inside a template are **not** resolved while
 seeding. They are written as they stand, so the installation resolves them every
-time it reads the file — which is what they are for.
+time it reads the file - which is what they are for.
 
 The site TYPO3 creates by itself
 --------------------------------
 
 TYPO3 writes an ``autogenerated-<uid>`` site configuration whenever a new page
-becomes a site root. An import suppresses that, always — whether the set
-declares :yaml:`sites` or not — because such a configuration is never what a
+becomes a site root. An import suppresses that, always - whether the set
+declares :yaml:`sites` or not - because such a configuration is never what a
 seed wanted.
 
 The consequence is reported rather than left to be discovered: when a seeded
 site root ends up covered by no site configuration at all, the import warns and
-names the pages. A page tree without a site is a frontend that cannot render,
-and nothing else would say so.
+names the pages by uid. A page tree without a site is a frontend that cannot
+render, and nothing else would say so.
 
 ..  _configuration-imports:
 
 Splitting a set over several files
 ==================================
 
+A set splits in two independent ways, and they are not interchangeable.
+
+The descriptor: imports
+-----------------------
+
 ..  code-block:: yaml
 
     imports:
-      - { resource: Pages.yaml }
-      - { resource: 'EXT:my_extension/Configuration/Seeder/shared/Content.yaml' }
+      - { resource: Files.yaml }
+      - { resource: 'EXT:my_extension/Configuration/Seeder/shared/Sites.yaml' }
 
-Imported lists are **merged** into the importing file rather than replacing it,
-resources are resolved relative to the file declaring them, and :file:`EXT:`
-paths are accepted. An imported file carries the same keys as the entry file —
-except the three metadata keys, which belong into :file:`config.yml`.
+:yaml:`imports` is handled by the loader TYPO3 reads its own site
+configurations with. Imported lists are **merged** into the importing file
+rather than replacing it, resources are resolved relative to the file declaring
+them, and :file:`EXT:` paths are accepted. An imported file carries the same
+keys as the entry file - except the three metadata keys, which belong into
+:file:`config.yml`.
 
-A resource that cannot be read stops the import with an error. It is not skipped:
-a typo in a path would otherwise mean the pages of that file are silently not
-seeded while the import reports success.
+A resource that cannot be read stops the import with an error. It is not
+skipped: a typo in a path would otherwise mean the files of that resource are
+silently not seeded while the import reports success.
 
-Placeholders are **not** substituted in a seed definition, unlike in a site
-configuration. Seeded content has to arrive in the database exactly as it was
+Placeholders are **not** substituted in a set descriptor, unlike in a site
+configuration. A title or a description is content and has to arrive as it was
 written, and ``%`` occurs in pairs in perfectly ordinary texts.
+
+The records: several scenarios
+------------------------------
+
+..  code-block:: yaml
+
+    scenarios:
+      - Scenario/Pages.yaml
+      - Scenario/Content.yaml
+      - 'EXT:my_extension/Configuration/Seeder/shared/Categories.yaml'
+
+The listed files are composed into **one** scenario before anything is built,
+in the order they are declared:
+
+..  list-table::
+    :header-rows: 1
+
+    *   -   Key
+        -   How it is merged
+    *   -   :yaml:`entitySettings`
+        -   Merged recursively. A later file wins a conflicting value, so a
+            shared file can declare the entities and a set specific one can
+            change a default.
+    *   -   :yaml:`entities`
+        -   Appended per entity name, in the order the files are declared. A
+            later file adds records, it never replaces them.
+    *   -   :yaml:`__variables`
+        -   Dropped. YAML anchors are resolved per file and never cross one, so
+            every file that uses anchors declares them itself.
+
+One composed scenario rather than one per file, because the dynamic uids are
+handed out per scenario: two scenarios would each start at ``10000`` and the
+second insert would fail on the primary key. Composed, the same collision is
+reported by name before anything is written.
+
+A scenario file that does not exist, cannot be read, is not valid YAML, is not
+a map, or declares an unknown top level key stops the import.
+
+..  _configuration-limits:
+
+What this version does not do
+=============================
+
+Two things the seed definition format does not currently express. Both are
+named here rather than left to be discovered:
+
+*   **A record cannot attach a file.** File *provisioning* works: the
+    :yaml:`files` of a set are copied and indexed, and a :sql:`sys_file` row
+    exists afterwards. What is missing is the file *reference* - there is no
+    way to hang a :sql:`sys_file_reference` onto a record's :sql:`assets` or
+    :sql:`media` field from a scenario. The scenario format has no concept of a
+    file, and inventing one is a change of its own.
+*   **There is no inline relation construct.** In this format every record has
+    a uid before it is written - declared as :yaml:`id`, or handed out from
+    ``10000`` upwards - so a relation is expressed by writing that uid into the
+    relation field, the same way any other value is written. What does not
+    exist is a nesting construct that creates the child and the relation in one
+    declaration.
 
 ..  _configuration-commands:
 
@@ -415,8 +819,8 @@ adds the directory the set lives in. Sets appear in the order the installation
 loads their extensions in, and within one extension sorted by directory name.
 
 The command exits non-zero when an identifier is provided by more than one
-extension — the sets cannot be told apart, so neither listing nor importing may
-pick one of them — and when a :file:`config.yml` cannot be read or does not name
+extension - the sets cannot be told apart, so neither listing nor importing may
+pick one of them - and when a :file:`config.yml` cannot be read or does not name
 itself. An installation without any seed set is not an error.
 
 ..  _configuration-command-import:
@@ -427,12 +831,13 @@ seeder:import
 ..  code-block:: bash
 
     vendor/bin/typo3 seeder:import demo
-    vendor/bin/typo3 seeder:import demo --dry-run
+    vendor/bin/typo3 seeder:import demo --dry-run -v
     vendor/bin/typo3 seeder:import demo --base='https://example.com/'
 
 Without an identifier the command asks which set to import. Without a terminal
-to ask on — a deployment script, a pipeline, a hook — it lists the available
-sets and exits non-zero rather than guessing.
+to ask on - a deployment script, a pipeline, a hook - it lists the available
+sets and exits non-zero rather than guessing. An identifier that names nothing
+is answered with the sets that look like it.
 
 ..  list-table::
     :header-rows: 1
@@ -440,8 +845,8 @@ sets and exits non-zero rather than guessing.
     *   -   Option
         -   Effect
     *   -   :bash:`--dry-run`
-        -   Parse, validate and check the set, report what an import would do,
-            and write nothing.
+        -   Parse the descriptor, compose the scenario, build every record and
+            check its uid, report what an import would do, and write nothing.
     *   -   :bash:`--force`
         -   Import although the set suggests uids this installation already
             uses. See :ref:`Declared uids <configuration-uids>`.
@@ -455,8 +860,14 @@ sets and exits non-zero rather than guessing.
         -   Skip the site configurations the set declares. The warning about
             uncovered site roots still appears.
     *   -   :bash:`-v`
-        -   Add the table of seed identifiers and the uids they were written
-            with.
+        -   Add the table of uids: what a dry run would suggest, or what a real
+            run wrote for each declared uid.
+
+:bash:`--root-page` moves the **top level** items of every entity onto the given
+page, and only those that do not declare a :sql:`pid` of their own. Nested
+records, children, language variants and version variants are untouched - they
+take their page from their node or from their ancestor, and moving them would
+take them off the tree they were declared in.
 
 Exit codes
 ~~~~~~~~~~
@@ -478,18 +889,21 @@ Exit codes
         -   The set cannot be told apart: the identifier is provided more than
             once, or a :file:`config.yml` in this installation cannot be read.
     *   -   5
-        -   The set is not a valid seed definition.
+        -   The set is not a valid seed definition: an unknown key, a scenario
+            that cannot be read or built, a scenario without a single record,
+            or a site whose :yaml:`rootPage` the scenario does not declare.
     *   -   6
-        -   The set suggests uids this installation already uses.
+        -   The set suggests uids this installation already uses, or
+            :bash:`--force` would give up the page uids a declared site needs.
     *   -   7
         -   There is no administrator backend user to write as.
     *   -   8
         -   Writing the set failed.
 
 A dry run does everything a real run does except the writing: it resolves the
-set, parses it, builds what would be written and checks the uids. A set that a
-dry run accepts fails afterwards only for a reason that lives in the
-installation rather than in the set.
+set, parses the descriptor, composes and builds the scenario, and checks the
+uids. A set that a dry run accepts fails afterwards only for a reason that lives
+in the installation rather than in the set.
 
 ..  _configuration-written:
 
@@ -501,26 +915,33 @@ What the seeder writes by itself
 
     *   -   Field
         -   Rule
-    *   -   ``pid``
-        -   Structure — it comes from the nesting and is never taken from the
-            set.
-    *   -   ``hidden``
-        -   Defaults to visible. TYPO3 creates records hidden, which is right
-            for an editor and wrong for a seed. Declare :yaml:`hidden: 1` for a
-            record that is meant to be hidden.
-    *   -   ``doktype``, ``l10n_parent``, ``sys_language_uid``
-        -   Written on every page unless the set declares them, so that a set
-            produces the same page in every installation rather than whatever
-            the local configuration defaults to.
+    *   -   ``uid``
+        -   Suggested for every record: the declared :yaml:`id`, or a dynamic
+            one from ``10000`` upwards.
+    *   -   The node column
+        -   Structure. The column named by :yaml:`nodeColumnName` gets the uid
+            of the record the item is nested under, and is never taken from the
+            item.
+    *   -   The parent column
+        -   Structure, likewise, for a :yaml:`children` entry and the column
+            named by :yaml:`parentColumnName`.
+    *   -   The language columns
+        -   The columns named by :yaml:`languageColumnNames` get the ancestors
+            of a :yaml:`languageVariants` entry. A value the variant declares
+            itself wins.
     *   -   ``sorting``
         -   Computed by TYPO3 so that records appear in the order they are
             declared.
-    *   -   The columns of a file reference
-        -   ``uid_local``, ``uid_foreign``, ``tablenames``, ``fieldname`` and
-            ``pid`` are structure and always win over a declared value.
+    *   -   ``slug``, TCA defaults and evaluations
+        -   Everything :php:`DataHandler` derives from a record is derived,
+            because the records go through it rather than through an
+            :sql:`INSERT`.
 
-Everything else in a record comes from the set, or from the TCA of the
-installation where the set declares nothing.
+Everything else in a record comes from its :yaml:`self` or :yaml:`version`, from
+the :yaml:`defaultValues` of its entity, or from the TCA of the installation
+where neither declares anything. This extension adds no default of its own - in
+particular, a record is created **hidden** unless the scenario says otherwise,
+which is why every example above declares :yaml:`defaultValues: {hidden: 0}`.
 
 See also
 ========

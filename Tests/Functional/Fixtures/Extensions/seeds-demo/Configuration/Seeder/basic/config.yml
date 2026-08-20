@@ -8,11 +8,8 @@ identifier: demo-pages
 title: 'Demo page tree'
 description: 'A page tree with nothing but pages in it.'
 
-pages:
-  - identifier: home
-    title: 'Home'
-    slug: '/'
-    is_siteroot: 1
+scenarios:
+  - Scenario.yaml
 
 #
 # The site the page tree of this set is reachable through. It declares no
@@ -21,4 +18,4 @@ pages:
 #
 sites:
   - identifier: main
-    rootPage: home
+    rootPage: 1000

@@ -8,8 +8,5 @@ identifier: demo-pages
 title: 'A second page tree claiming the same identifier'
 description: 'Provided by a different extension than the set it collides with.'
 
-pages:
-  - identifier: home
-    title: 'Home of the colliding set'
-    slug: '/'
-    is_siteroot: 1
+scenarios:
+  - Scenario.yaml

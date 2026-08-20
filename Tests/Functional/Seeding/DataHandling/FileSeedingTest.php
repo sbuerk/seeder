@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\DataMapFactory;
 use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\RecordSeeder;
+use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
+use SBUERK\Seeder\Seeding\Definition\SeedFile;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
@@ -16,18 +16,20 @@ use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
- * Copies the files of a seed definition into a storage and attaches them to the
- * records that declare them.
+ * Copies the files a seed definition brings into a file storage and indexes
+ * them, which is the pass that runs *before* any record is written.
  *
- * Two mechanisms are under test, and both are silent when they break:
+ * What is under test is provisioning, not referencing: a `sys_file` row that
+ * exists, points at the right storage and carries the identifier the
+ * definition asked for. The row is the whole point of going through the
+ * storage API - a file put into `fileadmin/` with `copy()` sits on disk in
+ * exactly the same place and does not exist for TYPO3, so nothing can
+ * reference it and nothing says why.
  *
- * - the copy goes through the storage API, so the file is *indexed* - a file
- *   copied into `fileadmin/` with `copy()` exists on disk and does not exist
- *   for TYPO3;
- * - the references are written in a second pass, so `uid_foreign` carries the
- *   uid of a record that exists rather than an unresolved `NEW…` placeholder,
- *   and the parent's counter field is written so `sorting_foreign` is numbered
- *   rather than left at `0`.
+ * The second silent failure covered here is the direction of the copy.
+ * `ResourceStorage::addFile()` *moves* by default, which would delete the
+ * source out of the package shipping the seed - once, quietly, and only on the
+ * machine that ran the seeder.
  *
  * Every row is read back through the `QueryBuilder`. Hand written SQL would
  * pass here and fail on PostgreSQL, which folds an unquoted identifier to lower
@@ -43,41 +45,35 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
     private const SEED = 'EXT:seeder/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml';
 
     /**
-     * The file field of the content elements of the set, declared by the
-     * `tests/file-fields` fixture extension. A field of its own rather than
-     * `tt_content.image`, so what is asserted here is the seeding rather than
-     * what a core version happens to offer on `tt_content`.
+     * The test instance is created once for the **whole test case** and only
+     * the database is reset between tests (13.4/14.3 testing framework:
+     * FunctionalTestCase::setUp(), which creates `fileadmin/` in the
+     * `isFirstTest` branch only). A file another test copied into a storage is
+     * therefore still on disk, while its `sys_file` row is gone - and half of
+     * what is asserted here is that a folder or a file was *not* there before
+     * the seeder ran.
+     *
+     * The storages are wiped rather than the assertions weakened, because a
+     * test that only passes when it runs first is a test that will fail for a
+     * reason that has nothing to do with the change that made it fail.
      */
-    private const CONTENT_FILE_FIELD = 'tx_testsfilefields_media';
-
-    /**
-     * The extension itself is repeated, because redeclaring the property
-     * replaces the one of the parent class.
-     */
-    protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
-        'tests/file-fields',
-    ];
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->importCSVDataSet(dirname(__DIR__, 2) . '/Fixtures/Database/BackendUsers.csv');
+        GeneralUtility::rmdir($this->instancePath . '/fileadmin', true);
+        GeneralUtility::rmdir($this->instancePath . '/secondary', true);
+        GeneralUtility::mkdir($this->instancePath . '/fileadmin');
     }
 
     /**
-     * The subject, constructed rather than fetched from the container: both
-     * services are private and nothing references them yet, so Symfony removes
-     * them while compiling the container. Their wiring is proven where they are
-     * first injected rather than by publishing them for a test.
+     * The subject, constructed rather than fetched from the container: the
+     * service is private and its wiring is proven where it is injected, not by
+     * publishing it for a test.
      */
-    private function subject(): RecordSeeder
+    private function subject(): FileSeeder
     {
-        return new RecordSeeder(
-            new DataMapFactory(),
-            new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class)),
-        );
+        return new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class));
     }
 
     /**
@@ -95,24 +91,63 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
      * StorageRepository.php:133ff). Leaning on that would make every test here
      * depend on a fallback meant for a fresh installation, and would say
      * nothing about an instance that was set up.
+     *
+     * @return int The uid of the created storage, which is what a `sys_file`
+     *         row is asserted to point at.
      */
-    private function createDefaultStorage(): void
+    private function createDefaultStorage(): int
     {
-        GeneralUtility::makeInstance(StorageRepository::class)
+        return GeneralUtility::makeInstance(StorageRepository::class)
             ->createLocalStorage('fileadmin', 'fileadmin/', 'relative', 'Seeding test storage', true);
     }
 
     /**
-     * @return array<string, int> The written uids, keyed by seed identifier.
+     * A second storage, so a declared `storage` has something to pick that is
+     * not the one it would have got anyway.
+     *
+     * The base path is created first: `createLocalStorage()` probes the case
+     * sensitivity of the filesystem by touching a file in it, and `touch()`
+     * does not create directories.
+     */
+    private function createSecondaryStorage(): int
+    {
+        GeneralUtility::mkdir_deep($this->instancePath . '/secondary/');
+
+        return GeneralUtility::makeInstance(StorageRepository::class)
+            ->createLocalStorage('secondary', 'secondary/', 'relative', 'A second storage', false);
+    }
+
+    private function fixtureDirectory(): string
+    {
+        return dirname(__DIR__, 2) . '/Fixtures/Seeds';
+    }
+
+    /**
+     * A definition built in the test rather than read from disk, for the cases
+     * a fixture set cannot express twice: a declared `name`, a declared
+     * `storage`, and a source that is not there.
+     *
+     * `basePath` is the directory of the fixture sets, so a relative `source`
+     * resolves the same way it does for the set on disk.
+     *
+     * @param list<SeedFile> $files
+     */
+    private function definition(array $files, string $identifier = 'file-seeding'): SeedDefinition
+    {
+        return new SeedDefinition(
+            identifier: $identifier,
+            title: 'Files to provision',
+            basePath: $this->fixtureDirectory(),
+            files: $files,
+        );
+    }
+
+    /**
+     * @return array<string, int> The `sys_file` uids, keyed by seed identifier.
      */
     private function seedFileSet(): array
     {
-        $this->createDefaultStorage();
-
-        return $this->subject()->seed(
-            (new SeedDefinitionParser())->parseFile(self::SEED),
-            $this->setUpBackendUser(1),
-        );
+        return $this->subject()->seed((new SeedDefinitionParser())->parseFile(self::SEED));
     }
 
     /**
@@ -139,66 +174,64 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * The indexed files, keyed by uid, so a returned uid can be looked up
+     * rather than assumed to be the first row.
+     *
+     * @return array<int, array<string, mixed>>
      */
-    private function references(): array
+    private function indexedFiles(): array
     {
-        return $this->queryTable(
-            'sys_file_reference',
-            [
-                'uid',
-                'pid',
-                'uid_local',
-                'uid_foreign',
-                'tablenames',
-                'fieldname',
-                'sorting_foreign',
-                'alternative',
-                'title',
-                'description',
-            ],
+        return array_column(
+            $this->queryTable('sys_file', ['uid', 'identifier', 'name', 'storage'], 'uid'),
+            null,
             'uid',
         );
     }
 
     /**
-     * The `sys_file` identifier of every indexed file, keyed by its uid.
+     * A `source` that is neither `EXT:` nor absolute resolves against the
+     * directory holding the set, which is what lets a set be moved or renamed
+     * without touching its paths.
      *
-     * @return array<int, string>
+     * The `sys_file` row is what proves the copy went through the storage API
+     * rather than through the filesystem.
      */
-    private function indexedFiles(): array
+    #[Test]
+    public function aRelativeSourceIsResolvedAgainstTheSetDirectoryAndIndexed(): void
     {
-        $files = [];
-        foreach ($this->queryTable('sys_file', ['uid', 'identifier'], 'uid') as $row) {
-            $files[(int)$row['uid']] = (string)$row['identifier'];
-        }
+        $storage = $this->createDefaultStorage();
 
-        return $files;
+        $uids = $this->seedFileSet();
+
+        $file = $this->indexedFiles()[$uids['landscape']];
+
+        $this->assertSame('/seed-files/placeholder.svg', (string)$file['identifier']);
+        $this->assertSame('placeholder.svg', (string)$file['name']);
+        $this->assertSame($storage, (int)$file['storage']);
+        $this->assertFileExists($this->instancePath . '/fileadmin/seed-files/placeholder.svg');
     }
 
     /**
-     * Both accepted source forms end up in the storage, indexed: a path
-     * relative to the directory holding the set, and an `EXT:` path.
+     * The other accepted form is resolved by the core, so a set may ship a file
+     * that lives in a different extension than the set itself.
      *
-     * The `sys_file` rows are what proves the copy went through the storage
-     * API. A file put into `fileadmin/` with `copy()` would sit on disk exactly
-     * the same way and be invisible to TYPO3 - nothing could reference it, and
-     * nothing would say why.
+     * `GeneralUtility::getFileAbsFileName()` handles only this form: it
+     * prepends the public web folder to a *relative* path, and a seed set lives
+     * in an extension rather than below the document root, so the path it would
+     * build names a file that is never there.
      */
     #[Test]
-    public function bothSourceFormsAreCopiedIntoTheStorageAndIndexed(): void
+    public function anExtensionPathSourceIsResolvedByTheCoreAndIndexed(): void
     {
-        $this->seedFileSet();
+        $storage = $this->createDefaultStorage();
 
-        $files = $this->queryTable('sys_file', ['uid', 'identifier', 'name'], 'uid');
+        $uids = $this->seedFileSet();
 
-        $this->assertSame(
-            ['/seed-files/placeholder.svg', '/seed-files/placeholder-portrait.svg'],
-            array_map('strval', array_column($files, 'identifier')),
-        );
-        // The declared folder was created on the way, rather than the files
-        // landing in the storage root.
-        $this->assertFileExists($this->instancePath . '/fileadmin/seed-files/placeholder.svg');
+        $file = $this->indexedFiles()[$uids['portrait']];
+
+        $this->assertSame('/seed-files/placeholder-portrait.svg', (string)$file['identifier']);
+        $this->assertSame('placeholder-portrait.svg', (string)$file['name']);
+        $this->assertSame($storage, (int)$file['storage']);
         $this->assertFileExists($this->instancePath . '/fileadmin/seed-files/placeholder-portrait.svg');
     }
 
@@ -211,247 +244,103 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
     #[Test]
     public function theSourceFilesStayWhereTheDefinitionDeclaresThem(): void
     {
+        $this->createDefaultStorage();
+
         $this->seedFileSet();
 
-        $sources = dirname(__DIR__, 2) . '/Fixtures/Seeds/Files';
-
-        $this->assertFileExists($sources . '/placeholder.svg');
-        $this->assertFileExists($sources . '/placeholder-portrait.svg');
+        $this->assertFileExists($this->fixtureDirectory() . '/Files/placeholder.svg');
+        $this->assertFileExists($this->fixtureDirectory() . '/Files/placeholder-portrait.svg');
     }
 
     /**
-     * Every reference belongs to the record that declares it, sits on that
-     * record's page, and names the table and the field it was declared under.
+     * The declared folder is created on the way, rather than the files landing
+     * in the storage root because the target was not there.
      *
-     * The assertion that nothing points at record `0` is the one this second
-     * pass exists for: `uid_foreign` is a plain integer column, so a `NEW…`
-     * placeholder written there is read as `0` - and DataHandler does not log a
-     * word about it.
+     * Its absence is asserted first, so what the test shows is the seeder
+     * creating the folder rather than the test instance happening to have one.
      */
     #[Test]
-    public function everyReferencePointsAtTheRecordThatDeclaresIt(): void
-    {
-        $uids = $this->seedFileSet();
-
-        $references = $this->references();
-
-        $this->assertCount(4, $references, 'Not every declared file reference was written.');
-        $this->assertSame([], array_values(array_filter(
-            $references,
-            static fn(array $row): bool => (int)$row['uid_foreign'] === 0,
-        )));
-
-        $onPage = array_values(array_filter(
-            $references,
-            static fn(array $row): bool => $row['tablenames'] === 'pages',
-        ));
-        $this->assertCount(1, $onPage);
-        $this->assertSame('media', $onPage[0]['fieldname']);
-        $this->assertSame($uids['home'], (int)$onPage[0]['uid_foreign']);
-        // The page of the level the record sits on, which for a top level page
-        // is the page tree root the seed was written below - never the record's
-        // own pid, which may be the negative "insert after" hint.
-        $this->assertSame(0, (int)$onPage[0]['pid']);
-
-        $onContent = array_values(array_filter(
-            $references,
-            static fn(array $row): bool => $row['tablenames'] === 'tt_content',
-        ));
-        $this->assertCount(3, $onContent);
-        foreach ($onContent as $row) {
-            $this->assertSame(self::CONTENT_FILE_FIELD, $row['fieldname']);
-            $this->assertSame($uids['home'], (int)$row['pid']);
-        }
-    }
-
-    /**
-     * The six columns the seeder owns on a `sys_file_reference` are asserted
-     * one by one on a single reference, rather than left to the tests that
-     * happen to touch one of them.
-     *
-     * `uid_local`, `uid_foreign`, `tablenames`, `fieldname`, `pid` and
-     * `sorting_foreign` are what makes a reference a reference: the file it
-     * points at, the record it belongs to, which field of which table that
-     * record used, the page it sits on and its place in the relation. A wrong
-     * or unwritten one of them produces a row that exists and a relation that
-     * does not, and DataHandler logs nothing about any of them.
-     *
-     * The reference is picked by uid rather than by a filter over the six
-     * columns, so a column that is wrong cannot make the row disappear from
-     * the selection and take the assertion with it.
-     */
-    #[Test]
-    public function everyStructuralColumnOfAReferenceIsWritten(): void
-    {
-        $uids = $this->seedFileSet();
-
-        $files = array_flip($this->indexedFiles());
-        $references = array_column($this->references(), null, 'uid_foreign');
-
-        $reference = $references[$uids['single']];
-
-        $this->assertSame($files['/seed-files/placeholder.svg'], (int)$reference['uid_local']);
-        $this->assertSame($uids['single'], (int)$reference['uid_foreign']);
-        $this->assertSame('tt_content', $reference['tablenames']);
-        $this->assertSame(self::CONTENT_FILE_FIELD, $reference['fieldname']);
-        $this->assertSame($uids['home'], (int)$reference['pid']);
-        $this->assertSame(1, (int)$reference['sorting_foreign']);
-    }
-
-    /**
-     * A multi file relation comes out in the order the definition declares it.
-     *
-     * The rows themselves were always written and the images always appeared,
-     * which is exactly why this went unnoticed for so long:
-     * `FileRepository::findByRelation()` selects by
-     * `uid_foreign`/`tablenames`/`fieldname` and never reads the parent's
-     * counter column. It *orders* by `sorting_foreign` though, and that column
-     * is written by `RelationHandler::writeForeignField()` - which only runs
-     * when the parent's field carries the comma separated placeholder list.
-     * Without it every seeded reference keeps a `sorting_foreign` of `0` and
-     * the order of a gallery is whatever the database feels like returning.
-     */
-    #[Test]
-    public function aMultiFileRelationIsNumberedInDeclarationOrder(): void
-    {
-        $uids = $this->seedFileSet();
-
-        $files = $this->indexedFiles();
-        $gallery = array_values(array_filter(
-            $this->references(),
-            static fn(array $row): bool => $row['tablenames'] === 'tt_content'
-                && (int)$row['uid_foreign'] === $uids['gallery'],
-        ));
-
-        $this->assertCount(2, $gallery, 'The two gallery references were not written.');
-        // Numbered rather than left at zero...
-        $this->assertSame([1, 2], array_map('intval', array_column($gallery, 'sorting_foreign')));
-        // ...and numbered in the order the definition declares.
-        $this->assertSame('/seed-files/placeholder.svg', $files[(int)$gallery[0]['uid_local']]);
-        $this->assertSame('/seed-files/placeholder-portrait.svg', $files[(int)$gallery[1]['uid_local']]);
-    }
-
-    /**
-     * The counter field of the parent is the other half DataHandler needs, and
-     * the honest tell that the relation was understood rather than that rows
-     * merely exist: nothing renders it, so it is only ever right on purpose.
-     */
-    #[Test]
-    public function theCounterFieldOfEveryParentCountsItsReferences(): void
-    {
-        $uids = $this->seedFileSet();
-
-        $content = array_column(
-            $this->queryTable('tt_content', ['uid', self::CONTENT_FILE_FIELD], 'uid'),
-            self::CONTENT_FILE_FIELD,
-            'uid',
-        );
-        $pages = array_column($this->queryTable('pages', ['uid', 'media'], 'uid'), 'media', 'uid');
-
-        $this->assertSame(1, (int)$content[$uids['single']]);
-        $this->assertSame(2, (int)$content[$uids['gallery']]);
-        // An element declaring no file keeps a counter of zero, which is what
-        // makes the two above mean something.
-        $this->assertSame(0, (int)$content[$uids['without-image']]);
-        $this->assertSame(1, (int)$pages[$uids['home']]);
-    }
-
-    /**
-     * The fields an editor fills in on a file relation live on the reference
-     * rather than on the file, which is what lets the same image carry a
-     * different alternative text in two places - and the short form writes none
-     * of them, because a bare identifier declares nothing.
-     */
-    #[Test]
-    public function theLongFormWritesTheFieldsOfTheReferenceAndTheShortFormNone(): void
-    {
-        $uids = $this->seedFileSet();
-
-        $references = $this->references();
-
-        $onPage = array_values(array_filter(
-            $references,
-            static fn(array $row): bool => $row['tablenames'] === 'pages',
-        ))[0];
-        $this->assertSame('A placeholder graphic', $onPage['alternative']);
-        $this->assertSame('Placeholder', $onPage['title']);
-        $this->assertSame('', (string)$onPage['description']);
-
-        $onSingle = array_values(array_filter(
-            $references,
-            static fn(array $row): bool => (int)$row['uid_foreign'] === $uids['single']
-                && $row['tablenames'] === 'tt_content',
-        ))[0];
-        $this->assertSame('A placeholder graphic in landscape format', $onSingle['alternative']);
-        $this->assertSame('The description of a file reference is the caption', $onSingle['description']);
-
-        // Declared as bare identifiers, so nothing but the structural columns
-        // is written on them.
-        $gallery = array_values(array_filter(
-            $references,
-            static fn(array $row): bool => (int)$row['uid_foreign'] === $uids['gallery'],
-        ));
-        $this->assertCount(2, $gallery);
-        foreach ($gallery as $row) {
-            $this->assertSame('', (string)$row['alternative']);
-            $this->assertSame('', (string)$row['title']);
-            $this->assertSame('', (string)$row['description']);
-        }
-    }
-
-    /**
-     * The columns the seeder owns win over a declared value, so a definition
-     * cannot detach a reference from the record carrying it - the same rule a
-     * record's `pid` follows. Everything else is written as declared.
-     */
-    #[Test]
-    public function aReferenceCannotBeDetachedFromTheRecordThatDeclaresIt(): void
+    public function theDeclaredTargetFolderIsCreatedInsideTheStorage(): void
     {
         $this->createDefaultStorage();
 
-        $definition = (new SeedDefinitionParser())->parse(
-            [
-                'identifier' => 'structural',
-                'title' => 'Structural columns win',
-                'files' => [
-                    ['identifier' => 'placeholder', 'source' => 'Files/placeholder.svg', 'folder' => 'structural'],
-                ],
-                'pages' => [
-                    [
-                        'identifier' => 'home',
-                        'uid' => 1,
-                        'title' => 'Home',
-                        'files' => [
-                            'media' => [
-                                [
-                                    'identifier' => 'placeholder',
-                                    // The columns the seeder owns...
-                                    'uid_foreign' => 999,
-                                    'tablenames' => 'tt_content',
-                                    'fieldname' => 'image',
-                                    'pid' => 42,
-                                    // ...and one it does not.
-                                    'alternative' => 'Kept',
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-            'structural definition',
-            dirname(__DIR__, 2) . '/Fixtures/Seeds',
-        );
+        $this->assertDirectoryDoesNotExist($this->instancePath . '/fileadmin/seed-files');
 
-        $this->subject()->seed($definition, $this->setUpBackendUser(1));
+        $this->seedFileSet();
 
-        $references = $this->references();
+        $this->assertDirectoryExists($this->instancePath . '/fileadmin/seed-files');
+    }
 
-        $this->assertCount(1, $references);
-        $this->assertSame(1, (int)$references[0]['uid_foreign']);
-        $this->assertSame('pages', $references[0]['tablenames']);
-        $this->assertSame('media', $references[0]['fieldname']);
-        $this->assertSame(0, (int)$references[0]['pid']);
-        $this->assertSame('Kept', $references[0]['alternative']);
+    /**
+     * The returned map is keyed by the seed identifier of the file, in the
+     * order the definition declares, and every value is the uid of a row that
+     * is actually there. That map is what a declared file reference is
+     * resolved against, so a key that does not match the definition is a
+     * relation that cannot be built.
+     */
+    #[Test]
+    public function theReturnedMapIsKeyedBySeedFileIdentifier(): void
+    {
+        $this->createDefaultStorage();
+
+        $uids = $this->seedFileSet();
+
+        $this->assertSame(['landscape', 'portrait'], array_keys($uids));
+        $this->assertSame(array_values($uids), array_keys($this->indexedFiles()));
+    }
+
+    /**
+     * A declared `name` wins over the basename of the source, which is what
+     * lets two sets ship a `placeholder.svg` each without one of them
+     * overwriting the other in the storage.
+     */
+    #[Test]
+    public function aDeclaredNameOverridesTheBasenameOfTheSource(): void
+    {
+        $this->createDefaultStorage();
+
+        $uids = $this->subject()->seed($this->definition([
+            new SeedFile(
+                identifier: 'renamed',
+                source: 'Files/placeholder.svg',
+                folder: 'seed-files',
+                name: 'a-different-name.svg',
+            ),
+        ]));
+
+        $file = $this->indexedFiles()[$uids['renamed']];
+
+        $this->assertSame('/seed-files/a-different-name.svg', (string)$file['identifier']);
+        $this->assertSame('a-different-name.svg', (string)$file['name']);
+    }
+
+    /**
+     * A declared `storage` picks the storage to write into, rather than the
+     * default one. Asserted against a second storage that is *not* the default,
+     * so the row cannot be right by accident.
+     */
+    #[Test]
+    public function aDeclaredStorageIsWrittenIntoInsteadOfTheDefaultOne(): void
+    {
+        $default = $this->createDefaultStorage();
+        $secondary = $this->createSecondaryStorage();
+
+        $uids = $this->subject()->seed($this->definition([
+            new SeedFile(
+                identifier: 'elsewhere',
+                source: 'Files/placeholder.svg',
+                folder: 'seed-files',
+                storage: $secondary,
+            ),
+        ]));
+
+        $file = $this->indexedFiles()[$uids['elsewhere']];
+
+        $this->assertNotSame($default, $secondary);
+        $this->assertSame($secondary, (int)$file['storage']);
+        $this->assertSame('/seed-files/placeholder.svg', (string)$file['identifier']);
+        $this->assertFileExists($this->instancePath . '/secondary/seed-files/placeholder.svg');
+        $this->assertFileDoesNotExist($this->instancePath . '/fileadmin/seed-files/placeholder.svg');
     }
 
     /**
@@ -464,23 +353,13 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
     {
         $this->createDefaultStorage();
 
-        $definition = (new SeedDefinitionParser())->parse(
-            [
-                'identifier' => 'missing-file',
-                'title' => 'A source that is not there',
-                'files' => [
-                    ['identifier' => 'absent', 'source' => 'Files/absent.svg'],
-                ],
-                'pages' => [
-                    ['identifier' => 'home', 'title' => 'Home'],
-                ],
-            ],
-            'missing file definition',
-            dirname(__DIR__, 2) . '/Fixtures/Seeds',
+        $definition = $this->definition(
+            [new SeedFile(identifier: 'absent', source: 'Files/absent.svg')],
+            'missing-file',
         );
 
         try {
-            $this->subject()->seed($definition, $this->setUpBackendUser(1));
+            $this->subject()->seed($definition);
             $this->fail('A seed file with a missing source was not refused.');
         } catch (InvalidSeedDefinitionException $exception) {
             $this->assertSame(1787076001, $exception->getCode());
@@ -488,9 +367,9 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
             $this->assertStringContainsString('Files/absent.svg', $exception->getMessage());
         }
 
-        // Refused before anything was written, so a broken definition leaves no
-        // half seeded page tree behind.
-        $this->assertSame([], $this->queryTable('pages', ['uid'], 'uid'));
+        // Refused before anything was indexed, so a broken definition leaves no
+        // half provisioned storage behind.
+        $this->assertSame([], $this->queryTable('sys_file', ['uid'], 'uid'));
     }
 
     /**
@@ -512,13 +391,10 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
     #[Test]
     public function anInstanceWithoutADefaultStorageIsRefused(): void
     {
-        GeneralUtility::makeInstance(StorageRepository::class)
-            ->createLocalStorage('secondary', 'fileadmin/', 'relative', 'Not the default storage', false);
-
-        $definition = (new SeedDefinitionParser())->parseFile(self::SEED);
+        $this->createSecondaryStorage();
 
         try {
-            $this->subject()->seed($definition, $this->setUpBackendUser(1));
+            $this->seedFileSet();
             $this->fail('Seeding files without a default storage was not refused.');
         } catch (SeedingFailedException $exception) {
             $this->assertSame(1787076002, $exception->getCode());
@@ -526,35 +402,33 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
             $this->assertStringContainsString('storage: <uid>', $exception->getMessage());
         }
 
-        $this->assertSame([], $this->queryTable('pages', ['uid'], 'uid'));
+        $this->assertSame([], $this->queryTable('sys_file', ['uid'], 'uid'));
     }
 
     /**
-     * A record referencing a file the definition does not declare is a broken
-     * definition, and the message names both.
+     * A `storage` naming a storage the instance does not have is refused the
+     * same way, with a message that names the declared uid rather than the way
+     * to a default storage the definition never asked for.
      */
     #[Test]
-    public function referencingAFileTheDefinitionDoesNotDeclareIsRefused(): void
+    public function aDeclaredStorageTheInstanceDoesNotHaveIsRefused(): void
     {
         $this->createDefaultStorage();
 
-        $definition = (new SeedDefinitionParser())->parse([
-            'identifier' => 'undeclared',
-            'title' => 'An undeclared file',
-            'pages' => [
-                ['identifier' => 'home', 'title' => 'Home', 'files' => ['media' => ['nope']]],
-            ],
-        ]);
+        $definition = $this->definition(
+            [new SeedFile(identifier: 'nowhere', source: 'Files/placeholder.svg', storage: 99)],
+            'unknown-storage',
+        );
 
         try {
-            $this->subject()->seed($definition, $this->setUpBackendUser(1));
-            $this->fail('A reference to an undeclared file was not refused.');
-        } catch (InvalidSeedDefinitionException $exception) {
-            $this->assertSame(1787076003, $exception->getCode());
-            $this->assertStringContainsString('"home"', $exception->getMessage());
-            $this->assertStringContainsString('"nope"', $exception->getMessage());
+            $this->subject()->seed($definition);
+            $this->fail('A seed file naming an unknown storage was not refused.');
+        } catch (SeedingFailedException $exception) {
+            $this->assertSame(1787076002, $exception->getCode());
+            $this->assertStringContainsString('"nowhere"', $exception->getMessage());
+            $this->assertStringContainsString('file storage 99', $exception->getMessage());
         }
 
-        $this->assertSame([], $this->queryTable('pages', ['uid'], 'uid'));
+        $this->assertSame([], $this->queryTable('sys_file', ['uid'], 'uid'));
     }
 }

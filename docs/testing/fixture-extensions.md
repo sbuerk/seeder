@@ -296,5 +296,5 @@ loading it, and there it is the only indication of what the fixture is for.
 - [PHPUnit configuration](phpunit-configuration.md)
 - [Site based tests](site-based-tests.md)
 - [Dependency injection](../architecture/dependency-injection.md)
-- [Seed definitions](../development/seed-definitions.md) — the format the seed fixtures are written in
+- [Seed definitions](../development/seed-definitions.md) — the descriptor and the scenario format the seed fixtures are written in
 - [Seeding](../architecture/seeding.md)

@@ -1,0 +1,44 @@
+# Everything the "--root-page" transformation has to decide about, in one file:
+# a top level item without a "pid", one declaring "pid: 0", one naming a page of
+# its own, an item declared as a workspace "version" rather than as "self", and
+# the four nesting keys whose items take their place from their ancestor and
+# must therefore stay untouched.
+entitySettings:
+  page:
+    isNode: true
+    tableName: pages
+
+entities:
+  page:
+    - self:
+        id: 1
+        title: 'No pid at all'
+      entities:
+        content:
+          - self:
+              id: 10
+              title: 'Nested entity'
+      children:
+        - self:
+            id: 2
+            title: 'Nested child'
+      languageVariants:
+        - self:
+            id: 3
+            title: 'Translated'
+      versionVariants:
+        - version:
+            workspace: 1
+            title: 'Workspace overlay'
+    - self:
+        id: 4
+        pid: 0
+        title: 'Explicit zero'
+    - self:
+        id: 5
+        pid: 99
+        title: 'Somewhere specific'
+    - version:
+        id: 6
+        workspace: 1
+        title: 'A workspace version'

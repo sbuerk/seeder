@@ -1,0 +1,16 @@
+# The records of "FileSeeding.yaml". Files are provided by the set descriptor
+# and indexed before any record is written, so this is an ordinary page tree.
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+
+entities:
+  page:
+    - self: {id: 1, title: 'Image elements', slug: '/', is_siteroot: 1}

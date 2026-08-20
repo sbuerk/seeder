@@ -1,0 +1,9 @@
+# A perfectly valid entry file that the parser is made to see as unreadable:
+# the test shadows "is_readable()" in the namespace of the parser for exactly
+# this path, because a file the process cannot read cannot be produced in the
+# container the gates run in. See SeedDefinitionParserTest for the reasoning.
+identifier: unreadable
+title: 'A set whose entry file cannot be read'
+
+scenarios:
+  - Pages.yaml

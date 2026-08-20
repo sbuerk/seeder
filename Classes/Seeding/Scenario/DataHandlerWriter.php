@@ -51,9 +51,23 @@ final class DataHandlerWriter
      */
     private array $errors = [];
 
+    /**
+     * @param array<string, true> $withoutSuggestedUids Suggestions to hold
+     *        back, keyed `<table>:<uid>` exactly as `getSuggestedIds()` keys
+     *        them. Deliberate, additive divergence from
+     *        `typo3/testing-framework` 9.6.1: with the default empty array the
+     *        `array_diff_key()` below returns its first argument unchanged, so
+     *        every call that does not pass it behaves byte for byte as upstream
+     *        does. The seeding pipeline needs it because `--force` gives up the
+     *        suggested uids of a table this installation already uses, and
+     *        `invokeFactory()` assigns `suggestedInsertUids` itself - there is
+     *        no moment between "the writer was constructed" and "the uid is
+     *        read" in which a caller could reduce it from the outside.
+     */
     public function __construct(
         private readonly DataHandler $dataHandler,
         private readonly BackendUserAuthentication $backendUser,
+        private readonly array $withoutSuggestedUids = [],
     ) {}
 
     public static function withBackendUser(BackendUserAuthentication $backendUser): self
@@ -67,7 +81,10 @@ final class DataHandlerWriter
 
     public function invokeFactory(DataHandlerFactory $factory): void
     {
-        $this->dataHandler->suggestedInsertUids = $factory->getSuggestedIds();
+        $this->dataHandler->suggestedInsertUids = array_diff_key(
+            $factory->getSuggestedIds(),
+            $this->withoutSuggestedUids,
+        );
         foreach ($factory->getDataMapPerWorkspace() as $workspaceId => $dataMap) {
             $dataMap = $this->updateDataMap($dataMap);
             $backendUser = clone $this->backendUser;
@@ -135,6 +152,22 @@ final class DataHandlerWriter
                 );
                 if ((string)$key === (string)(int)$key) {
                     unset($values['pid']);
+                }
+                if (isset($values['uid']) && isset($this->withoutSuggestedUids[$tableName . ':' . $values['uid']])) {
+                    // Part of the same additive divergence as the constructor
+                    // parameter, and not cosmetic. `process_datamap()` reads the
+                    // suggested uid out of `uid` and passes it to `insertDB()`,
+                    // which honours it only when `suggestedInsertUids` carries
+                    // it - but `postProcessDatabaseInsert()` then returns that
+                    // very number on PostgreSQL whether it was honoured or not
+                    // (DataHandler.php:9669ff), so `substNEWwithIDs` would map
+                    // the identifier to a uid no row has. Every later record
+                    // pointing at it - a child's `pid`, a sibling's `-NEW` -
+                    // then points at nothing. Dropping `uid` along with the
+                    // suggestion is what keeps the two in step, and it costs
+                    // nothing: `insertDB()` unsets the field before the INSERT
+                    // either way.
+                    unset($values['uid']);
                 }
                 $updatedTableDataMap[$tableName][$key] = $values;
             }

@@ -1,44 +1,28 @@
 #
-# The set "seeder:import" is driven with: pages with declared uids, content
-# elements, a file, a file reference, a site configuration - and an "imports"
-# of a file next to this one, so the resolution of a relative resource is
-# exercised for a set that was discovered rather than handed over by a test.
+# The set "seeder:import" is driven with: a page tree with declared uids, a
+# content element, a file, a site configuration - and an "imports" of a file
+# next to this one, so the resolution of a relative resource is exercised for a
+# set that was discovered rather than handed over by a test.
 #
 identifier: import-full
 title: 'Everything the importer writes'
-description: 'Pages, content elements, a file, a file reference and a site configuration.'
+description: 'Pages, a content element, a file and a site configuration.'
 
 imports:
   - { resource: Files.yaml }
 
-pages:
-  - identifier: home
-    uid: 11
-    title: 'Import home'
-    slug: '/'
-    is_siteroot: 1
-    content:
-      - identifier: home-heading
-        uid: 21
-        CType: header
-        header: 'Imported content'
-      # The CType and the file field come from the "tests/file-fields" fixture
-      # extension: what the shipped "tt_content" TCA offers is free to change
-      # between core versions and is not what the importer is tested for.
-      - identifier: home-image
-        CType: tests_file_fields_teaser
-        header: 'An imported image'
-        files:
-          tx_testsfilefields_media:
-            - identifier: placeholder
-              alternative: 'A placeholder graphic'
-    children:
-      - identifier: about
-        uid: 12
-        title: 'About'
-        slug: '/about'
+#
+# Relative to the directory of this file, which is what lets a set be moved or
+# renamed without touching its paths.
+#
+scenarios:
+  - Scenario.yaml
 
+#
+# "rootPage" is the uid the scenario declares for the page, not a name: a
+# scenario record has no symbolic identifier.
+#
 sites:
   - identifier: import-main
-    rootPage: home
+    rootPage: 11
     template: Sites/main

@@ -67,7 +67,7 @@ final class DataHandlerFactory
     private array $commandMapPerWorkspace = [];
 
     /**
-     * @var array<string, bool>
+     * @var array<string, true>
      */
     private array $suggestedIds = [];
 
@@ -124,7 +124,7 @@ final class DataHandlerFactory
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, true>
      */
     public function getSuggestedIds(): array
     {

@@ -1,0 +1,14 @@
+# "__variables" holds YAML anchors and nothing else. The parser resolves them
+# before the composer sees the file, so the key is inert by then - it is
+# accepted and dropped rather than refused, because every TYPO3 Core scenario
+# carries one.
+__variables:
+  - &pageDefaults
+    doktype: 1
+
+entities:
+  page:
+    - self:
+        <<: *pageDefaults
+        id: 1
+        title: 'Root'

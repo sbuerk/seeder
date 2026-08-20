@@ -1,0 +1,10 @@
+# "entitiy" instead of "entities". Accepting it silently would be an import that
+# reports success and writes nothing, which is why the key set is closed.
+entitySettings:
+  page:
+    tableName: pages
+
+entitiy:
+  page:
+    - self:
+        title: 'Root'

@@ -1,0 +1,7 @@
+# "entitySettings" as a scalar rather than a map of entity name to settings.
+entitySettings: 'page'
+
+entities:
+  page:
+    - self:
+        title: 'Root'

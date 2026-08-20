@@ -1,0 +1,28 @@
+##
+# A page tree with one site root and one page below it, written by
+# "SiteConfigurationSeederTest".
+#
+# The root page sits on the page tree root *and* carries "is_siteroot", which
+# are the two conditions the seeder counts as a site root; the page below it is
+# neither, and is what makes the uncovered-root report a statement about the
+# root page only.
+#
+# The declared ids are the handles the site configurations of that test name: a
+# site's "rootPage" is the "id" an entity of the "pages" table declares, and it
+# is the uid the record is written with.
+##
+entitySettings:
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      pid: 0
+      hidden: 0
+      doktype: 1
+
+entities:
+  page:
+    - self: {id: 700, title: 'Home', slug: '/', is_siteroot: 1}
+      children:
+        - self: {id: 710, title: 'About', slug: '/about'}

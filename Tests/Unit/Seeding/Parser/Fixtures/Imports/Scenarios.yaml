@@ -1,0 +1,5 @@
+# Imported by "config.yml" through a resource path relative to it. It carries
+# nothing but a scenario, so that what arrives in the parsed definition can only
+# have come from here.
+scenarios:
+  - Pages.yaml

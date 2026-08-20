@@ -1,0 +1,3 @@
+# A scenario file holding a scalar document rather than a map. "Yaml::parseFile"
+# returns the string, which is neither "entitySettings" nor "entities".
+'a scenario is a map, this is not'

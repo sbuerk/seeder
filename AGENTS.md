@@ -21,36 +21,62 @@ extensions themselves. Its entire surface is two console commands:
 | `seeder:import <identifier>` | Import one seed set: pages, records of any table, files, site configs.  |
 
 A **seed set** is a directory `Configuration/Seeder/<name>/` in any active
-package, with `config.yml` as its entry point. Every path inside a set resolves
-against that directory, and `EXT:` paths are accepted everywhere a path is.
+package, with `config.yml` as its entry point. `config.yml` describes the set
+and names the **scenario files** the records come from; those are written in the
+YAML scenario format of `typo3/testing-framework`, the one TYPO3 Core's own
+functional tests use. Every path inside a set resolves against the set
+directory, and `EXT:` paths are accepted everywhere a path is.
 
-Output is written through TYPO3 APIs — `DataHandler` for records and
-references, the FAL API for files, the site configuration API for sites — never
-through direct SQL. That is rule 8 below, and it is not a preference.
+Output is written through TYPO3 APIs - `DataHandler` for records, the FAL API
+for files, the site configuration API for sites - never through direct SQL. That
+is rule 8 below, and it is not a preference.
 
 → [`README.md`](README.md#what-it-does) states the same for users.
 
-## The seed definition format is a contract
+## Two formats, and only one of them is ours
 
-The YAML a seed set ships is what integrators write against, so it is parsed
-strictly rather than leniently:
+A seed set is written in two YAML formats, and the line between them is the
+thing to get right:
 
-- **An unknown key is an error, not a silent skip.** A misspelled structural
-  key fails the import naming the key and the level it sat on. Ignoring it
-  would produce an import that reports success and seeded something else.
-- **Structural keys are decided per level.** Everything that is not structural
-  *on that level* is a record field and is written verbatim, which is what lets
-  a table be seeded without support in this extension. Never promote a
-  structural key to "structural everywhere" — `tt_content` has real columns
-  named `table` and `records`.
-- **Identifiers are resolved, never guessed.** A relation, a site's `rootPage`
-  or a file reference names a seed identifier that must exist in the same
-  definition; an unresolved one fails the import. No fallback to a uid, no
-  derivation from a directory or file name.
+| File               | Format                                                      | Owner                          |
+|--------------------|-------------------------------------------------------------|--------------------------------|
+| `config.yml`       | the set descriptor: identity, `scenarios`, `files`, `sites` | this extension, closed key set |
+| the scenario files | the scenario format of `typo3/testing-framework`            | upstream, key for key          |
+
+- **The scenario format is not ours to extend.** `entitySettings`, `entities`
+  and `__variables`, and nothing else, is what a scenario file may declare. Its
+  value is precisely that a file can be lifted out of TYPO3 Core's functional
+  tests and seeded unchanged, and every added key destroys that. What this
+  extension needs goes into `config.yml` or into a class beside the port -
+  never into `DataHandlerFactory`, `DataHandlerWriter` or
+  `EntityConfiguration`, which are held to upstream by a conformance test.
+- **An unknown key is an error, not a silent skip**, on both sides. `config.yml`
+  refuses one naming the known keys; a scenario file refuses one naming the
+  three. Ignoring `scenario:` for `scenarios:` would produce an import that
+  reports success and writes nothing.
+- **Almost nothing inside `self:` or `version:` is structural.** `id` is - it
+  is read as the uid the record is written with before the values are processed
+  - and `workspace` is, inside a `version:`. Every other key is a record value,
+  resolved through `columnNames`, merged onto `defaultValues` and written
+  verbatim. That is what lets a table be seeded without support in this
+  extension, and it means no further key may ever be special-cased there.
+- **A record's handle is its uid.** A scenario record has no symbolic
+  identifier, so a site's `rootPage` is a page uid, and it is resolved against
+  what the run actually wrote rather than trusted. `--force` gives up the uid
+  suggestions of a colliding table, so a set declaring sites is refused rather
+  than forced past a collision in `pages`.
+- **Two traps of the upstream engine cost real debugging time.** The `'*'`
+  entity is merged into each entity with `array_merge_recursive()`, so a key
+  declared on both sides becomes a **list** and a `hidden` of `[0, 0]` reaches
+  the database as the string `Array`. And `'*'` reaches only entities that are
+  **listed** in `entitySettings`: one used under `entities:` and absent there
+  gets a bare configuration, with no defaults and a table name equal to its own
+  name. Both are documented on
+  [Seed definitions](docs/development/seed-definitions.md).
 - **A format change needs a `Documentation/Changelog/<version>/` entry** —
-  `Feature-*.rst` for a new key, `Breaking-*.rst` or `Deprecation-*.rst` when
-  an existing one changes meaning or goes away. Being pre-1.0 exempts a change
-  from a deprecation phase, not from being documented.
+  `Feature-*.rst` for a new `config.yml` key, `Breaking-*.rst` or
+  `Deprecation-*.rst` when an existing one changes meaning or goes away. Being
+  pre-1.0 exempts a change from a deprecation phase, not from being documented.
 
 ## Discovery is over active extensions, and it is deterministic
 
@@ -195,7 +221,8 @@ Nothing below `.agent/` is ever committed.
 | Symfony DI attributes, stateless services           | [Dependency injection](docs/architecture/dependency-injection.md)       |
 | `final readonly`, injected abstracts, DTOs          | [Class design](docs/architecture/class-design.md)                       |
 | The DataHandler behaviours seeding works around     | [Seeding](docs/architecture/seeding.md)                                 |
-| The seed definition format, key by key              | [Seed definitions](docs/development/seed-definitions.md)                |
+| The ported engine, its divergences, its test        | [The scenario engine](docs/architecture/scenario-engine.md)             |
+| The descriptor and the scenario format, key by key  | [Seed definitions](docs/development/seed-definitions.md)                |
 | Discovery, ordering and the command surface         | [Seed sets and the CLI](docs/development/seed-sets.md)                  |
 | Site templates, refusals, uncovered site roots      | [Site configurations](docs/architecture/site-configuration.md)          |
 | Both test suites and their strictness               | [Testing](docs/testing/Index.md)                                        |
