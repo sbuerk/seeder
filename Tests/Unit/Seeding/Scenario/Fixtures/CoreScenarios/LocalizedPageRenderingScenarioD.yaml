@@ -1,0 +1,49 @@
+__variables:
+  - &pageStandard 0
+  - &pageShortcut 4
+  - &contentText 'text'
+  - &idAcmeRootPage 1000
+
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid', language: 'sys_language_uid'}
+    defaultValues: {pid: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    languageColumnNames: ['l10n_parent', 'l10n_source']
+    columnNames: {type: 'doktype', root: 'is_siteroot', mount: 'mount_pid', visitorGroups: 'fe_group'}
+    defaultValues: {hidden: 0, doktype: *pageStandard, l18n_cfg: 2}
+    valueInstructions:
+      shortcut:
+        first: {shortcut: 0, shortcut_mode: 1}
+  content:
+    tableName: 'tt_content'
+    languageColumnNames: ['l18n_parent', 'l10n_source']
+    columnNames: {title: 'header', type: 'CType', column: 'colPos'}
+    defaultValues: {hidden: 0, type: *contentText, column: 0}
+  typoscript:
+    tableName: 'sys_template'
+    valueInstructions:
+      type:
+        site: {root: 1, clear: 1}
+
+entities:
+  page:
+    - self: {id: *idAcmeRootPage, title: 'EN: Root', root: true, slug: '/'}
+      children:
+        - self: {id: 1100, title: 'EN: Welcome', slug: '/hello'}
+        - self: {id: 1200, title: 'EN: About us', slug: '/about-us'}
+          languageVariants:
+            - self: {id: 1201, title: 'DE: Über uns', language: 1, slug: '/ueber-uns'}
+            - self: {id: 1202, title: 'DE-CH: Über uns', language: 2, slug: '/ueber-uns'}
+        - self: {id: 1300, title: 'EN: Products', slug: '/products'}
+          languageVariants:
+            - self: {id: 1302, title: 'DE-CH: Produkte', language: 2, slug: '/produkte'}
+        - self: {id: 1400, title: 'EN: Shortcut to welcome', slug: '/shortcut-to-welcome', type: *pageShortcut, shortcut: 1100, l18n_cfg: 0, l10n_state: '{"shortcut":"custom"}'}
+        - self: {id: 1500, title: 'EN: Company', slug: '/company'}
+          languageVariants:
+            - self: {id: 1501, title: 'DE: Unternehmen', language: 1, slug: '/shortcut-to-about', type: *pageShortcut, shortcut: 1200, shortcut_mode: 0, l18n_cfg: 0, l10n_state: '{"shortcut":"custom","shortcut_mode":"custom"}'}
+            - self: {id: 1502, title: 'DE-CH: Unternehmen', language: 2, slug: '/unternehmen'}

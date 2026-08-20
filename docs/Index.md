@@ -26,6 +26,7 @@ Documentation for people **using** the extension lives in
 | [Core version aware code](architecture/core-version-aware-code.md) | `Classes/` vs `Core13/` vs `Core14/`, and how the right variant is selected.                        |
 | [Dependency injection](architecture/dependency-injection.md)       | Symfony DI attributes, stateless services, the rules that apply.                                    |
 | [Class design](architecture/class-design.md)                       | `final readonly`, method injection in abstract classes, data objects, the accepted PHPStan ignores. |
+| [The scenario engine](architecture/scenario-engine.md)             | The seed format, why its engine is a port of the testing-framework one, and the conformance test.   |
 | [Seeding](architecture/seeding.md)                                 | Why it goes through DataHandler, and every behaviour of it a seed has to work around.               |
 | [Site configurations](architecture/site-configuration.md)          | Writing a site from a template, the refusals, the uncovered-site-roots report.                      |
 

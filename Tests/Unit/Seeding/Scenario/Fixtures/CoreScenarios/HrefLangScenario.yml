@@ -1,0 +1,60 @@
+__variables:
+  - &pageStandard 0
+  - &contentText 'text'
+  - &idAcmeRootPage 1000
+
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid', language: 'sys_language_uid'}
+    defaultValues: {pid: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    languageColumnNames: ['l10n_parent', 'l10n_source']
+    columnNames: {type: 'doktype', root: 'is_siteroot', mount: 'mount_pid', visitorGroups: 'fe_group'}
+    defaultValues: {hidden: 0, doktype: *pageStandard}
+    valueInstructions:
+      shortcut:
+        first: {shortcut: 0, shortcut_mode: 1}
+  content:
+    tableName: 'tt_content'
+    languageColumnNames: ['l18n_parent', 'l10n_source']
+    columnNames: {title: 'header', type: 'CType', column: 'colPos'}
+    defaultValues: {hidden: 0, type: *contentText, column: 0}
+  typoscript:
+    tableName: 'sys_template'
+    valueInstructions:
+      type:
+        site: {root: 1, clear: 1}
+
+entities:
+  page:
+    - self: {id: *idAcmeRootPage, title: 'EN: Root', root: true, slug: '/'}
+      languageVariants:
+        - self: {id: 1001, title: 'DE-CH: Root', language: 2, slug: '/'}
+      children:
+        - self: {id: 1100, title: 'EN: Welcome', slug: '/hello'}
+          languageVariants:
+            - self: {id: 1101, title: 'DE: Willkommen', language: 1, slug: '/willkommen'}
+            - self: {id: 1102, title: 'NL: Welkom', language: 3, slug: '/welkom'}
+        - self: {id: 1200, title: 'EN: Contact', slug: '/contact', canonical_link: 'https://www.typo3.org'}
+          languageVariants:
+            - self: {id: 1201, title: 'DE: Kontakt', language: 1, slug: '/kontakt'}
+            - self: {id: 1202, title: 'DE-CH: Kontakt', language: 2, slug: '/kontakt'}
+        - self: {id: 1300, title: 'EN: About', slug: '/about'}
+          languageVariants:
+            - self: {id: 1301, title: 'DE: Uber', language: 1, slug: '/uber'}
+            - self: {id: 1302, title: 'DE-CH: Uber', language: 2, slug: '/uber', canonical_link: 'https://acme.com/de/uber'}
+        - self: {id: 1400, title: 'EN: Products', slug: '/products'}
+          languageVariants:
+            - self: {id: 1401, title: 'DE: Produkte', language: 1, slug: '/produkte'}
+            - self: {id: 1402, title: 'DE-CH: Produkte', language: 2, slug: '/produkte'}
+        - self: {id: 1500, title: 'EN: No hreflang', slug: '/no-hreflang'}
+          languageVariants:
+            - self: {id: 1501, title: 'DE: Kein hreflang', language: 1, slug: '/kein-hreflang'}
+            - self: {id: 1502, title: 'DE-CH: Kein hreflang', language: 2, slug: '/kein-hreflang'}
+        - self: {id: 1600, title: 'EN: No translation', slug: '/no-translation'}
+          languageVariants:
+            - self: {id: 1601, title: 'DA: Hidden page', language: 5, hidden: 1, slug: '/no-translation'}

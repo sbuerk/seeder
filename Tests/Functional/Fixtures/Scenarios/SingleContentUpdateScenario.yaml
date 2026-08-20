@@ -1,0 +1,34 @@
+##
+# The records of "SingleContentScenario.yaml" with different values, plus one
+# page that scenario does not have.
+#
+# "DataHandlerWriterTest" runs this through a writer whose DataHandler already
+# resolves the identifiers of the root page and of the content element, so one
+# round exercises every case of the substitution at once: a key that resolves
+# to an existing record, a key that resolves to nothing, and a "-NEW" value -
+# the "insert after this record" form the factory chains siblings with - that
+# does resolve.
+##
+entitySettings:
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      pid: 0
+      doktype: 1
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    columnNames:
+      title: 'header'
+    defaultValues:
+      CType: 'text'
+
+entities:
+  page:
+    - self: {id: 100, title: 'Updated', slug: '/'}
+      entities:
+        content:
+          - self: {id: 300, title: 'Updated content'}
+    - self: {id: 110, title: 'Declared as a sibling of the root page', slug: '/sibling'}

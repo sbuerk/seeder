@@ -1,0 +1,37 @@
+##
+# A page tree with content, written by "DataHandlerWriterTest".
+#
+# Shaped like the scenario files of TYPO3 Core - a wildcard entity setting, a
+# node entity mapping "title", a non node entity mapping it to "header" - but
+# every record declares its id, so the test can assert the uids the suggested
+# ids produced instead of whatever auto increment handed out.
+##
+entitySettings:
+  '*':
+    defaultValues:
+      hidden: 0
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      pid: 0
+      doktype: 1
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    columnNames:
+      title: 'header'
+    defaultValues:
+      CType: 'text'
+
+entities:
+  page:
+    - self: {id: 100, title: 'Root', slug: '/'}
+      entities:
+        content:
+          - self: {id: 300, title: 'First on root'}
+          - self: {id: 301, title: 'Second on root'}
+      children:
+        - self: {id: 110, title: 'First child', slug: '/first'}
+        - self: {id: 120, title: 'Second child', slug: '/second'}

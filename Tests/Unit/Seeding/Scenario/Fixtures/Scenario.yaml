@@ -1,0 +1,26 @@
+entitySettings:
+  '*':
+    defaultValues:
+      hidden: 0
+  page:
+    isNode: true
+    tableName: pages
+    parentColumnName: pid
+    defaultValues:
+      pid: 0
+  content:
+    tableName: tt_content
+    nodeColumnName: pid
+    columnNames:
+      title: header
+
+entities:
+  page:
+    - self:
+        title: 'Root'
+      entities:
+        content:
+          - self:
+              title: 'Hello'
+    - self:
+        title: 'Second'

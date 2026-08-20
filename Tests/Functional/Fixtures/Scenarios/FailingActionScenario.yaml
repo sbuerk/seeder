@@ -1,0 +1,23 @@
+##
+# A scenario whose only action cannot be carried out, written by
+# "DataHandlerWriterTest": the root page is moved into its own child page.
+#
+# The data map round therefore succeeds and the command map round fails, which
+# is what makes the collected errors a statement about both rounds.
+##
+entitySettings:
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      pid: 0
+      doktype: 1
+
+entities:
+  page:
+    - self: {id: 100, title: 'Root', slug: '/'}
+      actions:
+        - {action: 'move', type: 'toPage', target: 110}
+      children:
+        - self: {id: 110, title: 'Child', slug: '/child'}

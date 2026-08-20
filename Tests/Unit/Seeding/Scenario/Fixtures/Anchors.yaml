@@ -1,0 +1,19 @@
+__variables:
+  - &pageDefaults
+    doktype: 1
+    hidden: 0
+
+entitySettings:
+  page:
+    isNode: true
+    tableName: pages
+
+entities:
+  page:
+    - self:
+        <<: *pageDefaults
+        title: 'Root'
+    - self:
+        <<: *pageDefaults
+        title: 'Second'
+        hidden: 1
