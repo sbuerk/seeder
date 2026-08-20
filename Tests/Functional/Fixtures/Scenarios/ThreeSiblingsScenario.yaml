@@ -1,0 +1,42 @@
+##
+# Three siblings on one page, in two tables, written by "ScenarioSeederTest".
+#
+# Two records are not enough to see the difference: the sequential ordering the
+# factory builds chains every record behind the previous one on the same page,
+# and the chain is only resolvable for "pages" - "resolveDataMapPageId()" looks
+# a back-reference up in the "pages" data map whatever the table of the record
+# is. The third record of any other table is therefore the first one that can
+# land in the wrong place.
+##
+entitySettings:
+  '*':
+    defaultValues:
+      pid: 0
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      hidden: 0
+      doktype: 1
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    columnNames:
+      title: 'header'
+    defaultValues:
+      hidden: 0
+      CType: 'text'
+
+entities:
+  page:
+    - self: {id: 100, title: 'Root', slug: '/'}
+      children:
+        - self: {id: 110, title: 'First page', slug: '/first'}
+        - self: {id: 120, title: 'Second page', slug: '/second'}
+        - self: {id: 130, title: 'Third page', slug: '/third'}
+      entities:
+        content:
+          - self: {id: 300, title: 'First element'}
+          - self: {id: 301, title: 'Second element'}
+          - self: {id: 302, title: 'Third element'}

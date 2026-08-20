@@ -86,6 +86,29 @@ final class ScenarioSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
+     * The uids of a table in the order the backend and the frontend list them,
+     * which is `sorting` and not `uid`.
+     *
+     * @return list<int>
+     */
+    private function uidsInSortingOrder(string $table, string $where): array
+    {
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll();
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $queryBuilder
+            ->select('uid')
+            ->from($table)
+            ->where($where)
+            ->orderBy('sorting')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        return array_map(static fn(array $row): int => (int)$row['uid'], $rows);
+    }
+
+    /**
      * Reads a table without restrictions, so what is asserted is what the
      * seeder wrote rather than what happens to be visible.
      *
@@ -160,6 +183,39 @@ final class ScenarioSeederTest extends AbstractFunctionalTestCase
 
         $rows = $this->rows('pages', 'uid', 'sorting');
         $this->assertGreaterThan((int)$rows[1]['sorting'], (int)$rows[2]['sorting']);
+    }
+
+    #[Test]
+    public function threePagesBelowOneParentKeepTheOrderTheyWereDeclaredIn(): void
+    {
+        $this->seed($this->definition(['ThreeSiblingsScenario.yaml']));
+
+        $this->assertSame([110, 120, 130], $this->uidsInSortingOrder('pages', 'pid = 100'));
+    }
+
+    #[Test]
+    public function theThirdRecordOfAnyOtherTableIsSortedBehindTheFirstRatherThanTheSecond(): void
+    {
+        $this->seed($this->definition(['ThreeSiblingsScenario.yaml']));
+
+        // The pages above and these three content elements are declared the
+        // same way, and only the pages come out in the declared order.
+        //
+        // The factory chains every record behind the previous one on its page
+        // by rewriting the `pid` to `-<previous identifier>`, and it finds that
+        // previous record by filtering the data map for records on the same
+        // page. `resolveDataMapPageId()` follows such a back-reference by
+        // looking the identifier up in the data map of `pages` - whatever table
+        // the record belongs to. For any other table the second record is
+        // therefore invisible to the third one, which chains behind the first
+        // and lands between the two.
+        //
+        // Two records are not enough to see it, which is why nothing noticed:
+        // TYPO3 Core's own scenario fixtures put at most two elements on a
+        // page. Repairing it means changing the ported `DataHandlerFactory`,
+        // which the upstream conformance test holds to the letter, and is
+        // therefore a decision for the step that narrows that test.
+        $this->assertSame([300, 302, 301], $this->uidsInSortingOrder('tt_content', 'pid = 100'));
     }
 
     /**

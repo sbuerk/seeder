@@ -1,0 +1,56 @@
+##
+# Workspace versions, written by "WorkspaceSeedingTest".
+#
+# The workspace itself is a record of the scenario, exactly as TYPO3 Core's own
+# "CommonScenario.yaml" declares it: "sys_workspace" is an ordinary table, so a
+# set can create the workspace it then versions records in, as long as the
+# workspace entity is declared first - the live data map is written before any
+# other, and a "t3ver_wsid" pointing at a workspace that does not exist yet
+# would be refused by DataHandler.
+##
+entitySettings:
+  '*':
+    defaultValues:
+      pid: 0
+  workspace:
+    tableName: 'sys_workspace'
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      hidden: 0
+      doktype: 1
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    columnNames:
+      title: 'header'
+    defaultValues:
+      hidden: 0
+      CType: 'text'
+
+entities:
+  workspace:
+    - self: {id: 1, title: 'Review'}
+    - self: {id: 2, title: 'Staging'}
+  page:
+    - self: {id: 100, title: 'Live root', slug: '/'}
+      versionVariants:
+        - version: {title: 'Review root', workspace: 1, slug: '/review'}
+      entities:
+        content:
+          - self: {id: 300, title: 'Live and unversioned'}
+          - self: {id: 301, title: 'Live, changed in review'}
+            versionVariants:
+              - version: {title: 'Review: changed', workspace: 1}
+          - self: {id: 302, title: 'Live, changed in two workspaces'}
+            versionVariants:
+              - version: {title: 'Review: changed too', workspace: 1}
+              - version: {title: 'Staging: changed as well', workspace: 2}
+          - self: {id: 303, title: 'Live, versioned and discarded again'}
+            versionVariants:
+              - version: {title: 'Review: discarded', workspace: 1}
+                actions:
+                  - {action: 'discard'}
+    - version: {id: 900, title: 'Only in review', workspace: 1, slug: '/only-in-review'}

@@ -29,8 +29,14 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * Ported from `typo3/testing-framework` 9.6.1, class
  * `TYPO3\TestingFramework\Core\Functional\Framework\DataHandling\Scenario\DataHandlerWriter`,
- * for the reason given on `DataHandlerFactory`. The behaviour is identical and
- * `UpstreamConformanceTest` keeps it that way.
+ * for the reason given on `DataHandlerFactory`.
+ *
+ * Two deliberate divergences from upstream: the optional
+ * `$withoutSuggestedUids` documented on the constructor, and the reset of
+ * `DataHandler::$autoVersionIdMap` between two workspace rounds documented in
+ * `invokeFactory()`. Both are additive - the first is inert when it is not
+ * passed, the second only matters for a scenario declaring more than one
+ * workspace, which upstream has no test and TYPO3 Core no fixture for.
  *
  * Note what this class does **not** do, because the seeding pipeline has to add
  * it: it never sets `DataHandler::$isImporting`, it never checks that the
@@ -89,6 +95,20 @@ final class DataHandlerWriter
             $dataMap = $this->updateDataMap($dataMap);
             $backendUser = clone $this->backendUser;
             $backendUser->workspace = $workspaceId;
+            // Deliberate divergence from `typo3/testing-framework` 9.6.1,
+            // which reuses one `DataHandler` for every round and leaves this
+            // map alone. `DataHandler::$autoVersionIdMap` remembers which
+            // workspace version it auto-created for a live uid, `start()` does
+            // not reset it, and `process_datamap()` reads it *before* it asks
+            // whether a version for the current workspace exists. A second
+            // workspace declaring a version of the same record therefore
+            // overwrites the version of the first one and creates nothing of
+            // its own - silently, with an empty error log.
+            //
+            // The map is per round by nature: it exists so children versioned
+            // along with their parent are written to the version rather than
+            // to the live record, and that is finished when the round is.
+            $this->dataHandler->autoVersionIdMap = [];
             $this->dataHandler->start($dataMap, [], $backendUser);
             $this->dataHandler->process_datamap();
             $this->errors = array_merge($this->errors, $this->errorLog());

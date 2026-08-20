@@ -166,6 +166,22 @@ Additionally:
   writing SQL.
 - Wrap expensive fixture setup in `withDatabaseSnapshot()` so it is built once
   and restored per test.
+- **Load a core extension only where it is needed, and in one class.**
+  `$coreExtensionsToLoad` costs setup time in every test of the class that
+  declares it, so a table that only one subject needs belongs in a test class of
+  its own rather than in `AbstractFunctionalTestCase`.
+
+  `EXT:workspaces` is the case in point. Having `typo3/cms-workspaces` in
+  `require-dev` puts the package on disk; it does **not** create
+  `sys_workspace` in the test instance. Without
+
+  ```php
+  protected array $coreExtensionsToLoad = ['workspaces'];
+  ```
+
+  the table does not exist, a record carrying a `t3ver_wsid` has nothing to
+  point at, and a data map for a workspace other than the live one cannot be
+  written at all. `WorkspaceSeedingTest` is the one class that declares it.
 
 ## Core version aware functional tests
 
