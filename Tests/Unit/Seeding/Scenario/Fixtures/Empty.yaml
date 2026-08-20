@@ -1,0 +1,2 @@
+# This scenario file deliberately has no content at all, so that
+# "Yaml::parseFile()" returns NULL rather than an array.

@@ -1,0 +1,26 @@
+##
+# One page with one content element, written by "DataHandlerWriterTest" as the
+# state a second writer run is then applied to.
+##
+entitySettings:
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      pid: 0
+      doktype: 1
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    columnNames:
+      title: 'header'
+    defaultValues:
+      CType: 'text'
+
+entities:
+  page:
+    - self: {id: 100, title: 'Original', slug: '/'}
+      entities:
+        content:
+          - self: {id: 300, title: 'Original content'}
