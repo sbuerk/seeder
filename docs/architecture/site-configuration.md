@@ -22,8 +22,26 @@ missing from that map when no `pages` entity of the scenario declares it, and it
 differs from what was written when `--force` gave up the uid suggestions of the
 `pages` table. Both would produce a site pointing at a page this set never
 seeded, so both are refused - the first by the command before anything is
-written, the second by refusing `--force` for a set that declares sites at all.
+written, the second by refusing a forced run that would give up the suggestions
+of the `pages` table.
+
+That second refusal is narrower than "a set declaring sites cannot be forced",
+and deliberately so. It asks three things: that site configurations are being
+written at all, that the set declares any, and that the run actually gives up a
+**page** uid. A collision in another table leaves the page tree exactly as
+declared, so the site still names the page it was going to name and the run is
+refused by nothing; `--no-site-config` writes no file naming a number, so the
+same collision becomes the ordinary forced one. Both boundaries are pinned by a
+test, because a guard that is too wide is as wrong as one that is too narrow
+and nothing about it is visible from its result.
 See [Uid collisions and `--force`](../development/seed-sets.md#uid-collisions-and---force).
+
+`--root-page` does not enter into any of this, and that is worth one sentence
+because it looks as though it should. It rewrites the `pid` of the top level
+items of the scenario and nothing else, so the declared uid of the site root is
+untouched: the site is written for the same page it names without the option,
+which is now a page inside another tree - a legal site root for TYPO3, and a
+sub-site rather than a broken one.
 
 The resolved uid **always wins** over whatever the template declares. That is not
 a merge policy but the point of the construct: a template is a file someone
