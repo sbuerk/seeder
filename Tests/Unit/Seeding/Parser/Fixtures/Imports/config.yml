@@ -1,9 +1,11 @@
+# The entry file of a set that is split over two files. "Scenarios.yaml"
+# contributes one scenario, this file contributes another, and "YamlFileLoader"
+# merges the imported list into the importing one instead of replacing it.
 identifier: imports-demo
 title: 'A set split over two files'
 
 imports:
-  - { resource: Pages.yaml }
+  - { resource: Scenarios.yaml }
 
-pages:
-  - identifier: contact
-    title: 'Contact'
+scenarios:
+  - Content.yaml

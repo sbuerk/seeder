@@ -1,0 +1,2 @@
+# "entities" as a scalar rather than a map of entity name to items.
+entities: 'Pages.yaml'

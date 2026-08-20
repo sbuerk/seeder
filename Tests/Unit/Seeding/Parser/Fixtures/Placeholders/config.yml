@@ -1,7 +1,9 @@
+# Every "%…%" fragment in here has to survive verbatim: the loader is called
+# with PROCESS_IMPORTS only, so placeholder substitution - which would replace
+# "%identifier%" with the identifier below - never runs.
 identifier: placeholders
 title: 'Save 50% today, 100% sure'
+description: '%identifier% is not substituted'
 
-pages:
-  - identifier: home
-    title: '%identifier% is not substituted'
-    subtitle: 'width: 50%; height: 100%'
+scenarios:
+  - '%identifier%.yaml'

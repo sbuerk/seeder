@@ -1,0 +1,4 @@
+# Deliberately unparseable: the flow sequence below is never closed.
+entitySettings:
+  page:
+    tableName: [pages

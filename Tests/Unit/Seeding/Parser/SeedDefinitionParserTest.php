@@ -6,14 +6,46 @@ namespace SBUERK\Seeder\Tests\Unit\Seeding\Parser;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Definition\SeedRecord;
+use SBUERK\Seeder\Seeding\Definition\SeedFile;
+use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
+require_once __DIR__ . '/Fixtures/ShadowedIsReadable.php';
+
+/**
+ * The `config.yml` of a seed set is what an integrator writes against, so it is
+ * parsed strictly: the key set is closed at the top level and on a site, and an
+ * unknown key fails the import naming the key rather than being skipped.
+ *
+ * Since the records moved into scenario files, the descriptor describes the
+ * **set** only - which scenarios it is written from, which files it brings, and
+ * which sites it sets up. That is what this class covers, in three layers:
+ *
+ * - {@see SeedDefinitionParser::parse()} on an array, which is the whole
+ *   validation surface and needs no file system;
+ * - {@see SeedDefinitionParser::parseFile()}, which adds `imports` through
+ *   `YamlFileLoader` and the two deviations from how the core calls it -
+ *   placeholders switched off, a failing import raised rather than logged;
+ * - the silent fallbacks of a `files` entry, which are deliberately *not*
+ *   errors and would otherwise only be noticed when a file lands in the wrong
+ *   storage.
+ *
+ * Where a path is confined - a set below `vendor/`, a set outside the project
+ * path - is a question about `GeneralUtility::getFileAbsFileName()` rather than
+ * about parsing, and lives in {@see SeedDefinitionParserPathResolutionTest}.
+ */
 final class SeedDefinitionParserTest extends UnitTestCase
 {
+    /**
+     * The one entry file `Fixtures/ShadowedIsReadable.php` answers as
+     * unreadable. It is a normal, readable fixture - see that file for why the
+     * answer is shadowed rather than the permission bits changed.
+     */
+    public const UNREADABLE_ENTRY_FILE = __DIR__ . '/Fixtures/Unreadable/config.yml';
+
     private SeedDefinitionParser $subject;
 
     protected function setUp(): void
@@ -29,6 +61,7 @@ final class SeedDefinitionParserTest extends UnitTestCase
             'identifier' => 'demo',
             'title' => 'Demo page tree',
             'description' => 'A page tree to look at.',
+            'scenarios' => ['Pages.yaml'],
         ]);
 
         $this->assertSame('demo', $definition->identifier);
@@ -37,16 +70,17 @@ final class SeedDefinitionParserTest extends UnitTestCase
     }
 
     #[Test]
-    public function aDefinitionWithoutRecordsIsAccepted(): void
+    public function aDefinitionWithoutFilesOrSitesIsAccepted(): void
     {
-        // A set may ship files or site configurations alone, and an empty set
-        // is a valid intermediate state while one is being written.
+        // A set that writes records and nothing else is the common case, and
+        // neither key is required for it.
         $definition = $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
         ]);
 
-        $this->assertSame([], $definition->records);
+        $this->assertSame(['Pages.yaml'], $definition->scenarios);
         $this->assertSame([], $definition->files);
         $this->assertSame([], $definition->sites);
         $this->assertSame('', $definition->description);
@@ -56,601 +90,665 @@ final class SeedDefinitionParserTest extends UnitTestCase
     #[Test]
     public function anEmptyDescriptionKeyIsTheSameAsNone(): void
     {
-        // "description:" with nothing behind it decodes to null.
+        // "description:" with nothing behind it decodes to null, which the null
+        // coalescing operator cannot tell from an absent key - and must not,
+        // because both mean "this set has no long text".
         $definition = $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
             'description' => null,
+            'scenarios' => ['Pages.yaml'],
         ]);
 
         $this->assertSame('', $definition->description);
     }
 
-    #[Test]
-    public function structuralKeysAreNotWrittenAsFields(): void
+    /**
+     * @return \Generator<string, array{basePath: string, expected: string}>
+     */
+    public static function basePaths(): \Generator
     {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [
-                ['identifier' => 'home', 'uid' => 1, 'title' => 'Home', 'children' => [], 'content' => []],
-            ],
-        ]);
+        yield 'a directory without a trailing slash is kept' => [
+            'basePath' => '/var/www/set',
+            'expected' => '/var/www/set',
+        ];
+        yield 'a trailing slash is removed' => [
+            'basePath' => '/var/www/set/',
+            'expected' => '/var/www/set',
+        ];
+        yield 'several trailing slashes are removed' => [
+            'basePath' => '/var/www/set///',
+            'expected' => '/var/www/set',
+        ];
+        // The consumers concatenate "basePath . '/' . $relative", so the root
+        // directory has to arrive as an empty string rather than as "/" for
+        // that to produce one separator instead of two.
+        yield 'the root directory becomes an empty string' => [
+            'basePath' => '/',
+            'expected' => '',
+        ];
+        yield 'no base path stays empty' => [
+            'basePath' => '',
+            'expected' => '',
+        ];
+    }
 
-        $record = $definition->records[0];
+    #[DataProvider('basePaths')]
+    #[Test]
+    public function theBasePathIsRightTrimmed(string $basePath, string $expected): void
+    {
+        $definition = $this->subject->parse(
+            ['identifier' => 'demo', 'title' => 'Demo', 'scenarios' => ['Pages.yaml']],
+            'seed definition',
+            $basePath,
+        );
 
-        $this->assertSame(['title' => 'Home'], $record->values);
-        $this->assertSame(1, $record->uid);
-        $this->assertSame('home', $record->identifier);
-        $this->assertSame('pages', $record->table);
+        $this->assertSame($expected, $definition->basePath);
     }
 
     #[Test]
-    public function everyKeyThatIsNotStructureIsCopiedVerbatim(): void
+    public function anUnknownTopLevelKeyNamesItselfAndTheKnownKeys(): void
     {
-        // The load bearing property of the format: a field needs no support in
-        // the seeder to be seedable. Nothing here is known to this extension.
+        // The typo this guards against is "scenario:" for "scenarios:", which
+        // would otherwise be an import that reports success and writes nothing.
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787072814);
+        $this->expectExceptionMessage(
+            'The seed definition "config.yml" declares the unknown key "scenario". Known keys are:'
+            . ' identifier, title, description, imports, scenarios, files, sites.',
+        );
+
+        $this->subject->parse(
+            ['identifier' => 'demo', 'title' => 'Demo', 'scenario' => ['Pages.yaml']],
+            'config.yml',
+        );
+    }
+
+    #[Test]
+    public function anImportsKeyIsAcceptedAlthoughTheLoaderConsumesIt(): void
+    {
+        // "YamlFileLoader" merges and removes "imports", so the parser never
+        // sees one in practice. It stays a known key so that "parse()" can be
+        // called with a raw array carrying one.
         $definition = $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'tx_vendor_unknown_field' => 'kept',
-                'nav_hide' => 1,
-                'abstract' => null,
-                'is_siteroot' => true,
-                'tx_vendor_float' => 1.5,
-            ]],
+            'imports' => [['resource' => 'Scenarios.yaml']],
+            'scenarios' => ['Pages.yaml'],
+        ]);
+
+        $this->assertSame('demo', $definition->identifier);
+    }
+
+    /**
+     * @return \Generator<string, array{definition: mixed, code: int}>
+     */
+    public static function invalidDefinitions(): \Generator
+    {
+        yield 'not a map' => [
+            'definition' => 'nope',
+            'code' => 1787072810,
+        ];
+        yield 'null rather than a map' => [
+            'definition' => null,
+            'code' => 1787072810,
+        ];
+        yield 'unknown key at the set level' => [
+            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => []],
+            'code' => 1787072814,
+        ];
+        // A stray list entry produces an integer key, which the message casts
+        // to a string rather than failing on.
+        yield 'a numeric key' => [
+            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 0 => 'stray'],
+            'code' => 1787072814,
+        ];
+        yield 'no identifier' => [
+            'definition' => ['title' => 'Demo', 'scenarios' => ['Pages.yaml']],
+            'code' => 1787072811,
+        ];
+        yield 'empty identifier' => [
+            'definition' => ['identifier' => '', 'title' => 'Demo', 'scenarios' => ['Pages.yaml']],
+            'code' => 1787072811,
+        ];
+        yield 'identifier not a string' => [
+            'definition' => ['identifier' => 17, 'title' => 'Demo', 'scenarios' => ['Pages.yaml']],
+            'code' => 1787072811,
+        ];
+        yield 'no title' => [
+            'definition' => ['identifier' => 'demo', 'scenarios' => ['Pages.yaml']],
+            'code' => 1787072812,
+        ];
+        yield 'empty title' => [
+            'definition' => ['identifier' => 'demo', 'title' => '', 'scenarios' => ['Pages.yaml']],
+            'code' => 1787072812,
+        ];
+        yield 'title not a string' => [
+            'definition' => ['identifier' => 'demo', 'title' => 17, 'scenarios' => ['Pages.yaml']],
+            'code' => 1787072812,
+        ];
+        yield 'description not a string' => [
+            'definition' => [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'description' => ['nope'],
+                'scenarios' => ['Pages.yaml'],
+            ],
+            'code' => 1787072813,
+        ];
+    }
+
+    #[DataProvider('invalidDefinitions')]
+    #[Test]
+    public function anInvalidDefinitionIsRejected(mixed $definition, int $code): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode($code);
+
+        $this->subject->parse($definition);
+    }
+
+    #[Test]
+    public function scenariosAreKeptInDeclarationOrderAndVerbatim(): void
+    {
+        // The order is the order the files are composed in, so a later file
+        // overrides an earlier one - sorting them would silently change which
+        // settings win. Nothing is normalised either: a path is resolved when
+        // it is read, not here.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => [
+                'Zulu.yaml',
+                'Alpha.yaml',
+                'EXT:demo/Configuration/Seeder/demo/Pages.yaml',
+                '/absolute/Content.yaml',
+                'Nested/../Content.yaml',
+            ],
         ]);
 
         $this->assertSame(
             [
-                'tx_vendor_unknown_field' => 'kept',
-                'nav_hide' => 1,
-                'abstract' => null,
-                'is_siteroot' => true,
-                'tx_vendor_float' => 1.5,
+                'Zulu.yaml',
+                'Alpha.yaml',
+                'EXT:demo/Configuration/Seeder/demo/Pages.yaml',
+                '/absolute/Content.yaml',
+                'Nested/../Content.yaml',
             ],
-            $definition->records[0]->values,
+            $definition->scenarios,
         );
     }
 
-    #[Test]
-    public function contentIsNestedAsTtContentAndChildrenAsPages(): void
+    /**
+     * @return \Generator<string, array{scenarios: mixed}>
+     */
+    public static function unusableScenarioDeclarations(): \Generator
     {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [
-                [
-                    'identifier' => 'home',
-                    'content' => [['identifier' => 'text', 'CType' => 'text']],
-                    'children' => [['identifier' => 'sub', 'title' => 'Sub']],
-                ],
-            ],
-        ]);
-
-        $children = $definition->records[0]->children;
-
-        $this->assertCount(2, $children);
-        // Content first, so it lands above the sub pages of the same parent.
-        $this->assertSame('tt_content', $children[0]->table);
-        $this->assertSame('pages', $children[1]->table);
+        yield 'absent' => ['scenarios' => null];
+        yield 'a single path rather than a list' => ['scenarios' => 'Pages.yaml'];
+        yield 'a map rather than a list' => ['scenarios' => ['first' => 'Pages.yaml']];
+        yield 'an empty list' => ['scenarios' => []];
+        yield 'boolean false' => ['scenarios' => false];
     }
 
+    #[DataProvider('unusableScenarioDeclarations')]
     #[Test]
-    public function uidIsOptional(): void
+    public function aSetWithoutScenariosIsRejected(mixed $scenarios): void
     {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [['identifier' => 'home', 'title' => 'Home']],
-        ]);
+        // Required and non-empty: a descriptor that names no scenario writes no
+        // record, and saying so by omission is indistinguishable from having
+        // misspelled the key.
+        $definition = ['identifier' => 'demo', 'title' => 'Demo'];
+        if ($scenarios !== null) {
+            $definition['scenarios'] = $scenarios;
+        }
 
-        $this->assertNull($definition->records[0]->uid);
-    }
-
-    #[Test]
-    public function aFileReferenceIsEitherAnIdentifierOrAMapCarryingItsFields(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [
-                [
-                    'identifier' => 'home',
-                    'files' => [
-                        'media' => [
-                            'plain',
-                            ['identifier' => 'annotated', 'alternative' => 'Alt text', 'description' => 'Caption'],
-                        ],
-                    ],
-                ],
-            ],
-        ]);
-
-        $references = $definition->records[0]->files['media'];
-
-        $this->assertSame('plain', $references[0]->identifier);
-        // The short form declares no fields rather than empty ones, so nothing
-        // it does not mention is written to the reference at all.
-        $this->assertSame([], $references[0]->values);
-
-        $this->assertSame('annotated', $references[1]->identifier);
-        $this->assertSame(['alternative' => 'Alt text', 'description' => 'Caption'], $references[1]->values);
-    }
-
-    #[Test]
-    public function aFileFieldWithAnEmptyListDeclaresNoReference(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [['identifier' => 'home', 'files' => ['media' => []]]],
-        ]);
-
-        // Not an empty list under "media": seeding writes, and an empty
-        // declaration is not an instruction to clear the relation, so the
-        // field is not addressed at all.
-        $this->assertSame([], $definition->records[0]->files);
-    }
-
-    #[Test]
-    public function anEmptyInlineMapDeclaresNoChildren(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [['identifier' => 'home', 'inline' => []]],
-        ]);
-
-        $this->assertSame([], $definition->records[0]->inline);
-        // ... and "inline" is still structure, so it is not written as a field.
-        $this->assertSame([], $definition->records[0]->values);
-    }
-
-    #[Test]
-    public function inlineChildrenAreKeyedByTheParentFieldAndCarryTheirOwnTable(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [[
-                    'identifier' => 'links',
-                    'CType' => 'example_linklist',
-                    'inline' => [
-                        'tx_example_items' => [
-                            ['identifier' => 'links-docs', 'table' => 'tx_example_item', 'link_label' => 'Docs'],
-                            ['identifier' => 'links-media', 'table' => 'tx_example_item', 'link_label' => 'Media'],
-                        ],
-                    ],
-                ]],
-            ]],
-        ]);
-
-        $parent = $definition->records[0]->children[0];
-        $children = $parent->inline['tx_example_items'];
-
-        $this->assertSame(['tx_example_items'], array_keys($parent->inline));
-        $this->assertCount(2, $children);
-        $this->assertSame('tx_example_item', $children[0]->table);
-        $this->assertSame('links-docs', $children[0]->identifier);
-        $this->assertSame('links-media', $children[1]->identifier);
-        // "table" is structure on an inline child, so it is not written as a
-        // field of the record.
-        $this->assertSame(['link_label' => 'Docs'], $children[0]->values);
-        // ... and "inline" is not written as a field of the parent either.
-        $this->assertSame(['CType' => 'example_linklist'], $parent->values);
-    }
-
-    #[Test]
-    public function aRecordMayCarryMoreThanOneInlineField(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [[
-                    'identifier' => 'element',
-                    'inline' => [
-                        'tx_example_items' => [
-                            ['identifier' => 'first', 'table' => 'tx_example_item'],
-                        ],
-                        'tx_example_others' => [
-                            ['identifier' => 'second', 'table' => 'tx_example_other'],
-                        ],
-                    ],
-                ]],
-            ]],
-        ]);
-
-        $inline = $definition->records[0]->children[0]->inline;
-
-        $this->assertSame(['tx_example_items', 'tx_example_others'], array_keys($inline));
-        $this->assertSame('tx_example_item', $inline['tx_example_items'][0]->table);
-        $this->assertSame('tx_example_other', $inline['tx_example_others'][0]->table);
-    }
-
-    #[Test]
-    public function anInlineChildTakesTheSameUidAndFilesAsAnyOtherRecord(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [[
-                    'identifier' => 'grid',
-                    'inline' => [
-                        'tx_example_items' => [[
-                            'identifier' => 'grid-tile',
-                            'table' => 'tx_example_item',
-                            'uid' => 42,
-                            'files' => ['image' => ['placeholder']],
-                        ]],
-                    ],
-                ]],
-            ]],
-        ]);
-
-        $child = $definition->records[0]->children[0]->inline['tx_example_items'][0];
-
-        $this->assertSame(42, $child->uid);
-        $this->assertSame('placeholder', $child->files['image'][0]->identifier);
-    }
-
-    #[Test]
-    public function anInlineChildDeclaringNestedRecordsIsRejected(): void
-    {
-        // "children", "content" and "records" describe what sits on a page.
-        // The data map factory reaches the children of a record from the page
-        // level and the inline children of any record - the page-style children
-        // of an inline child were reached by neither and vanished without a
-        // word, which is the one thing this format must never do.
         $this->expectException(InvalidSeedDefinitionException::class);
-        $this->expectExceptionCode(1787078001);
-        $this->expectExceptionMessage('The inline child "grid-tile"');
-        $this->expectExceptionMessage('"content"');
+        $this->expectExceptionCode(1787256301);
+
+        $this->subject->parse($definition);
+    }
+
+    /**
+     * @return \Generator<string, array{scenario: mixed}>
+     */
+    public static function unusableScenarioEntries(): \Generator
+    {
+        yield 'an empty string' => ['scenario' => ''];
+        yield 'whitespace only' => ['scenario' => "  \t "];
+        yield 'a number' => ['scenario' => 17];
+        yield 'null' => ['scenario' => null];
+        yield 'a nested list' => ['scenario' => ['Pages.yaml']];
+        yield 'a map' => ['scenario' => ['resource' => 'Pages.yaml']];
+    }
+
+    #[DataProvider('unusableScenarioEntries')]
+    #[Test]
+    public function aScenarioEntryThatIsNoPathIsRejected(mixed $scenario): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787256302);
 
         $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [[
-                    'identifier' => 'grid',
-                    'inline' => [
-                        'tx_example_items' => [[
-                            'identifier' => 'grid-tile',
-                            'table' => 'tx_example_item',
-                            'content' => [['identifier' => 'lost', 'CType' => 'header']],
-                        ]],
-                    ],
-                ]],
-            ]],
+            'scenarios' => ['Pages.yaml', $scenario],
         ]);
     }
 
     #[Test]
-    public function recordsIsAFieldOnAnInlineChildThatIsNotAPage(): void
-    {
-        // The rejection above is about structure, and "records" is structure
-        // on a page alone: "tt_content" has a column of that name, so an inline
-        // child of that table writes it as a field exactly as a content
-        // element does.
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [[
-                    'identifier' => 'grid',
-                    'inline' => [
-                        'tx_example_items' => [[
-                            'identifier' => 'grid-tile',
-                            'table' => 'tt_content',
-                            'CType' => 'shortcut',
-                            'records' => 'tt_content_601',
-                        ]],
-                    ],
-                ]],
-            ]],
-        ]);
-
-        $child = $definition->records[0]->children[0]->inline['tx_example_items'][0];
-
-        $this->assertSame(['CType' => 'shortcut', 'records' => 'tt_content_601'], $child->values);
-        $this->assertSame([], $child->children);
-    }
-
-    #[Test]
-    public function recordsCarryTheirOwnTableAndAreNestedOntoThePageDeclaringThem(): void
+    public function aFileIsParsedWithEverythingItDeclares(): void
     {
         $definition = $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'storage',
-                'doktype' => 254,
-                'records' => [
-                    ['identifier' => 'category-news', 'table' => 'sys_category', 'title' => 'News'],
-                    ['identifier' => 'user-doe', 'table' => 'fe_users', 'username' => 'doe'],
-                ],
-            ]],
-        ]);
-
-        $page = $definition->records[0];
-        $records = $page->children;
-
-        $this->assertCount(2, $records);
-        $this->assertSame('sys_category', $records[0]->table);
-        $this->assertSame('fe_users', $records[1]->table);
-        // "table" is structure under "records", exactly as it is on an inline
-        // child, so it is not written as a field of the record.
-        $this->assertSame(['title' => 'News'], $records[0]->values);
-        // ... and "records" is not written as a field of the page either.
-        $this->assertSame(['doktype' => 254], $page->values);
-    }
-
-    #[Test]
-    public function recordsJoinContentAndChildrenRatherThanReplacingThem(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [['identifier' => 'home-heading', 'CType' => 'header']],
-                'records' => [['identifier' => 'home-category', 'table' => 'sys_category']],
-                'children' => [['identifier' => 'about']],
-            ]],
-        ]);
-
-        $tables = array_map(
-            static fn(SeedRecord $record): string => $record->table,
-            $definition->records[0]->children,
-        );
-
-        $this->assertSame(['tt_content', 'sys_category', 'pages'], $tables);
-    }
-
-    #[Test]
-    public function aRecordTakesTheSameUidFilesAndInlineAsAnyOtherRecord(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'storage',
-                'records' => [[
-                    'identifier' => 'profile-doe',
-                    'table' => 'tx_example_profile',
-                    'uid' => 42,
-                    'files' => ['image' => ['placeholder']],
-                    'inline' => [
-                        'contracts' => [[
-                            'identifier' => 'contract-doe',
-                            'table' => 'tx_example_contract',
-                            'position' => 'Professor',
-                        ]],
-                    ],
-                ]],
-            ]],
-        ]);
-
-        $record = $definition->records[0]->children[0];
-
-        $this->assertSame(42, $record->uid);
-        $this->assertSame('placeholder', $record->files['image'][0]->identifier);
-        $this->assertSame('tx_example_contract', $record->inline['contracts'][0]->table);
-        $this->assertSame(['position' => 'Professor'], $record->inline['contracts'][0]->values);
-    }
-
-    #[Test]
-    public function recordsIsAFieldEverywhereButOnAPage(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [['identifier' => 'insert', 'CType' => 'shortcut', 'records' => 'tt_content_601']],
-            ]],
-        ]);
-
-        $record = $definition->records[0]->children[0];
-
-        // "tt_content" has a column of that name - the one the "Insert records"
-        // element writes into - so on a content element it is an ordinary field
-        // and has to survive as one.
-        $this->assertSame(['CType' => 'shortcut', 'records' => 'tt_content_601'], $record->values);
-        $this->assertSame([], $record->children);
-    }
-
-    #[Test]
-    public function recordsIsStructureOnAPageWhereverThatPageWasDeclared(): void
-    {
-        // The resolved table decides, not the level: a page declared below
-        // "records" is still a page, and "records" on it is still structure.
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'records' => [[
-                    'identifier' => 'sub',
-                    'table' => 'pages',
-                    'title' => 'Sub',
-                    'records' => [['identifier' => 'sub-category', 'table' => 'sys_category']],
-                ]],
-            ]],
-        ]);
-
-        $sub = $definition->records[0]->children[0];
-
-        $this->assertSame('pages', $sub->table);
-        $this->assertSame(['title' => 'Sub'], $sub->values);
-        $this->assertCount(1, $sub->children);
-        $this->assertSame('sys_category', $sub->children[0]->table);
-    }
-
-    #[Test]
-    public function tableIsAFieldOnAPageButStructureOnAnInlineChild(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                // "pages" has real fields whose name starts with "table", and
-                // the table of a page comes from the nesting, so a "table" key
-                // here is an ordinary field and has to survive as one.
-                'table' => 'nope',
-                'tablespace' => 'also a field',
-                'inline' => [
-                    'tx_example_items' => [
-                        ['identifier' => 'item', 'table' => 'tx_example_item', 'label' => 'Docs'],
-                    ],
-                ],
-            ]],
-        ]);
-
-        $page = $definition->records[0];
-
-        $this->assertSame('pages', $page->table);
-        $this->assertSame(['table' => 'nope', 'tablespace' => 'also a field'], $page->values);
-        $this->assertSame('tx_example_item', $page->inline['tx_example_items'][0]->table);
-        $this->assertSame(['label' => 'Docs'], $page->inline['tx_example_items'][0]->values);
-    }
-
-    #[Test]
-    public function tableIsAFieldOnAContentElementAsWell(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'content' => [['identifier' => 'a-table', 'CType' => 'table', 'table_caption' => 'Prices', 'table' => 'nope']],
-            ]],
-        ]);
-
-        $record = $definition->records[0]->children[0];
-
-        $this->assertSame('tt_content', $record->table);
-        $this->assertSame(['CType' => 'table', 'table_caption' => 'Prices', 'table' => 'nope'], $record->values);
-    }
-
-    #[Test]
-    public function filesOfTheSetCarryTheirDefaults(): void
-    {
-        $definition = $this->subject->parse([
-            'identifier' => 'demo',
-            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
             'files' => [
-                ['identifier' => 'plain', 'source' => 'Files/placeholder.svg'],
                 [
-                    'identifier' => 'full',
-                    'source' => 'EXT:seeder/Resources/Public/Icons/Extension.svg',
-                    'folder' => 'seeder',
+                    'identifier' => 'placeholder',
+                    'source' => 'Files/placeholder.svg',
+                    'folder' => 'demo/images',
                     'name' => 'renamed.svg',
                     'storage' => 2,
                 ],
             ],
         ]);
 
-        $this->assertSame('plain', $definition->files[0]->identifier);
-        $this->assertSame('Files/placeholder.svg', $definition->files[0]->source);
+        $this->assertCount(1, $definition->files);
+        $this->assertEquals(
+            new SeedFile('placeholder', 'Files/placeholder.svg', 'demo/images', 'renamed.svg', 2),
+            $definition->files[0],
+        );
+    }
+
+    #[Test]
+    public function aFileFallsBackToTheStorageRootAndTheSourceName(): void
+    {
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [
+                ['identifier' => 'placeholder', 'source' => 'Files/placeholder.svg'],
+            ],
+        ]);
+
         $this->assertSame('/', $definition->files[0]->folder);
         $this->assertNull($definition->files[0]->name);
         $this->assertNull($definition->files[0]->storage);
+    }
 
-        $this->assertSame('seeder', $definition->files[1]->folder);
-        $this->assertSame('renamed.svg', $definition->files[1]->name);
-        $this->assertSame(2, $definition->files[1]->storage);
+    /**
+     * @return \Generator<string, array{file: array<string, mixed>, expected: SeedFile}>
+     */
+    public static function filesWithUnusableOptionalValues(): \Generator
+    {
+        yield 'a folder that is not a string falls back to the storage root' => [
+            'file' => ['identifier' => 'f', 'source' => 's.svg', 'folder' => 17],
+            'expected' => new SeedFile('f', 's.svg', '/'),
+        ];
+        yield 'a folder that is a list falls back to the storage root' => [
+            'file' => ['identifier' => 'f', 'source' => 's.svg', 'folder' => ['demo']],
+            'expected' => new SeedFile('f', 's.svg', '/'),
+        ];
+        yield 'a name that is not a string falls back to the source name' => [
+            'file' => ['identifier' => 'f', 'source' => 's.svg', 'name' => 17],
+            'expected' => new SeedFile('f', 's.svg', '/', null),
+        ];
+        // "storage: '2'" is what a quoted YAML scalar produces, and it is
+        // dropped rather than cast - the file lands in the default storage.
+        yield 'a storage that is a numeric string falls back to the default storage' => [
+            'file' => ['identifier' => 'f', 'source' => 's.svg', 'storage' => '2'],
+            'expected' => new SeedFile('f', 's.svg', '/', null, null),
+        ];
+        yield 'a storage that is a boolean falls back to the default storage' => [
+            'file' => ['identifier' => 'f', 'source' => 's.svg', 'storage' => true],
+            'expected' => new SeedFile('f', 's.svg', '/', null, null),
+        ];
+        // Storage 0 is a real storage uid in TYPO3 - the one holding files
+        // outside any storage - so it is kept rather than treated as "none".
+        yield 'storage zero is kept' => [
+            'file' => ['identifier' => 'f', 'source' => 's.svg', 'storage' => 0],
+            'expected' => new SeedFile('f', 's.svg', '/', null, 0),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $file
+     */
+    #[DataProvider('filesWithUnusableOptionalValues')]
+    #[Test]
+    public function anUnusableOptionalFileValueFallsBackSilently(array $file, SeedFile $expected): void
+    {
+        // Pinned rather than turned into an error: the optional values of a
+        // file are conveniences, and a wrong type in one of them is not worth
+        // refusing a set over.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [$file],
+        ]);
+
+        $this->assertEquals($expected, $definition->files[0]);
+    }
+
+    /**
+     * A file declaration is configuration, not a record: nothing in it is
+     * written verbatim to anything, so an unknown key can only be a mistake.
+     * Accepting `foldr:` silently would put the file in the storage root and
+     * report success.
+     */
+    #[Test]
+    public function anUnknownFileKeyNamesItselfAndTheKnownKeys(): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787256303);
+        $this->expectExceptionMessage(
+            'A file of the seed definition "seed definition" declares the unknown key "foldr".'
+            . ' Known keys are: identifier, source, folder, name, storage.'
+        );
+
+        $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => [
+                ['identifier' => 'f', 'source' => 's.svg', 'foldr' => 'demo'],
+            ],
+        ]);
+    }
+
+    /**
+     * @return \Generator<string, array{files: mixed, code: int}>
+     */
+    public static function invalidFileDeclarations(): \Generator
+    {
+        yield 'files not a list' => ['files' => 'nope', 'code' => 1787072820];
+        yield 'files a map rather than a list' => [
+            'files' => ['placeholder' => ['source' => 's.svg']],
+            'code' => 1787072820,
+        ];
+        yield 'a file that is not a map' => ['files' => ['nope'], 'code' => 1787072821];
+        yield 'a file without an identifier' => ['files' => [['source' => 's.svg']], 'code' => 1787072822];
+        yield 'a file with an empty identifier' => [
+            'files' => [['identifier' => '', 'source' => 's.svg']],
+            'code' => 1787072822,
+        ];
+        yield 'a file with an identifier that is not a string' => [
+            'files' => [['identifier' => 17, 'source' => 's.svg']],
+            'code' => 1787072822,
+        ];
+        yield 'the same file identifier twice' => [
+            'files' => [
+                ['identifier' => 'placeholder', 'source' => 'a.svg'],
+                ['identifier' => 'placeholder', 'source' => 'b.svg'],
+            ],
+            'code' => 1787072823,
+        ];
+        yield 'a file without a source' => ['files' => [['identifier' => 'f']], 'code' => 1787072824];
+        yield 'a file with an empty source' => [
+            'files' => [['identifier' => 'f', 'source' => '']],
+            'code' => 1787072824,
+        ];
+        yield 'a file with a source that is not a string' => [
+            'files' => [['identifier' => 'f', 'source' => 17]],
+            'code' => 1787072824,
+        ];
+    }
+
+    #[DataProvider('invalidFileDeclarations')]
+    #[Test]
+    public function anInvalidFileDeclarationIsRejected(mixed $files, int $code): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode($code);
+
+        $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'files' => $files,
+        ]);
     }
 
     #[Test]
-    public function sitesArePartOfTheDefinition(): void
+    public function aSiteIsParsedWithEverythingItDeclares(): void
     {
         $definition = $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
-            'pages' => [
-                ['identifier' => 'home', 'is_siteroot' => 1],
-                ['identifier' => 'shop', 'is_siteroot' => 1],
-            ],
+            'scenarios' => ['Pages.yaml'],
             'sites' => [
-                ['identifier' => 'main', 'rootPage' => 'home'],
-                ['identifier' => 'shop_site', 'rootPage' => 'shop', 'template' => 'Sites/other', 'base' => 'https://example.com/'],
+                [
+                    'identifier' => 'main',
+                    'rootPage' => 1000,
+                    'template' => 'Sites/other',
+                    'base' => 'https://example.com/',
+                ],
             ],
         ]);
 
-        $this->assertCount(2, $definition->sites);
-        $this->assertSame('main', $definition->sites[0]->identifier);
-        $this->assertSame('home', $definition->sites[0]->rootPage);
-        // The template defaults to "Sites/<identifier>", resolved here so no
-        // consumer has to know the default.
-        $this->assertSame('Sites/main', $definition->sites[0]->template);
-        $this->assertNull($definition->sites[0]->base);
-
-        $this->assertSame('Sites/other', $definition->sites[1]->template);
-        $this->assertSame('https://example.com/', $definition->sites[1]->base);
+        $this->assertCount(1, $definition->sites);
+        $this->assertEquals(
+            new SeedSiteConfiguration('main', 1000, 'Sites/other', 'https://example.com/'),
+            $definition->sites[0],
+        );
     }
 
     #[Test]
-    public function aSiteMayPointAtAPageDeclaredAnywhereInTheDefinition(): void
+    public function aSiteTemplateDefaultsToTheDirectoryNamedAfterTheIdentifier(): void
+    {
+        // Filled in here rather than in the seeder, so no consumer has to know
+        // the convention - and so an explicit template always wins.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'sites' => [
+                ['identifier' => 'main', 'rootPage' => 1000],
+                ['identifier' => 'second', 'rootPage' => 2000, 'template' => null],
+            ],
+        ]);
+
+        $this->assertSame('Sites/main', $definition->sites[0]->template);
+        $this->assertSame('Sites/second', $definition->sites[1]->template);
+        $this->assertNull($definition->sites[0]->base);
+    }
+
+    #[Test]
+    public function anEmptySiteBaseIsNotTheSameAsNone(): void
+    {
+        // An empty string is a base - the one a site rendered under the domain
+        // it is called with needs - and only null leaves the template's alone.
+        $definition = $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'sites' => [['identifier' => 'main', 'rootPage' => 1000, 'base' => '']],
+        ]);
+
+        $this->assertSame('', $definition->sites[0]->base);
+    }
+
+    #[Test]
+    public function anUnknownSiteKeyNamesItselfAndTheKnownKeys(): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode(1787072878);
+        $this->expectExceptionMessage(
+            'A site of the seed definition "config.yml" declares the unknown key "rootPageId". Known keys are:'
+            . ' identifier, rootPage, template, base.',
+        );
+
+        $this->subject->parse(
+            [
+                'identifier' => 'demo',
+                'title' => 'Demo',
+                'scenarios' => ['Pages.yaml'],
+                'sites' => [['identifier' => 'main', 'rootPageId' => 1000]],
+            ],
+            'config.yml',
+        );
+    }
+
+    /**
+     * @return \Generator<string, array{sites: mixed, code: int}>
+     */
+    public static function invalidSiteDeclarations(): \Generator
+    {
+        yield 'sites not a list' => ['sites' => 'nope', 'code' => 1787072816];
+        yield 'sites a map rather than a list' => [
+            'sites' => ['main' => ['rootPage' => 1000]],
+            'code' => 1787072816,
+        ];
+        yield 'a site that is not a map' => ['sites' => ['nope'], 'code' => 1787072870];
+        yield 'a site without an identifier' => ['sites' => [['rootPage' => 1000]], 'code' => 1787072871];
+        yield 'a site with an empty identifier' => [
+            'sites' => [['identifier' => '', 'rootPage' => 1000]],
+            'code' => 1787072871,
+        ];
+        yield 'a site with an identifier that is not a string' => [
+            'sites' => [['identifier' => 17, 'rootPage' => 1000]],
+            'code' => 1787072871,
+        ];
+        // Everything below becomes a directory name under "config/sites/".
+        yield 'a site identifier holding a separator' => [
+            'sites' => [['identifier' => 'main/sub', 'rootPage' => 1000]],
+            'code' => 1787072872,
+        ];
+        yield 'a site identifier that is the parent directory' => [
+            'sites' => [['identifier' => '..', 'rootPage' => 1000]],
+            'code' => 1787072872,
+        ];
+        yield 'a site identifier holding a dot' => [
+            'sites' => [['identifier' => 'main.site', 'rootPage' => 1000]],
+            'code' => 1787072872,
+        ];
+        yield 'a site identifier holding a space' => [
+            'sites' => [['identifier' => 'main site', 'rootPage' => 1000]],
+            'code' => 1787072872,
+        ];
+        yield 'a site identifier starting with an underscore' => [
+            'sites' => [['identifier' => '_main', 'rootPage' => 1000]],
+            'code' => 1787072872,
+        ];
+        yield 'a site identifier starting with a dash' => [
+            'sites' => [['identifier' => '-main', 'rootPage' => 1000]],
+            'code' => 1787072872,
+        ];
+        yield 'the same site identifier twice' => [
+            'sites' => [
+                ['identifier' => 'main', 'rootPage' => 1000],
+                ['identifier' => 'main', 'rootPage' => 2000],
+            ],
+            'code' => 1787072873,
+        ];
+        // "rootPage" is a page uid now, so a string is not "close enough":
+        // casting it would accept "eleven" as page 0.
+        yield 'a site without a rootPage' => ['sites' => [['identifier' => 'main']], 'code' => 1787072874];
+        yield 'a site whose rootPage is a numeric string' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => '1000']],
+            'code' => 1787072874,
+        ];
+        yield 'a site whose rootPage is a seed identifier' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => 'home']],
+            'code' => 1787072874,
+        ];
+        yield 'a site whose rootPage is zero' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => 0]],
+            'code' => 1787072874,
+        ];
+        yield 'a site whose rootPage is negative' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => -1]],
+            'code' => 1787072874,
+        ];
+        yield 'a site whose rootPage is a float' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => 1000.0]],
+            'code' => 1787072874,
+        ];
+        yield 'a site whose rootPage is null' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => null]],
+            'code' => 1787072874,
+        ];
+        yield 'a site whose template is empty' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => 1000, 'template' => '']],
+            'code' => 1787072877,
+        ];
+        yield 'a site whose template is not a string' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => 1000, 'template' => 17]],
+            'code' => 1787072877,
+        ];
+        yield 'a site whose base is not a string' => [
+            'sites' => [['identifier' => 'main', 'rootPage' => 1000, 'base' => 17]],
+            'code' => 1787072879,
+        ];
+    }
+
+    #[DataProvider('invalidSiteDeclarations')]
+    #[Test]
+    public function anInvalidSiteDeclarationIsRejected(mixed $sites, int $code): void
+    {
+        $this->expectException(InvalidSeedDefinitionException::class);
+        $this->expectExceptionCode($code);
+
+        $this->subject->parse([
+            'identifier' => 'demo',
+            'title' => 'Demo',
+            'scenarios' => ['Pages.yaml'],
+            'sites' => $sites,
+        ]);
+    }
+
+    #[Test]
+    public function aSiteIdentifierMayHoldLettersDigitsDashesAndUnderscores(): void
     {
         $definition = $this->subject->parse([
             'identifier' => 'demo',
             'title' => 'Demo',
-            'pages' => [[
-                'identifier' => 'home',
-                'children' => [['identifier' => 'campaign', 'is_siteroot' => 1]],
-            ]],
-            'sites' => [['identifier' => 'campaign', 'rootPage' => 'campaign']],
+            'scenarios' => ['Pages.yaml'],
+            'sites' => [
+                ['identifier' => 'main', 'rootPage' => 1],
+                ['identifier' => 'Main-2_site', 'rootPage' => 2],
+                ['identifier' => '2nd', 'rootPage' => 3],
+            ],
         ]);
 
-        $this->assertSame('campaign', $definition->sites[0]->rootPage);
+        $this->assertSame(
+            ['main', 'Main-2_site', '2nd'],
+            array_map(static fn(SeedSiteConfiguration $site): string => $site->identifier, $definition->sites),
+        );
     }
 
     #[Test]
-    public function theEntryFileIsReadWithItsDirectoryAsTheBasePath(): void
+    public function anEntryFileIsReadWithTheDirectoryHoldingItAsBasePath(): void
     {
         $definition = $this->subject->parseFile(__DIR__ . '/Fixtures/Imports/config.yml');
 
         $this->assertSame('imports-demo', $definition->identifier);
         $this->assertSame('A set split over two files', $definition->title);
         // Relative resource paths of the set resolve against this, not against
-        // the public path and not against "EXT:" alone.
+        // the public path and not against the current working directory.
         $this->assertSame(__DIR__ . '/Fixtures/Imports', $definition->basePath);
     }
 
     #[Test]
-    public function anImportedFileContributesItsRecordsInDeclarationOrder(): void
+    public function anImportedFileContributesItsScenariosInDeclarationOrder(): void
     {
         $definition = $this->subject->parseFile(__DIR__ . '/Fixtures/Imports/config.yml');
 
-        $identifiers = array_map(
-            static fn(SeedRecord $record): string => $record->identifier,
-            $definition->records,
-        );
-
-        // The imported list is merged in front of the importing one, which is
-        // what makes a set splittable without its page tree changing order.
-        $this->assertSame(['home', 'contact'], $identifiers);
-        $this->assertSame(['title' => 'Home', 'slug' => '/'], $definition->records[0]->values);
+        // The imported list is merged in front of the importing one rather than
+        // replacing it, which is what makes a descriptor splittable without the
+        // composition order changing.
+        $this->assertSame(['Pages.yaml', 'Content.yaml'], $definition->scenarios);
     }
 
     #[Test]
     public function aFailingImportIsRejectedRatherThanSilentlyDropped(): void
     {
         // "YamlFileLoader" logs a failing import and carries on. For a seed
-        // definition that is data loss, so the parser turns the report back
-        // into an exception.
+        // definition that is data loss, so "ThrowOnErrorLogger" turns the
+        // report back into an exception.
         $this->expectException(InvalidSeedDefinitionException::class);
         $this->expectExceptionCode(1787072804);
 
@@ -685,478 +783,34 @@ final class SeedDefinitionParserTest extends UnitTestCase
     }
 
     #[Test]
+    public function anEntryFileThatCannotBeReadIsRejected(): void
+    {
+        // A separate code from "does not exist", because the two need different
+        // answers: one is a broken descriptor, the other is a permission
+        // problem on the machine running the import.
+        //
+        // The fixture is readable; what is not is the answer the parser gets,
+        // see the shadowed "is_readable()" at the bottom of this file.
+        $this->assertFileIsReadable(self::UNREADABLE_ENTRY_FILE);
+
+        $this->expectException(SeedDefinitionNotFoundException::class);
+        $this->expectExceptionCode(1787072802);
+
+        $this->subject->parseFile(self::UNREADABLE_ENTRY_FILE);
+    }
+
+    #[Test]
     public function percentSignsInValuesSurviveVerbatim(): void
     {
         $definition = $this->subject->parseFile(__DIR__ . '/Fixtures/Placeholders/config.yml');
 
-        // Placeholder substitution is switched off deliberately: a seed
-        // definition is content, and "50%" is a percentage rather than the
-        // beginning of a placeholder.
+        // Placeholder substitution is switched off deliberately: a title is
+        // content, "50%" is a percentage rather than the beginning of a
+        // placeholder, and "%identifier%" would otherwise be replaced with the
+        // identifier of the very definition it stands in.
         $this->assertSame('Save 50% today, 100% sure', $definition->title);
-        $this->assertSame(
-            [
-                'title' => '%identifier% is not substituted',
-                'subtitle' => 'width: 50%; height: 100%',
-            ],
-            $definition->records[0]->values,
-        );
+        $this->assertSame('%identifier% is not substituted', $definition->description);
+        $this->assertSame(['%identifier%.yaml'], $definition->scenarios);
     }
 
-    /**
-     * @return \Generator<string, array{definition: mixed, code: int}>
-     */
-    public static function invalidDefinitions(): \Generator
-    {
-        yield 'not a map' => [
-            'definition' => 'nope',
-            'code' => 1787072810,
-        ];
-        yield 'unknown key at the set level' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'page' => []],
-            'code' => 1787072814,
-        ];
-        yield 'no identifier' => [
-            'definition' => ['title' => 'Demo', 'pages' => []],
-            'code' => 1787072811,
-        ];
-        yield 'empty identifier' => [
-            'definition' => ['identifier' => '', 'title' => 'Demo'],
-            'code' => 1787072811,
-        ];
-        yield 'no title' => [
-            'definition' => ['identifier' => 'demo', 'pages' => []],
-            'code' => 1787072812,
-        ];
-        yield 'title not a string' => [
-            'definition' => ['identifier' => 'demo', 'title' => 17],
-            'code' => 1787072812,
-        ];
-        yield 'description not a string' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'description' => ['nope']],
-            'code' => 1787072813,
-        ];
-        yield 'pages not a list' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => 'nope'],
-            'code' => 1787072815,
-        ];
-        yield 'pages a map rather than a list' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => ['home' => ['title' => 'Home']]],
-            'code' => 1787072815,
-        ];
-        yield 'record not a map' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => ['nope']],
-            'code' => 1787072830,
-        ];
-        yield 'record without identifier' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['title' => 'Home']]],
-            'code' => 1787072831,
-        ];
-        yield 'identifier carrying an underscore' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['identifier' => 'home_page']]],
-            'code' => 1787072832,
-        ];
-        yield 'identifier starting with a dash' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['identifier' => '-home']]],
-            'code' => 1787072832,
-        ];
-        yield 'identifier carrying a dot' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['identifier' => 'home.page']]],
-            'code' => 1787072832,
-        ];
-        yield 'identifier carrying a space' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['identifier' => 'home page']]],
-            'code' => 1787072832,
-        ];
-        yield 'duplicate identifier' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home'], ['identifier' => 'home']],
-            ],
-            'code' => 1787072833,
-        ];
-        yield 'duplicate identifier across nesting levels' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [
-                    ['identifier' => 'home', 'children' => [['identifier' => 'home']]],
-                ],
-            ],
-            'code' => 1787072833,
-        ];
-        yield 'duplicate identifier between an inline child and a page' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'inline' => [
-                        'tx_example_items' => [['identifier' => 'home', 'table' => 'tx_example_item']],
-                    ],
-                ]],
-            ],
-            'code' => 1787072833,
-        ];
-        yield 'duplicate identifier between a record and a page' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'records' => [['identifier' => 'home', 'table' => 'sys_category']],
-                ]],
-            ],
-            'code' => 1787072833,
-        ];
-        yield 'uid not a positive integer' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['identifier' => 'home', 'uid' => 0]]],
-            'code' => 1787072834,
-        ];
-        yield 'uid a numeric string' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'pages' => [['identifier' => 'home', 'uid' => '1']]],
-            'code' => 1787072834,
-        ];
-        yield 'inline child without table' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'inline' => ['tx_example_items' => [['identifier' => 'child']]],
-                ]],
-            ],
-            'code' => 1787072835,
-        ];
-        yield 'record without table' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'records' => [['identifier' => 'orphan']]]],
-            ],
-            'code' => 1787072835,
-        ];
-        yield 'content not a list' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'content' => 'nope']],
-            ],
-            'code' => 1787072836,
-        ];
-        yield 'records not a list' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'records' => 'nope']],
-            ],
-            'code' => 1787072837,
-        ];
-        yield 'children not a list' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'children' => 'nope']],
-            ],
-            'code' => 1787072838,
-        ];
-        yield 'field name not a string' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 7 => 'nope']],
-            ],
-            'code' => 1787072839,
-        ];
-        yield 'field value not scalar' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'title' => ['nope']]],
-            ],
-            'code' => 1787072840,
-        ];
-        yield 'files of the set not a list' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'files' => 'nope'],
-            'code' => 1787072820,
-        ];
-        yield 'file not a map' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'files' => ['nope']],
-            'code' => 1787072821,
-        ];
-        yield 'file without identifier' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'files' => [['source' => 'Files/a.svg']]],
-            'code' => 1787072822,
-        ];
-        yield 'duplicate file identifier' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'files' => [
-                    ['identifier' => 'a', 'source' => 'Files/a.svg'],
-                    ['identifier' => 'a', 'source' => 'Files/b.svg'],
-                ],
-            ],
-            'code' => 1787072823,
-        ];
-        yield 'file without source' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'files' => [['identifier' => 'a']]],
-            'code' => 1787072824,
-        ];
-        yield 'file references of a record not a map' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'files' => 'nope']],
-            ],
-            'code' => 1787072850,
-        ];
-        yield 'file field name not a string' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'files' => [7 => ['a']]]],
-            ],
-            'code' => 1787072851,
-        ];
-        yield 'file field not a list' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'files' => ['media' => 'nope']]],
-            ],
-            'code' => 1787072852,
-        ];
-        yield 'file reference neither identifier nor map' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'files' => ['media' => [17]]]],
-            ],
-            'code' => 1787072853,
-        ];
-        yield 'file reference map without identifier' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'files' => ['media' => [['alternative' => 'Alt']]]]],
-            ],
-            'code' => 1787072854,
-        ];
-        yield 'file reference field name not a string' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'files' => ['media' => [['identifier' => 'hero', 7 => 'nope']]],
-                ]],
-            ],
-            'code' => 1787072855,
-        ];
-        yield 'file reference field value not scalar' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'files' => ['media' => [['identifier' => 'hero', 'alternative' => ['nope']]]],
-                ]],
-            ],
-            'code' => 1787072856,
-        ];
-        yield 'inline not a map' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'inline' => 'nope']],
-            ],
-            'code' => 1787072860,
-        ];
-        yield 'inline field name not a string' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'inline' => [7 => []]]],
-            ],
-            'code' => 1787072861,
-        ];
-        yield 'inline child declaring content' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'inline' => ['tx_example_items' => [[
-                        'identifier' => 'child',
-                        'table' => 'tx_example_item',
-                        'content' => [['identifier' => 'lost', 'CType' => 'header']],
-                    ]]],
-                ]],
-            ],
-            'code' => 1787078001,
-        ];
-        yield 'inline child declaring children' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'inline' => ['tx_example_items' => [[
-                        'identifier' => 'child',
-                        'table' => 'tx_example_item',
-                        'children' => [['identifier' => 'lost', 'title' => 'Lost']],
-                    ]]],
-                ]],
-            ],
-            'code' => 1787078001,
-        ];
-        yield 'inline child of the pages table declaring records' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'inline' => ['tx_example_pages' => [[
-                        'identifier' => 'child',
-                        'table' => 'pages',
-                        'records' => [['identifier' => 'lost', 'table' => 'sys_category']],
-                    ]]],
-                ]],
-            ],
-            'code' => 1787078001,
-        ];
-        yield 'inline child of an inline child declaring content' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'inline' => ['tx_example_items' => [[
-                        'identifier' => 'child',
-                        'table' => 'tx_example_item',
-                        'inline' => ['tx_example_links' => [[
-                            'identifier' => 'grandchild',
-                            'table' => 'tx_example_link',
-                            'content' => [['identifier' => 'lost', 'CType' => 'header']],
-                        ]]],
-                    ]]],
-                ]],
-            ],
-            'code' => 1787078001,
-        ];
-        yield 'inline field not a list of records' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home', 'inline' => ['tx_example_items' => 'nope']]],
-            ],
-            'code' => 1787072862,
-        ];
-        yield 'sites not a list' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'sites' => 'nope'],
-            'code' => 1787072816,
-        ];
-        yield 'site not a map' => [
-            'definition' => ['identifier' => 'demo', 'title' => 'Demo', 'sites' => ['nope']],
-            'code' => 1787072870,
-        ];
-        yield 'site without identifier' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['rootPage' => 'home']],
-            ],
-            'code' => 1787072871,
-        ];
-        yield 'site identifier carrying a path separator' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['identifier' => '../escape', 'rootPage' => 'home']],
-            ],
-            'code' => 1787072872,
-        ];
-        yield 'duplicate site identifier' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home'], ['identifier' => 'shop']],
-                'sites' => [
-                    ['identifier' => 'main', 'rootPage' => 'home'],
-                    ['identifier' => 'main', 'rootPage' => 'shop'],
-                ],
-            ],
-            'code' => 1787072873,
-        ];
-        yield 'site without rootPage' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['identifier' => 'main']],
-            ],
-            'code' => 1787072874,
-        ];
-        yield 'site rootPage naming nothing the definition declares' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['identifier' => 'main', 'rootPage' => 'typo']],
-            ],
-            'code' => 1787072875,
-        ];
-        yield 'site rootPage naming a record that is not a page' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [[
-                    'identifier' => 'home',
-                    'content' => [['identifier' => 'heading', 'CType' => 'header']],
-                ]],
-                'sites' => [['identifier' => 'main', 'rootPage' => 'heading']],
-            ],
-            'code' => 1787072876,
-        ];
-        yield 'site template not a string' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['identifier' => 'main', 'rootPage' => 'home', 'template' => 17]],
-            ],
-            'code' => 1787072877,
-        ];
-        yield 'site unknown key' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['identifier' => 'main', 'rootPage' => 'home', 'rootPageId' => 1]],
-            ],
-            'code' => 1787072878,
-        ];
-        yield 'site base not a string' => [
-            'definition' => [
-                'identifier' => 'demo',
-                'title' => 'Demo',
-                'pages' => [['identifier' => 'home']],
-                'sites' => [['identifier' => 'main', 'rootPage' => 'home', 'base' => ['nope']]],
-            ],
-            'code' => 1787072879,
-        ];
-    }
-
-    #[DataProvider('invalidDefinitions')]
-    #[Test]
-    public function invalidDefinitionIsRejected(mixed $definition, int $code): void
-    {
-        $this->expectException(InvalidSeedDefinitionException::class);
-        $this->expectExceptionCode($code);
-
-        $this->subject->parse($definition);
-    }
 }

@@ -2,12 +2,5 @@ identifier: demo-content
 title: 'Demo content elements'
 description: 'The page tree of "demo-pages" with content elements on it.'
 
-pages:
-  - identifier: home
-    title: 'Home'
-    slug: '/'
-    is_siteroot: 1
-    content:
-      - identifier: home-heading
-        CType: header
-        header: 'A frontend to look at'
+scenarios:
+  - Scenario.yaml

@@ -1,0 +1,2 @@
+# Nothing but this comment, so that "Yaml::parseFile()" returns NULL - what a
+# scenario file that was started and never written looks like.

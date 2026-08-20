@@ -1,0 +1,27 @@
+#
+# The same records "full/Scenario.yaml" declares, and deliberately the same
+# uids: they are the ones "Fixtures/Database/OccupiedUids.csv" occupies, so
+# this set collides in both of its tables.
+#
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    columnNames: {title: 'header', type: 'CType'}
+
+entities:
+  page:
+    - self: {id: 11, title: 'Import home', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 21, title: 'Imported content', type: 'header'}
+      children:
+        - self: {id: 12, title: 'About', slug: '/about'}

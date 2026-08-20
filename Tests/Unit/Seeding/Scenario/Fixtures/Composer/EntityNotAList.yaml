@@ -1,0 +1,6 @@
+# The items of "page" written as a map instead of a list, which is what happens
+# when the dash in front of the first item is forgotten.
+entities:
+  page:
+    self:
+      title: 'Root'

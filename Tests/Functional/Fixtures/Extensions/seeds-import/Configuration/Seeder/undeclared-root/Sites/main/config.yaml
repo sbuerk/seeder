@@ -1,0 +1,6 @@
+#
+# Never read: the import refuses the set before it gets to a template. It
+# exists so the set is wrong in exactly one way.
+#
+rootPageId: 999
+base: 'https://orphan.example.org/'

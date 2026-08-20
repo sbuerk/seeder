@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\DataMapFactory;
 use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\RecordSeeder;
+use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
 use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeedResult;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
 use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Yaml\Yaml;
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
@@ -35,9 +35,21 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * project. In a functional test the project is the test instance, so a template
  * below "Tests/" is unreadable while one below an extension linked into the
  * instance is exactly what a package ships.
+ *
+ * The **scenarios** are the other way round: `ScenarioComposer` reads them
+ * itself and accepts an absolute path unchanged, so the shared fixtures below
+ * "Tests/Functional/Fixtures/Scenarios/" are named absolutely while the base
+ * path of every definition stays the template directory of the fixture
+ * extension. One definition therefore exercises both path kinds at once.
  */
 final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
 {
+    /**
+     * The `id` the site root of "SiteRootScenario.yaml" declares, which is the
+     * uid it is written with and therefore what a site names as its `rootPage`.
+     */
+    private const ROOT_PAGE = 700;
+
     protected array $testExtensionsToLoad = [
         'sbuerk/seeder',
         'tests/seeds-demo',
@@ -80,6 +92,11 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
         return rtrim(ExtensionManagementUtility::extPath('tests_seeds_demo'), '/') . '/Configuration/Seeder/basic';
     }
 
+    private function scenarioPath(string $scenario): string
+    {
+        return dirname(__DIR__, 2) . '/Fixtures/Scenarios/' . $scenario;
+    }
+
     /**
      * @param array<string, mixed> $definition
      */
@@ -89,42 +106,47 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
-     * @return array{0: array<string, int>, 1: SiteConfigurationSeedResult}
+     * Writes the records of the definition, which is what gives the sites a
+     * root page to point at.
      */
-    private function seed(SeedDefinition $definition): array
+    private function seedScenario(SeedDefinition $definition): ScenarioSeedResult
     {
-        $recordSeeder = new RecordSeeder(
-            new DataMapFactory(),
+        $scenarioSeeder = new ScenarioSeeder(
             new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class)),
         );
-        $uids = $recordSeeder->seed($definition, $this->setUpBackendUser(1));
 
-        return [$uids, $this->subject()->seed($definition, $uids)];
+        return $scenarioSeeder->seed(
+            $definition,
+            (new ScenarioComposer())->compose($definition),
+            $this->setUpBackendUser(1),
+        );
     }
 
     /**
-     * A page tree with one site root and one sub page, which is what nearly
-     * every case below needs.
+     * The whole run, in the order the import command runs it.
+     *
+     * @return array{0: ScenarioSeedResult, 1: SiteConfigurationSeedResult}
+     */
+    private function seed(SeedDefinition $definition, ?string $base = null): array
+    {
+        $seedResult = $this->seedScenario($definition);
+
+        return [$seedResult, $this->subject()->seed($definition, $seedResult, $base)];
+    }
+
+    /**
+     * A page tree with one site root and one page below it, which is what
+     * nearly every case below needs.
      *
      * @param array<string, mixed> $site
      * @return array<string, mixed>
      */
-    private static function treeWithSite(array $site): array
+    private function treeWithSite(array $site): array
     {
         return [
             'identifier' => 'demo',
             'title' => 'A page tree with a site',
-            'pages' => [
-                [
-                    'identifier' => 'home',
-                    'title' => 'Home',
-                    'slug' => '/',
-                    'is_siteroot' => 1,
-                    'children' => [
-                        ['identifier' => 'about', 'title' => 'About'],
-                    ],
-                ],
-            ],
+            'scenarios' => [$this->scenarioPath('SiteRootScenario.yaml')],
             'sites' => [$site],
         ];
     }
@@ -152,6 +174,30 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
+     * The uid a seeded page ended up with, read back out of the database rather
+     * than taken from the seed result: an assertion that the site points at a
+     * page this installation has is worth nothing if both sides of it come from
+     * the same map.
+     *
+     * Read through the `QueryBuilder` - hand written SQL would pass here and
+     * fail on PostgreSQL, which folds an unquoted identifier to lower case.
+     */
+    private function pageUidByTitle(string $title): int
+    {
+        $queryBuilder = $this->get(ConnectionPool::class)->getQueryBuilderForTable('pages');
+        $queryBuilder->getRestrictions()->removeAll();
+
+        return (int)$queryBuilder
+            ->select('uid')
+            ->from('pages')
+            ->where(
+                $queryBuilder->expr()->eq('title', $queryBuilder->createNamedParameter($title)),
+            )
+            ->executeQuery()
+            ->fetchOne();
+    }
+
+    /**
      * A set declaring a site gets that site and nothing else - in particular
      * not the "autogenerated-<uid>" configuration TYPO3 writes by itself for
      * every new root page.
@@ -159,9 +205,9 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aSetDeclaringSitesProducesNoAutomaticSiteConfiguration(): void
     {
-        [, $result] = $this->seed($this->parse(self::treeWithSite([
+        [, $result] = $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
         ])));
 
         $this->assertSame(['main'], $result->writtenSites);
@@ -182,14 +228,15 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function theRootPageIdComesFromTheSeededPageRatherThanFromTheTemplate(): void
     {
-        [$uids] = $this->seed($this->parse(self::treeWithSite([
+        [$seedResult] = $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
         ])));
 
         $configuration = $this->writtenConfiguration('main');
 
-        $this->assertSame($uids['home'], (int)$configuration['rootPageId']);
+        $this->assertSame($seedResult->writtenUid('pages', self::ROOT_PAGE), (int)$configuration['rootPageId']);
+        $this->assertSame($this->pageUidByTitle('Home'), (int)$configuration['rootPageId']);
         $this->assertNotSame(999, (int)$configuration['rootPageId']);
         // Everything the template declares beside it is written unchanged.
         $this->assertSame('https://template.example.org/', $configuration['base']);
@@ -204,13 +251,33 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aBaseInTheDefinitionOverridesTheTemplate(): void
     {
-        $this->seed($this->parse(self::treeWithSite([
+        $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
             'base' => 'https://seeded.example.com/',
         ])));
 
         $this->assertSame('https://seeded.example.com/', $this->writtenConfiguration('main')['base']);
+    }
+
+    /**
+     * The "base" of the run wins over both, which is the top of the same
+     * ladder: the template knows the least about the instance being seeded, the
+     * definition more, and whoever starts the import most.
+     */
+    #[Test]
+    public function aBaseGivenToTheRunOverridesTheDefinitionAndTheTemplate(): void
+    {
+        $this->seed(
+            $this->parse($this->treeWithSite([
+                'identifier' => 'main',
+                'rootPage' => self::ROOT_PAGE,
+                'base' => 'https://seeded.example.com/',
+            ])),
+            'https://this-instance.example.net/',
+        );
+
+        $this->assertSame('https://this-instance.example.net/', $this->writtenConfiguration('main')['base']);
     }
 
     /**
@@ -221,27 +288,17 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aSetWithoutSitesReportsTheSiteRootsNoConfigurationCovers(): void
     {
-        [$uids, $result] = $this->seed($this->parse([
+        [$seedResult, $result] = $this->seed($this->parse([
             'identifier' => 'demo',
             'title' => 'A page tree without a site',
-            'pages' => [
-                [
-                    'identifier' => 'home',
-                    'title' => 'Home',
-                    'slug' => '/',
-                    'is_siteroot' => 1,
-                    'children' => [
-                        ['identifier' => 'about', 'title' => 'About'],
-                    ],
-                ],
-            ],
+            'scenarios' => [$this->scenarioPath('SiteRootScenario.yaml')],
         ]));
 
         $this->assertSame([], $result->writtenSites);
         $this->assertSame([], $this->automaticSiteConfigurations());
-        // The site root, and only it: the sub page below it is not a site root
-        // and reporting it would be noise.
-        $this->assertSame(['home' => $uids['home']], $result->uncoveredSiteRoots);
+        // The site root, and only it: the page below it is not a site root and
+        // reporting it would be noise.
+        $this->assertSame([$seedResult->writtenUid('pages', self::ROOT_PAGE)], $result->uncoveredSiteRoots);
     }
 
     /**
@@ -252,9 +309,9 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aSiteRootCoveredByADeclaredSiteIsNotReported(): void
     {
-        [, $result] = $this->seed($this->parse(self::treeWithSite([
+        [, $result] = $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
         ])));
 
         $this->assertSame([], $result->uncoveredSiteRoots);
@@ -271,14 +328,15 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aSeededRootLevelSysfolderIsNoUncoveredSiteRoot(): void
     {
-        [, $result] = $this->seed($this->parse([
+        [$seedResult, $result] = $this->seed($this->parse([
             'identifier' => 'storage',
             'title' => 'A storage folder',
-            'pages' => [
-                ['identifier' => 'storage', 'title' => 'Storage', 'doktype' => 254],
-            ],
+            'scenarios' => [$this->scenarioPath('RootLevelSysfolderScenario.yaml')],
         ]));
 
+        // The record was written and it does sit on the page tree root, so the
+        // empty report below is about its doktype and nothing else.
+        $this->assertSame([800], $seedResult->pageUids());
         $this->assertSame([], $result->uncoveredSiteRoots);
     }
 
@@ -299,15 +357,16 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
         $siteFinder = $this->get(SiteFinder::class);
         $this->assertSame([], $siteFinder->getAllSites());
 
-        [$uids] = $this->seed($this->parse(self::treeWithSite([
+        [$seedResult] = $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
         ])));
 
+        $rootPageId = $seedResult->writtenUid('pages', self::ROOT_PAGE);
         $site = $siteFinder->getSiteByIdentifier('main');
 
-        $this->assertSame($uids['home'], $site->getRootPageId());
-        $this->assertSame($uids['home'], $siteFinder->getSiteByRootPageId($uids['home'])->getRootPageId());
+        $this->assertSame($rootPageId, $site->getRootPageId());
+        $this->assertSame($rootPageId, $siteFinder->getSiteByRootPageId((int)$rootPageId)->getRootPageId());
         $this->assertSame('https://template.example.org/', (string)$site->getBase());
     }
 
@@ -324,15 +383,15 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aTemplateDeclaringNothingButABaseProducesAUsableSite(): void
     {
-        [$uids] = $this->seed($this->parse(self::treeWithSite([
+        [$seedResult] = $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'minimal',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
             'template' => 'Sites/minimal',
         ])));
 
         $site = $this->get(SiteFinder::class)->getSiteByIdentifier('minimal');
 
-        $this->assertSame($uids['home'], $site->getRootPageId());
+        $this->assertSame($seedResult->writtenUid('pages', self::ROOT_PAGE), $site->getRootPageId());
         $this->assertSame('https://minimal.example.org/', (string)$site->getBase());
         // The default language `Site` substitutes, which the template does not
         // declare. Its locale is not asserted: `Locale` normalises what the
@@ -353,9 +412,9 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aTemplateSettingsFileIsWrittenBesideTheConfiguration(): void
     {
-        $this->seed($this->parse(self::treeWithSite([
+        $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'settings',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
             'template' => 'Sites/withsettings',
         ])));
 
@@ -379,9 +438,9 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aTemplateCarryingSiteSetDependenciesIsWrittenOnBothCoreVersions(): void
     {
-        $this->seed($this->parse(self::treeWithSite([
+        $this->seed($this->parse($this->treeWithSite([
             'identifier' => 'dependencies',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
             'template' => 'Sites/withdependencies',
         ])));
 
@@ -402,9 +461,9 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aMissingTemplateFailsNamingTheSetAndThePath(): void
     {
-        $definition = $this->parse(self::treeWithSite([
+        $definition = $this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
             'template' => 'Sites/does-not-exist',
         ]));
 
@@ -422,6 +481,37 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
+     * A `rootPage` no entity of the scenario wrote is refused here as well, and
+     * before the site is written.
+     *
+     * The import command catches the same case earlier, on the suggested ids of
+     * the composed scenario, and never gets this far. This is the guard for
+     * everything that does not go through the command - and for the one case
+     * the command cannot rule out, a "--force" run that gave up the suggested
+     * page uids, where the declared uid exists in the scenario and not in the
+     * result map.
+     */
+    #[Test]
+    public function aRootPageTheScenarioDidNotWriteIsRefused(): void
+    {
+        $definition = $this->parse($this->treeWithSite([
+            'identifier' => 'main',
+            'rootPage' => 999,
+        ]));
+
+        try {
+            $this->seed($definition);
+            $this->fail('A site pointing at a page the scenario does not write was written.');
+        } catch (SeedingFailedException $exception) {
+            $this->assertSame(1787077001, $exception->getCode());
+            $this->assertStringContainsString('999', $exception->getMessage());
+            $this->assertStringContainsString('"main"', $exception->getMessage());
+        }
+
+        $this->assertSame([], glob(Environment::getConfigPath() . '/sites/*') ?: []);
+    }
+
+    /**
      * An identifier the installation already uses is refused rather than
      * merged into.
      *
@@ -429,19 +519,25 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
      * existing file and applies only the changed keys, so writing a template
      * over an existing site produces a hybrid of the two. Seeding the same set
      * twice is the case a user runs into, and it has to say so.
+     *
+     * Only the site half of the run is repeated, not the records: the scenario
+     * suggests the uids it declares, so a second write of the same set fails on
+     * the primary key long before a site is written. The uid collision is the
+     * import command's subject; this one is about the site configuration.
      */
     #[Test]
     public function anIdentifierTheInstallationAlreadyUsesIsRefused(): void
     {
-        $definition = $this->parse(self::treeWithSite([
+        $definition = $this->parse($this->treeWithSite([
             'identifier' => 'main',
-            'rootPage' => 'home',
+            'rootPage' => self::ROOT_PAGE,
             'base' => 'https://first.example.com/',
         ]));
-        $this->seed($definition);
+        $seedResult = $this->seedScenario($definition);
+        $this->subject()->seed($definition, $seedResult);
 
         try {
-            $this->seed($definition);
+            $this->subject()->seed($definition, $seedResult);
             $this->fail('A site configuration that already exists was overwritten.');
         } catch (SeedingFailedException $exception) {
             $this->assertSame(1787077002, $exception->getCode());
@@ -454,44 +550,25 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
-     * A "rootPage" naming an identifier the definition does not declare is
-     * refused by the parser, before anything is written.
-     *
-     * The check is asserted where it lives rather than repeated in the seeder:
-     * a definition that cannot be right is a broken definition, and the earlier
-     * it is refused the less of an installation it has already changed.
-     */
-    #[Test]
-    public function aRootPageNoRecordDeclaresIsRefusedByTheParser(): void
-    {
-        $this->expectException(InvalidSeedDefinitionException::class);
-        $this->expectExceptionCode(1787072875);
-
-        $this->parse(self::treeWithSite([
-            'identifier' => 'main',
-            'rootPage' => 'nowhere',
-        ]));
-    }
-
-    /**
      * The whole way through, from the `config.yml` of a set shipped by an
      * extension to a written site: the definition is read from the file, the
-     * template path is the default the parser fills in, and it resolves against
-     * the directory the set lives in.
+     * scenario and the template path are resolved against the directory the set
+     * lives in, and the template path is the default the parser fills in.
      *
-     * Everything above builds its definition from an array, so nothing above
-     * would notice if the default template path or the base path of a set were
-     * wrong.
+     * Everything above names its scenario absolutely and builds its definition
+     * from an array, so nothing above would notice if the default template path
+     * or the base path of a set were wrong.
      */
     #[Test]
     public function aSetShippedByAnExtensionIsSeededFromItsOwnDirectory(): void
     {
         $definition = (new SeedDefinitionParser())->parseFile($this->templateBasePath() . '/config.yml');
 
-        [$uids, $result] = $this->seed($definition);
+        [$seedResult, $result] = $this->seed($definition);
 
         $this->assertSame(['main'], $result->writtenSites);
         $this->assertSame([], $result->uncoveredSiteRoots);
-        $this->assertSame($uids['home'], (int)$this->writtenConfiguration('main')['rootPageId']);
+        $this->assertSame(1000, $seedResult->writtenUid('pages', 1000));
+        $this->assertSame(1000, (int)$this->writtenConfiguration('main')['rootPageId']);
     }
 }

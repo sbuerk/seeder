@@ -6,9 +6,10 @@ written in. This page explains why the engine that reads it lives in
 `Classes/Seeding/Scenario/` as a port rather than as a dependency, what was
 changed in the process, and what keeps the port honest.
 
-The format itself is documented in
-[Seed definitions](../development/seed-definitions.md); this page is about the
-code that reads it.
+The format itself is documented key by key in
+[Seed definitions](../development/seed-definitions.md), together with the
+`config.yml` that names the scenario files of a set; this page is about the code
+that reads it.
 
 ## Why the format, and not one of our own
 
@@ -64,6 +65,7 @@ Everything that is not listed here is unchanged.
 | PHPStan level 8 array shapes throughout                               | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |
 | `?int $workspaceId` became `int $workspaceId` on two private methods  | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
 | The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed | See below. This is the one deliberate behavioural divergence.                                                                                          |
+| `DataHandlerWriter::__construct()` gained an optional third parameter | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                          |
 
 The original TYPO3 file headers are kept. The code is GPL-2.0-or-later and so is
 this repository; dropping the header to make the files look native would be
@@ -71,7 +73,8 @@ dishonest about where they came from.
 
 ## The deliberate divergences
 
-There are two, and both are forced.
+There are three. Two are forced, the third is additive - it changes nothing for
+a caller that does not use it.
 
 ### The double-indexed identifier list
 
@@ -122,6 +125,82 @@ so the coercion is spelled out as `$value ?? ''` instead.
 The lookup still hits exactly the key it hit before — this changes no
 behaviour, only how the same key is arrived at. It is listed here because it is
 a diff against upstream, not because anything observable moved.
+
+### A withheld set of suggested uids
+
+`DataHandlerWriter::__construct()` takes a third parameter:
+
+```php
+public function __construct(
+    private readonly DataHandler $dataHandler,
+    private readonly BackendUserAuthentication $backendUser,
+    private readonly array $withoutSuggestedUids = [],
+) {}
+```
+
+and `invokeFactory()` assigns
+
+```php
+$this->dataHandler->suggestedInsertUids = array_diff_key(
+    $factory->getSuggestedIds(),
+    $this->withoutSuggestedUids,
+);
+```
+
+where upstream assigns `$factory->getSuggestedIds()` directly. It is **strictly
+additive**: with the default empty array `array_diff_key()` returns its first
+argument unchanged, so every call that does not pass the parameter behaves byte
+for byte as upstream does, and the conformance test needs no exclusion for it.
+
+It exists because `--force` has to hold back the suggested uids of a colliding
+table, and `invokeFactory()` assigns `suggestedInsertUids` itself - there is no
+moment between "the writer was constructed" and "the uid is read" in which a
+caller could reduce the array from the outside. Reaching into
+`DataHandler::$suggestedInsertUids` after the writer was handed the factory
+would mean reaching into a run that has already started; passing the set in is
+the same decision, made at construction time. The keys are `<table>:<uid>`,
+exactly as `getSuggestedIds()` keys them.
+
+`updateDataMap()` drops the `uid` field of a record whose suggestion was held
+back, guarded by the same array and therefore inert by default:
+
+```php
+if (isset($values['uid']) && isset($this->withoutSuggestedUids[$tableName . ':' . $values['uid']])) {
+    unset($values['uid']);
+}
+```
+
+That half is not tidiness, it is a workaround for a TYPO3 core defect that only
+PostgreSQL exposes. `process_datamap()` reads the suggested uid out of the `uid`
+field and passes it to `insertDB()`, which honours it only when
+`suggestedInsertUids` carries it - but `postProcessDatabaseInsert()` then does
+
+```php
+if ($suggestedUid !== 0 && $connection->getDatabasePlatform() instanceof PostgreSqlPlatform) {
+    $this->postProcessPostgresqlInsert($connection, $tableName);
+    return $suggestedUid;
+}
+```
+
+and returns that number **whether the insert used it or not**
+(`DataHandler.php:9669ff`). `substNEWwithIDs` then maps the identifier to a uid
+no row has, and everything pointing at that identifier - a child's `pid`, a
+sibling's `-NEW` "insert after" - points at nothing. `getSortNumber()` returns
+`false`, `$fieldArray['pid']` is never set, and the run dies with a `TypeError`
+in `addDefaultPermittedLanguageIfNotSet()`. MySQL and SQLite hide it, because
+they take `lastInsertId()` and return the truth.
+
+The same path is reachable upstream: `insertDB()` skips the forced uid for a
+non-admin too, so any non-admin scenario run on PostgreSQL hits it. Dropping the
+field costs nothing - `insertDB()` unsets it before the INSERT either way -
+and `DataHandlerWriterTest` pins the chain that broke. It is worth reporting to
+TYPO3 Core.
+
+One annotation moved with it: `getSuggestedIds()` is documented as
+`array<string, true>` rather than `array<string, bool>`. `true` is the only
+value the class ever writes, and stating it is what lets PHPStan see the result
+of the `array_diff_key()` above as the same shape rather than as a widened one.
+No code path changed.
 
 ## What keeps the port honest
 
@@ -188,7 +267,7 @@ resolution and the CSV `DataSet`. The format is only ever exercised indirectly,
 by Core tests asserting rendered output.
 
 That gap is filled here, in `Tests/Unit/Seeding/Scenario/`, from a written
-inventory of every untested behaviour of the three classes. Two of the tests
+inventory of every untested behaviour of the three classes. Three of the tests
 pin behaviour that is arguably wrong and is left alone deliberately:
 
 - `hasStaticId()` reads a property that is **never written**, so its
@@ -205,11 +284,11 @@ pin behaviour that is arguably wrong and is left alone deliberately:
   marker is lost, and the record is created *inside* the record it was meant to
   follow. It only bites from the second workspace round on.
 
-Both are pinned as they behave today, and both say so in their docblock, so that
-a later reader changes them on purpose or not at all.
+All three are pinned as they behave today, and all three say so in their
+docblock, so that a later reader changes them on purpose or not at all.
 
 ## See also
 
-- [Seed definitions](../development/seed-definitions.md) — the format itself
+- [Seed definitions](../development/seed-definitions.md) — the format itself, key by key
 - [Seeding](seeding.md) — the DataHandler behaviours seeding works around
 - [Unit tests](../testing/unit-tests.md)

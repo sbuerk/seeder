@@ -16,7 +16,7 @@ Documentation for people **using** the extension lives in
 | [Development environment](development/environment.md) | `runTests.sh`, container runtimes, suites and options.                       |
 | [Dual core setup](development/dual-core-setup.md)     | Running against TYPO3 v13 and v14, and the rule that avoids false positives. |
 | [Quality gates](development/quality-gates.md)         | Every gate and its configuration, PHPStan per core version, CI.              |
-| [Seed definitions](development/seed-definitions.md)   | The YAML format: structural keys, accepted shapes, defaults, validation.     |
+| [Seed definitions](development/seed-definitions.md)   | `config.yml` and the testing-framework scenario format, key by key.          |
 | [Seed sets and the CLI](development/seed-sets.md)     | Discovery, ordering, `imports`, `seeder:list` and `seeder:import`.           |
 
 ## [Architecture](architecture/Index.md)

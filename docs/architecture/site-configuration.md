@@ -5,15 +5,25 @@ a frontend that cannot render. `SiteConfigurationSeeder` is what closes that gap
 and it runs last for a reason: the one value a site configuration cannot be
 written without is the uid of a page the same definition creates.
 
-The keys a definition declares are specified in
+The keys a `sites` entry declares are specified in
 [Seed definitions](../development/seed-definitions.md#site-configurations). This
 page is about what happens to them.
 
 ## Why it runs after the records
 
-`rootPageId` is the uid of a seeded page. The definition therefore names that
-page by its **seed** identifier, and this class resolves it from the uid map
-`RecordSeeder::seed()` returns.
+`rootPageId` is the uid of a seeded page. A scenario record has no symbolic
+identifier - the `id` its entity declares *is* its handle - so a `sites` entry
+names that number, and this class resolves it against
+`ScenarioSeedResult::writtenUid('pages', …)`, the map of declared uid to written
+uid that `ScenarioSeeder::seed()` returns.
+
+Resolving it rather than trusting it is not ceremony. The declared uid is
+missing from that map when no `pages` entity of the scenario declares it, and it
+differs from what was written when `--force` gave up the uid suggestions of the
+`pages` table. Both would produce a site pointing at a page this set never
+seeded, so both are refused - the first by the command before anything is
+written, the second by refusing `--force` for a set that declares sites at all.
+See [Uid collisions and `--force`](../development/seed-sets.md#uid-collisions-and---force).
 
 The resolved uid **always wins** over whatever the template declares. That is not
 a merge policy but the point of the construct: a template is a file someone
@@ -183,10 +193,10 @@ Three details decide what the report is worth:
   caches of `SiteConfiguration` and `SiteFinder` on its way out. This is the read
   that makes the `SiteWriter` choice above load bearing rather than tidy.
 
-The pages are identified by their **seed** identifier in the report. The uid map
-alone cannot do that: it is keyed by seed identifier across every table, and a
-`tt_content` record may perfectly well carry the uid of a page — so the records
-are walked to tell the two apart.
+The pages are reported **by uid** - `page 11`, not `"home" (page 11)`. There is
+no name to report: a scenario record's handle is its uid, and the `pages:` prefix
+of the uid map is what tells a page apart from a `tt_content` record that happens
+to carry the same number.
 
 ## See also
 

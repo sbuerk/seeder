@@ -1,0 +1,13 @@
+##
+# A second page tree, declaring ids that "PageTreeScenario.yaml" does not, so
+# the two can be composed into one run.
+#
+# It declares only the entity settings it needs itself. Composing merges the
+# settings of both files, which is what lets a set split its records over
+# several files without repeating how a table is written.
+##
+entities:
+  page:
+    - self: {id: 200, title: 'Second root', slug: '/second-root'}
+      children:
+        - self: {id: 210, title: 'Child of the second root', slug: '/second-root/child'}

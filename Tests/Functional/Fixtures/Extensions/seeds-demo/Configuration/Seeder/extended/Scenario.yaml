@@ -1,0 +1,20 @@
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    columnNames: {title: 'header', type: 'CType'}
+
+entities:
+  page:
+    - self: {id: 2000, title: 'Home', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 2001, title: 'A frontend to look at', type: 'header'}

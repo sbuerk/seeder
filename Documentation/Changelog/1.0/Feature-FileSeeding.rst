@@ -2,53 +2,50 @@
 
 ..  _feature-file-seeding:
 
-======================================
-Feature: Seeding files and references
-======================================
+======================
+Feature: Seeding files
+======================
 
 Description
 ===========
 
-A seed set brings the files its records need, and attaches them as file
-references:
+A seed set brings the files its content needs, and copies them into a file
+storage before the first record is written:
 
 ..  code-block:: yaml
+    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
 
     files:
       - identifier: placeholder
         source: 'Files/placeholder.svg'
         folder: 'demo'
+        name: 'placeholder.svg'
+        storage: 1
 
-    pages:
-      - identifier: home
-        title: 'Demo'
-        content:
-          - identifier: teaser
-            CType: textmedia
-            header: 'With an image'
-            files:
-              assets:
-                - identifier: placeholder
-                  alternative: 'A placeholder graphic'
-                  description: 'Shown as the caption'
+:yaml:`identifier` is unique among the files of the set, :yaml:`source` is a
+path relative to the directory holding the set or an :file:`EXT:` path,
+:yaml:`folder` defaults to the storage root, :yaml:`name` to the base name of
+the source, and :yaml:`storage` to the default storage of the installation.
+Those five keys are the whole vocabulary of a file: an unknown key is refused,
+naming the known ones.
 
-Files are copied before the records are written, and through the file storage
-API rather than through the file system — which is what indexes them, so the
-copied file exists for TYPO3 and not only on disk. A missing target folder is
-created, an existing file of the same name is replaced, the source in the
-extension is left where it is, and a set may name the storage to write into.
+The copy goes through the file storage API rather than through the file system -
+which is what indexes the file, so the result exists for TYPO3 and not only on
+disk. A missing target folder is created, an existing file of the same name is
+replaced, and the source in the extension is left where it is.
 
-A reference is either the bare identifier of a declared file or a map adding the
-fields of the reference record: :yaml:`alternative`, :yaml:`title`,
-:yaml:`description`, :yaml:`link` and :yaml:`crop` — the fields an editor fills
-in on a file relation. They belong to the reference and not to the file, so the
-same image can carry a different alternative text in two places.
+Files are written in a pass of their own, before the records, so that a record
+naming a :sql:`sys_file` uid names one that exists.
 
-References of one field keep the order they were declared in. Referencing a file
-the set does not declare is refused before anything is written.
+..  note::
+
+    This version seeds files, and it does not attach them to records: there is
+    no way yet to declare a :sql:`sys_file_reference` from a scenario. A
+    relation to a file therefore has to be written the way any other relation is
+    written in the scenario format, by uid.
 
 Impact
 ======
 
-A seed set is complete: it ships the images of the content it describes, instead
-of describing content that points at files someone has to upload first.
+A seed set ships the images of the content it describes, instead of describing
+content that points at files someone has to upload first.

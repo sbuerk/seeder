@@ -1,0 +1,8 @@
+# A perfectly valid, readable scenario that the composer is made to see as
+# unreadable - see "ShadowedIsReadable.php" next to it for why the answer is
+# shadowed rather than the permission bits changed.
+entities:
+  page:
+    - self:
+        id: 1
+        title: 'Root'

@@ -1,0 +1,12 @@
+entitySettings:
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0, doktype: 1}
+
+entities:
+  page:
+    - self: {id: 4000, title: 'Home of the colliding set', slug: '/', is_siteroot: 1}

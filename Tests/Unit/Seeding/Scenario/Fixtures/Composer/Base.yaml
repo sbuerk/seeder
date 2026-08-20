@@ -1,0 +1,21 @@
+# The first of the two files the merge is asserted on. It declares the settings
+# a later file overrides, and the entities a later file is appended to. Static
+# "id" values keep the suggested ids of the built factory readable.
+entitySettings:
+  page:
+    isNode: true
+    tableName: pages
+    defaultValues:
+      doktype: 1
+  content:
+    tableName: tt_content
+
+entities:
+  page:
+    - self:
+        id: 1
+        title: 'Root'
+  content:
+    - self:
+        id: 10
+        title: 'Text on the root page'

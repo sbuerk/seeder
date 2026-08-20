@@ -1,4 +1,5 @@
+# Deliberately unparseable: the quoted scalar below is never terminated.
 identifier: broken
 title: 'Unterminated
-pages:
-  - identifier: home
+scenarios:
+  - Pages.yaml

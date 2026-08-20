@@ -15,8 +15,9 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  * Where a seed set may live, which is the one question `seeder:import` cannot
  * answer from a functional test.
  *
- * `SeedDefinitionParser::parseFile()` resolves through `YamlFileLoader`, which
- * runs every path through `GeneralUtility::getFileAbsFileName()`. That function
+ * `SeedDefinitionParser::parseFile()` runs the entry file through
+ * `GeneralUtility::getFileAbsFileName()`, and resolves its `imports` through
+ * `YamlFileLoader`, which does the same for every resource. That function
  * answers an absolute path outside `Environment::getProjectPath()` and
  * `Environment::getPublicPath()` with an empty string - and `seeder:import`
  * hands it the absolute `config.yml` that discovery found, which in a Composer
@@ -40,6 +41,11 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  *   remains: it is reachable with a `TYPO3_PATH_APP` pointing somewhere else,
  *   and it is what the import command explains rather than reporting a file
  *   that plainly exists as missing.
+ *
+ * Only the entry file is confined this way. A **scenario** path is resolved by
+ * {@see \SBUERK\Seeder\Seeding\Scenario\ScenarioComposer}, which deliberately
+ * does not send an absolute path through `getFileAbsFileName()` - see the
+ * resolution tests there.
  */
 final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
 {
@@ -103,8 +109,7 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
         // The import is resolved against the importing file and then checked
         // with "isAllowedAbsPath()" a second time, so a set that is readable
         // and whose imports are not is a possible state - and not this one.
-        $this->assertCount(1, $definition->records);
-        $this->assertSame('imported', $definition->records[0]->identifier);
+        $this->assertSame(['Imported.yaml', 'Declared.yaml'], $definition->scenarios);
     }
 
     #[Test]
@@ -128,12 +133,13 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
         GeneralUtility::mkdir_deep($directory);
         GeneralUtility::writeFile(
             $directory . '/config.yml',
-            "identifier: vendor-demo\ntitle: 'A set shipped by a package'\nimports:\n  - { resource: Pages.yaml }\n",
+            "identifier: vendor-demo\ntitle: 'A set shipped by a package'\n"
+            . "imports:\n  - { resource: Scenarios.yaml }\nscenarios:\n  - Declared.yaml\n",
             true,
         );
         GeneralUtility::writeFile(
-            $directory . '/Pages.yaml',
-            "pages:\n  - identifier: imported\n    title: 'Imported'\n",
+            $directory . '/Scenarios.yaml',
+            "scenarios:\n  - Imported.yaml\n",
             true,
         );
     }

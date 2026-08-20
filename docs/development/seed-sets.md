@@ -1,13 +1,25 @@
 # Seed sets and the CLI
 
 How a set is found, in which order, and what the two commands do with it. The
-format of a set is specified in [Seed definitions](seed-definitions.md); what
-happens while it is written is on [Seeding](../architecture/seeding.md).
+descriptor and the scenario format a set is written in are specified in
+[Seed definitions](seed-definitions.md); what happens while it is written is on
+[Seeding](../architecture/seeding.md).
 
 ## Discovery
 
 A seed set is a directory `Configuration/Seeder/<name>/` with a `config.yml` in
-it. `SeedSetRepository` walks the **active packages** of the installation and
+it. That `config.yml` names the **scenario files** the records come from, and
+those files sit next to it or anywhere an `EXT:` path reaches:
+
+```
+Configuration/Seeder/demo/
+├── config.yml               identifier, title, "scenarios", "files", "sites"
+├── Scenario.yaml            the records, in the scenario format
+├── Files/
+└── Sites/
+```
+
+`SeedSetRepository` walks the **active packages** of the installation and
 collects those directories:
 
 - a set is available exactly when the extension shipping it is installed *and*
@@ -27,8 +39,8 @@ the format has no meaning.
 
 A `config.yml` is read here with `Yaml::parseFile()`, and only `identifier`,
 `title` and `description` are looked at. It is deliberately **not** handed to
-`SeedDefinitionParser`, which would follow the `imports` of the set, walk its
-page tree and validate every record and every file of it.
+`SeedDefinitionParser`, which would follow the `imports` of the set, read every
+scenario file it names and validate every entity and every file of it.
 
 Parsing in full to show a title would make `seeder:list` as fragile as the least
 well maintained set in the installation: one set with a typo in a page record and
@@ -93,6 +105,13 @@ declaring them, `EXT:` paths are accepted, placeholder substitution is switched
 off, and a failing import raises instead of being logged. The reasoning is in
 [Seed definitions](seed-definitions.md#imports).
 
+`imports` merges into the **descriptor**, and only into the descriptor. It is
+how a set splits its own `files:` or `sites:` off into a second file; it does
+not bring records in. Records live in the files `scenarios:` names, and those
+are read with a plain `Yaml::parseFile()` outside the loader - which is why a
+scenario file carrying `imports:` is refused as an unknown key rather than
+followed.
+
 The path handed to the loader is the **absolute path discovery found**, unchanged.
 Deriving an `EXT:` path from the extension key was considered and rejected: it
 would rescue the entry file and nothing else, because
@@ -149,14 +168,16 @@ vendor/bin/typo3 seeder:import demo --base='https://example.com/'
 1. The **set is resolved** — asked for when no identifier was given and there is
    someone to ask, and answered with the near misses when the identifier names
    nothing.
-2. The **definition is parsed and the data map built**, before anything is
-   written, so a set that cannot be written fails before its first row exists.
-3. The **uids are checked** against the installation, per table.
+2. The **descriptor is parsed and the scenario composed** into one
+   `DataHandlerFactory`, before anything is written, so a set that cannot be
+   written fails before its first row exists.
+3. The **uids are checked** against the installation, per table - every uid the
+   scenario declares *and* every one the factory assigned dynamically.
 4. **Nothing is written on a dry run.** The run stops here and reports what the
    first three steps found.
 5. The **backend user is authenticated**, and refused unless it is an admin.
-6. **Files, records and site configurations** are written, in that order, because
-   each needs the uids of the one before it.
+6. **Files, records and site configurations** are written, in that order,
+   because each needs the uids of the one before it.
 
 ### Options
 
@@ -168,12 +189,17 @@ vendor/bin/typo3 seeder:import demo --base='https://example.com/'
 | `--root-page`      | uid    | The page the top level records are written below. `0`, the default, is the page tree root.                   |
 | `--base`           | URL    | Overrides the `base` of every site configuration the set writes.                                             |
 | `--no-site-config` | flag   | Skip the site configurations the set declares.                                                               |
-| `-v`               | flag   | Adds the identifier-to-uid table to the result, and the suggested uids to a dry run.                         |
+| `-v`               | flag   | Adds the declared-uid-to-written-uid table to the result, and the suggested uids to a dry run.               |
 
 `--root-page` is verified to exist before anything is written: DataHandler
 happily writes a record below a page that is not there, and the result is a page
 tree that is in the database and in no tree. Restrictions are removed for that
 check — a hidden page is a perfectly good place to seed below.
+
+It rewrites the `pid` of the **top level items** of the scenario and of nothing
+else. Which items those are, and why the transformation sits there rather than
+on the entity defaults or on the built data map, is on
+[Seed definitions](seed-definitions.md#--root-page).
 
 `--base` wins over the `base` of the definition, which wins over the one of the
 template. Each of the two overrides is written by someone who knows more about
@@ -187,8 +213,11 @@ uncovered site roots have to be reported — and they are.
 
 ### Uid collisions and `--force`
 
-A set may suggest the uid of every record it writes, which is what makes a seeded
-page tree reproducible. `UidCollisionDetector` asks, per table and per uid,
+A scenario suggests the uid of **every** record it writes, which is what makes a
+seeded page tree reproducible - the ones an entity declares as `id`, and the
+ones the factory assigned from its dynamic counter at 10000 upwards. There is no
+"let the database decide" mode to fall back on.
+`UidCollisionDetector` asks, per table and per uid,
 whether the installation already uses one of them, and the refusal names the
 records in the way — with their label, because *"pages:1, pages:2"* tells nobody
 whether that is a page tree worth keeping and *"pages:1 (Company site)"* does.
@@ -218,6 +247,13 @@ record of that table — which does not write that record somewhere else, it fai
 its `INSERT` on the primary key. Giving up a whole table cannot run into that,
 because a table nothing forces a uid in is written by the auto increment alone.
 
+**`--force` is refused for a set that declares sites and collides in `pages`.**
+A site names its root page by uid, and giving up the `pages` suggestions writes
+that page under a different one - the site would point at a page the run never
+created, or worse at somebody else's. The refusal exits `EXIT_UID_COLLISION`
+like the unforced case, and says to import the set with `--no-site-config` or to
+free the uids instead.
+
 ### Exit codes
 
 A caller scripting this command has to be able to tell *"that set does not
@@ -231,7 +267,7 @@ well.
 | `2`  | `EXIT_INVALID_INPUT`      | No identifier and no terminal to ask on, or an option value that cannot be used.                                       |
 | `3`  | `EXIT_UNKNOWN_SET`        | No active extension provides a set of that identifier — or none at all.                                                |
 | `4`  | `EXIT_UNRESOLVABLE_SET`   | The identifier is provided more than once, or a `config.yml` in this installation cannot be read.                      |
-| `5`  | `EXIT_INVALID_DEFINITION` | The set was found and is not a valid seed definition.                                                                  |
+| `5`  | `EXIT_INVALID_DEFINITION` | The set was found and is not a valid seed definition, scenario files included.                                         |
 | `6`  | `EXIT_UID_COLLISION`      | The set suggests uids this installation already uses. The only failure `--force` overrides.                            |
 | `7`  | `EXIT_NO_ADMIN_USER`      | There is no admin backend user to write as.                                                                            |
 | `8`  | `EXIT_SEEDING_FAILED`     | The writing itself failed. Nothing that gets this far is the caller's fault, which is why it is one code and not five. |
@@ -255,7 +291,7 @@ identifier is found.
 
 ## See also
 
-- [Seed definitions](seed-definitions.md) — the format the commands read
+- [Seed definitions](seed-definitions.md) — the descriptor and the scenario format the commands read
 - [Seeding](../architecture/seeding.md) — what happens between parsing and the database
 - [Site configurations](../architecture/site-configuration.md)
 - [Development environment](environment.md)

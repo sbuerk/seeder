@@ -1,0 +1,24 @@
+##
+# A scenario whose records are top level content elements.
+#
+# Top level, because that is where "--root-page" applies: a nested record takes
+# its "pid" from the node it sits in, and moving it would take it off the tree
+# it was declared in. The second element declares a "pid" of its own, which a
+# root page does not override - a scenario naming a specific page means that
+# page.
+##
+entitySettings:
+  content:
+    tableName: 'tt_content'
+    nodeColumnName: 'pid'
+    columnNames:
+      title: 'header'
+    defaultValues:
+      pid: 0
+      hidden: 0
+      CType: 'text'
+
+entities:
+  content:
+    - self: {id: 500, title: 'Written below the root page'}
+    - self: {id: 501, title: 'Written where it says', pid: 120}

@@ -1,0 +1,19 @@
+# The second file of the merge. It overrides a scalar the first file declares
+# ("content.tableName"), adds a key the first file does not have
+# ("page.parentColumnName"), appends an item to an entity that already has one,
+# and declares an entity the first file does not know at all.
+entitySettings:
+  page:
+    parentColumnName: pid
+  content:
+    tableName: tt_content_override
+
+entities:
+  page:
+    - self:
+        id: 2
+        title: 'Second'
+  category:
+    - self:
+        id: 20
+        title: 'A category'

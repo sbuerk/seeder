@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace SBUERK\Seeder\Command;
 
-use SBUERK\Seeder\Seeding\DataHandling\DataMapFactory;
 use SBUERK\Seeder\Seeding\DataHandling\OccupiedUid;
-use SBUERK\Seeder\Seeding\DataHandling\RecordSeeder;
+use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
 use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeedResult;
 use SBUERK\Seeder\Seeding\DataHandling\UidCollisionDetector;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Seeding\Definition\SeedRecord;
 use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
@@ -20,6 +18,8 @@ use SBUERK\Seeder\Seeding\Exception\SeedingException;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Exception\SeedSetNotFoundException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
 use SBUERK\Seeder\Seeding\SeedSet;
 use SBUERK\Seeder\Seeding\SeedSetRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -53,13 +53,16 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * 1. The **set is resolved** - asked for when no identifier was given and there
  *    is someone to ask, and answered with the near misses when the identifier
  *    names nothing.
- * 2. The **definition is parsed and the data map built**, before anything is
- *    written. Building it is what validates the parts of a set that only the
- *    factory can see - a record referencing a file the set does not ship, for
- *    instance - so a set that cannot be written fails before the first row of
- *    it exists rather than halfway through.
+ * 2. The **descriptor is parsed and the scenario composed**, before anything is
+ *    written. Composing it is what validates the parts of a set that only the
+ *    factory can see - an entity item without a `self`, an id declared twice,
+ *    a site naming a root page the scenario does not write - so a set that
+ *    cannot be written fails before the first row of it exists rather than
+ *    halfway through.
  * 3. The **uids are checked** against the installation, per table, and the
- *    refusal names the records in the way. `--force` skips the check.
+ *    refusal names the records in the way. `--force` does not skip the check,
+ *    it decides what happens to its result: the suggestions of every colliding
+ *    table are given up so the INSERT cannot fail on the primary key.
  * 4. **Nothing is written on a dry run.** The run stops here and reports what
  *    the first three steps found.
  * 5. **The backend user is authenticated**, and refused unless it is an admin.
@@ -126,9 +129,9 @@ final class ImportSeedCommand extends Command
     public function __construct(
         private readonly SeedSetRepository $seedSetRepository,
         private readonly SeedDefinitionParser $seedDefinitionParser,
-        private readonly DataMapFactory $dataMapFactory,
+        private readonly ScenarioComposer $scenarioComposer,
         private readonly UidCollisionDetector $uidCollisionDetector,
-        private readonly RecordSeeder $recordSeeder,
+        private readonly ScenarioSeeder $scenarioSeeder,
         private readonly SiteConfigurationSeeder $siteConfigurationSeeder,
         private readonly ConnectionPool $connectionPool,
     ) {
@@ -182,12 +185,15 @@ final class ImportSeedCommand extends Command
             . 'Without an identifier the command asks which set to import; without a terminal to ask'
             . ' on it lists the available sets and exits non-zero. "seeder:list" shows the same list.'
             . PHP_EOL . PHP_EOL
-            . 'A seed set may suggest the uid of every record it writes, which is what makes a seeded'
-            . ' page tree reproducible. The import therefore refuses to run when one of those uids is'
-            . ' already used in its table - naming the records in the way, including deleted ones,'
-            . ' which occupy their uid as much as any other row. "--force" imports anyway: every record'
-            . ' of a table something collides in is then written with a free uid instead of the'
-            . ' declared one, and nothing that is in the way is deleted or overwritten.'
+            . 'A seed set suggests the uid of every record it writes - the "id" its scenario declares,'
+            . ' or one handed out from 10000 upwards - which is what makes a seeded page tree'
+            . ' reproducible. The import therefore refuses to run when one of those uids is already'
+            . ' used in its table, naming the records in the way, including deleted ones, which occupy'
+            . ' their uid as much as any other row. "--force" imports anyway: every record of a table'
+            . ' something collides in is then written with a free uid instead of the declared one, and'
+            . ' nothing that is in the way is deleted or overwritten. A set declaring site'
+            . ' configurations cannot be forced past a collision in "pages", because every site names'
+            . ' its root page by that uid.'
             . PHP_EOL . PHP_EOL
             . 'The automatic "autogenerated-<uid>" site configuration TYPO3 writes for a new site root'
             . ' is suppressed for the whole run, whether the set declares site configurations or not.'
@@ -284,27 +290,36 @@ final class ImportSeedCommand extends Command
         }
 
         try {
-            // Built here and not only inside the seeding, so that a definition
+            // Composed here and not only inside the seeding, so that a scenario
             // the factory refuses is refused before the first file has been
             // copied - and so that a dry run does the same work a real run
-            // does, minus the writing. The file uids are placeholders: the map
-            // is only read for its shape here, and the factory needs a key per
-            // declared file to tell a reference to an undeclared one apart.
-            $map = $this->dataMapFactory->createFromDefinition(
-                $definition,
-                $rootPageId,
-                array_fill_keys(array_map(
-                    static fn(SeedFile $file): string => $file->identifier,
-                    $definition->files,
-                ), 0),
-            );
-        } catch (InvalidSeedDefinitionException $exception) {
+            // does, minus the writing. The factory validates while it builds:
+            // a missing "self", an id declared twice, an unknown structure.
+            $factory = $this->scenarioComposer->compose($definition, $rootPageId);
+        } catch (SeedDefinitionNotFoundException|InvalidSeedDefinitionException $exception) {
             $io->error($exception->getMessage());
+            return self::EXIT_INVALID_DEFINITION;
+        } catch (\LogicException $exception) {
+            // What the scenario factory raises for a scenario it cannot build:
+            // an entity item without "self", an id assigned twice, a version
+            // variant on something that has none. It carries the upstream
+            // exception codes, which is why it is not wrapped.
+            $io->error(sprintf(
+                'The scenario of the seed set "%s" cannot be built: %s',
+                $seedSet->identifier,
+                $exception->getMessage(),
+            ));
             return self::EXIT_INVALID_DEFINITION;
         }
 
-        if ($map['dataMap'] === []) {
+        if ($factory->getDataMapPerWorkspace() === []) {
             $io->error(sprintf('The seed set "%s" contains no records.', $seedSet->identifier));
+            return self::EXIT_INVALID_DEFINITION;
+        }
+
+        $undeclaredRootPage = $this->undeclaredSiteRootPage($definition, $factory);
+        if ($undeclaredRootPage !== null) {
+            $io->error($undeclaredRootPage);
             return self::EXIT_INVALID_DEFINITION;
         }
 
@@ -315,19 +330,34 @@ final class ImportSeedCommand extends Command
         // for a uid another row holds does not write that record somewhere
         // else, it makes the INSERT fail on the primary key - so the uids that
         // collide are the ones the writing pass is told not to suggest.
-        $occupied = $this->uidCollisionDetector->detect($map['suggestedUids']);
+        $suggestedUids = $factory->getSuggestedIds();
+        $occupied = $this->uidCollisionDetector->detect($suggestedUids);
         $withoutSuggestedUids = [];
         if ($occupied !== []) {
             if (!$force) {
                 $this->reportCollisions($io, $seedSet, $occupied);
                 return self::EXIT_UID_COLLISION;
             }
-            $withoutSuggestedUids = $this->withoutSuggestionsOfCollidingTables($map['suggestedUids'], $occupied);
+            $withoutSuggestedUids = $this->withoutSuggestionsOfCollidingTables($suggestedUids, $occupied);
+            if ($writeSiteConfigurations && $definition->sites !== [] && $this->givesUpPageUids($withoutSuggestedUids)) {
+                // Every site names its root page by the uid the scenario
+                // declares. Giving that uid up means the page is written under
+                // whatever the database assigns, and the site would point at a
+                // page of somebody else - or at nothing.
+                $io->error(sprintf(
+                    'The seed set "%s" declares site configurations and suggests page uids this installation'
+                    . ' already uses. "--force" gives up the suggested uids of the colliding table, so the root'
+                    . ' page of every site would be written under a different uid than the site names. Free the'
+                    . ' uids, or import the set with "--no-site-config".',
+                    $seedSet->identifier,
+                ));
+                return self::EXIT_UID_COLLISION;
+            }
             $this->reportForcedCollisions($io, $occupied, $withoutSuggestedUids);
         }
 
         if ($dryRun) {
-            $this->reportPlan($io, $definition, $rootPageId, $writeSiteConfigurations, $output->isVerbose());
+            $this->reportPlan($io, $definition, $factory, $rootPageId, $writeSiteConfigurations, $output->isVerbose());
             return self::SUCCESS;
         }
 
@@ -337,15 +367,15 @@ final class ImportSeedCommand extends Command
         }
 
         try {
-            $seededUids = $this->recordSeeder->seed(
+            $seedResult = $this->scenarioSeeder->seed(
                 $definition,
+                $factory,
                 $backendUser,
-                $rootPageId,
                 $withoutSuggestedUids,
             );
             $siteResult = $this->siteConfigurationSeeder->seed(
                 $definition,
-                $seededUids,
+                $seedResult,
                 $base,
                 $writeSiteConfigurations,
             );
@@ -357,9 +387,51 @@ final class ImportSeedCommand extends Command
             return self::EXIT_SEEDING_FAILED;
         }
 
-        $this->reportResult($io, $definition, $seededUids, $siteResult, $rootPageId, $output->isVerbose());
+        $this->reportResult($io, $definition, $seedResult, $siteResult, $rootPageId, $output->isVerbose());
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The message for the first site whose `rootPage` no entity of the `pages`
+     * table declares, or null when every site names a page the set writes.
+     *
+     * Checked before anything is written, because the alternative is a run that
+     * seeds the whole tree and then refuses to write the site it was imported
+     * for.
+     */
+    private function undeclaredSiteRootPage(SeedDefinition $definition, DataHandlerFactory $factory): ?string
+    {
+        $suggestedUids = $factory->getSuggestedIds();
+        foreach ($definition->sites as $site) {
+            if (isset($suggestedUids['pages:' . $site->rootPage])) {
+                continue;
+            }
+
+            return sprintf(
+                'The site "%s" of the seed set "%s" declares the root page %d, which no entity of the "pages"'
+                . ' table of its scenario declares as its "id".',
+                $site->identifier,
+                $definition->identifier,
+                $site->rootPage,
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, true> $withoutSuggestedUids
+     */
+    private function givesUpPageUids(array $withoutSuggestedUids): bool
+    {
+        foreach (array_keys($withoutSuggestedUids) as $suggestion) {
+            if (str_starts_with($suggestion, 'pages:')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -653,11 +725,12 @@ final class ImportSeedCommand extends Command
     private function reportPlan(
         SymfonyStyle $io,
         SeedDefinition $definition,
+        DataHandlerFactory $factory,
         int $rootPageId,
         bool $writeSiteConfigurations,
         bool $verbose,
     ): void {
-        $this->reportRecordCounts($io, $definition, $rootPageId, true);
+        $this->reportRecordCounts($io, $this->countRecords($factory), $rootPageId, true);
 
         $io->writeln(sprintf('Files to index: %d', count($definition->files)));
         $io->writeln(sprintf(
@@ -671,7 +744,7 @@ final class ImportSeedCommand extends Command
         ));
 
         if ($verbose) {
-            $this->reportDeclaredUids($io, $definition);
+            $this->reportDeclaredUids($io, $factory);
         }
 
         $io->success(sprintf(
@@ -681,33 +754,30 @@ final class ImportSeedCommand extends Command
         ));
     }
 
-    /**
-     * @param array<string, int> $seededUids
-     */
     private function reportResult(
         SymfonyStyle $io,
         SeedDefinition $definition,
-        array $seededUids,
+        ScenarioSeedResult $seedResult,
         SiteConfigurationSeedResult $siteResult,
         int $rootPageId,
         bool $verbose,
     ): void {
-        $this->reportRecordCounts($io, $definition, $rootPageId, false);
+        $this->reportRecordCounts($io, $seedResult->recordCounts, $rootPageId, false);
 
-        $io->writeln(sprintf('Files indexed: %d', count($definition->files)));
+        $io->writeln(sprintf('Files indexed: %d', count($seedResult->fileUids)));
         $io->writeln(sprintf(
             'Site configurations written: %s',
             $siteResult->writtenSites === [] ? '0' : implode(', ', $siteResult->writtenSites),
         ));
 
-        if ($verbose && $seededUids !== []) {
+        if ($verbose && $seedResult->writtenUids !== []) {
             $io->writeln('');
             $io->table(
-                ['Seed identifier', 'Uid'],
+                ['Declared', 'Uid'],
                 array_map(
-                    static fn(string $identifier, int $uid): array => [$identifier, (string)$uid],
-                    array_keys($seededUids),
-                    array_values($seededUids),
+                    static fn(string $declared, int $uid): array => [$declared, (string)$uid],
+                    array_keys($seedResult->writtenUids),
+                    array_values($seedResult->writtenUids),
                 ),
             );
         }
@@ -715,8 +785,8 @@ final class ImportSeedCommand extends Command
         $io->success(sprintf(
             'Imported "%s": %d record%s.',
             $definition->identifier,
-            count($seededUids),
-            count($seededUids) === 1 ? '' : 's',
+            $seedResult->recordCount(),
+            $seedResult->recordCount() === 1 ? '' : 's',
         ));
 
         if ($siteResult->uncoveredSiteRoots === []) {
@@ -729,9 +799,8 @@ final class ImportSeedCommand extends Command
             . ' Declare the site in the seed set with a "sites:" entry, or write a site configuration'
             . ' for the page.',
             implode(', ', array_map(
-                static fn(string $identifier, int $uid): string => sprintf('"%s" (page %d)', $identifier, $uid),
-                array_keys($siteResult->uncoveredSiteRoots),
-                array_values($siteResult->uncoveredSiteRoots),
+                static fn(int $uid): string => sprintf('page %d', $uid),
+                $siteResult->uncoveredSiteRoots,
             )),
         ));
     }
@@ -740,15 +809,15 @@ final class ImportSeedCommand extends Command
      * The records of the set per table, which is the number a summary is
      * actually about - "47 records" says nothing, "40 pages and 7 content
      * elements" says what was imported.
+     *
+     * @param array<string, int> $counts
      */
     private function reportRecordCounts(
         SymfonyStyle $io,
-        SeedDefinition $definition,
+        array $counts,
         int $rootPageId,
         bool $dryRun,
     ): void {
-        $counts = [];
-        $this->countRecords($definition->records, $counts);
         ksort($counts, SORT_STRING);
 
         $rows = [];
@@ -767,52 +836,44 @@ final class ImportSeedCommand extends Command
 
     /**
      * The uids a dry run would suggest, which is the closest a run without a
-     * database write can get to the identifier-to-uid table of a real one.
+     * database write can get to the table of a real one.
+     *
+     * Every record of a scenario has one - the factory hands out a dynamic uid
+     * from 10000 upwards where the entity declares no `id` - which is why this
+     * is a complete list and not the "declared or assigned by DataHandler" of a
+     * format where the uid was optional.
      */
-    private function reportDeclaredUids(SymfonyStyle $io, SeedDefinition $definition): void
+    private function reportDeclaredUids(SymfonyStyle $io, DataHandlerFactory $factory): void
     {
-        $rows = [];
-        $this->collectDeclaredUids($definition->records, $rows);
-        if ($rows === []) {
+        $suggestedUids = array_keys($factory->getSuggestedIds());
+        if ($suggestedUids === []) {
             return;
+        }
+        sort($suggestedUids, SORT_NATURAL);
+
+        $rows = [];
+        foreach ($suggestedUids as $suggestion) {
+            [$table, $uid] = explode(':', $suggestion, 2);
+            $rows[] = [$table, $uid];
         }
 
         $io->writeln('');
-        $io->table(['Seed identifier', 'Table', 'Suggested uid'], $rows);
+        $io->table(['Table', 'Suggested uid'], $rows);
     }
 
     /**
-     * @param list<SeedRecord> $records
-     * @param array<string, int> $counts
+     * @return array<string, int>
      */
-    private function countRecords(array $records, array &$counts): void
+    private function countRecords(DataHandlerFactory $factory): array
     {
-        foreach ($records as $record) {
-            $counts[$record->table] = ($counts[$record->table] ?? 0) + 1;
-            $this->countRecords($record->children, $counts);
-            foreach ($record->inline as $children) {
-                $this->countRecords($children, $counts);
+        $counts = [];
+        foreach ($factory->getDataMapPerWorkspace() as $dataMap) {
+            foreach ($dataMap as $tableName => $tableDataMap) {
+                $counts[$tableName] = ($counts[$tableName] ?? 0) + count($tableDataMap);
             }
         }
-    }
 
-    /**
-     * @param list<SeedRecord> $records
-     * @param list<array{string, string, string}> $rows
-     */
-    private function collectDeclaredUids(array $records, array &$rows): void
-    {
-        foreach ($records as $record) {
-            $rows[] = [
-                $record->identifier,
-                $record->table,
-                $record->uid === null ? 'assigned by DataHandler' : (string)$record->uid,
-            ];
-            $this->collectDeclaredUids($record->children, $rows);
-            foreach ($record->inline as $children) {
-                $this->collectDeclaredUids($children, $rows);
-            }
-        }
+        return $counts;
     }
 
     /**
@@ -828,9 +889,9 @@ final class ImportSeedCommand extends Command
      *
      * Being an admin is not a formality here: DataHandler honours a suggested
      * uid only for an admin and ignores it silently otherwise
-     * ({@see RecordSeeder::seed()}), so a non-admin run would write a page tree
+     * ({@see ScenarioSeeder::seed()}), so a non-admin run would write a page tree
      * whose uids are not the ones the set declares - and every site
-     * configuration pointing at a root page would be wrong. `RecordSeeder`
+     * configuration pointing at a root page would be wrong. `ScenarioSeeder`
      * refuses that with an exception; asking here is what turns the exception
      * into a sentence and an exit code of its own.
      */

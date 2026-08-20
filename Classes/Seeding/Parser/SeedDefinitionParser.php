@@ -6,8 +6,6 @@ namespace SBUERK\Seeder\Seeding\Parser;
 
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
-use SBUERK\Seeder\Seeding\Definition\SeedRecord;
 use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
@@ -17,80 +15,36 @@ use TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
- * Reads a seed definition from a YAML file, or from an already decoded array.
+ * Reads the `config.yml` of a seed set, or an already decoded array.
  *
- * The format keeps the structural keys to a minimum, so that everything which
- * is not structure is a field of the record:
+ * `config.yml` describes the **set**, not its records:
  *
  *     identifier: demo
  *     title: 'Demo page tree'
- *     pages:
- *       - identifier: root
- *         uid: 1
- *         title: 'Demo'
- *         slug: '/'
- *         is_siteroot: 1
- *         content:
- *           - identifier: root-welcome
- *             CType: header
- *             header: 'Welcome'
- *         children:
- *           - identifier: about
- *             title: 'About'
- *             slug: '/about'
+ *     description: 'A page tree with content on it.'
+ *     scenarios:
+ *       - Pages.yaml
+ *       - Content.yaml
+ *     files:
+ *       - identifier: placeholder
+ *         source: 'Files/placeholder.svg'
+ *         folder: 'demo'
+ *     sites:
+ *       - identifier: main
+ *         rootPage: 1000
  *
- * `identifier`, `uid`, `children` and `content` are structure; every other key
- * is written to the record as-is. `children` nests pages, `content` nests
- * `tt_content` records below the page carrying them. **A field needs no support
- * in the seeder to be seedable**, and the tests keep that true.
+ * The records live in the files named under `scenarios`, in the YAML scenario
+ * format of `typo3/testing-framework`, and are read by
+ * {@see \SBUERK\Seeder\Seeding\Scenario\ScenarioComposer}. Keeping the two
+ * apart is what makes the rule of the scenario format - "the file is the
+ * contract, and every key of it is upstream's" - hold: nothing this extension
+ * adds is mixed into a scenario file, and nothing a scenario file declares has
+ * to be understood here.
  *
- * `records` nests records of *any* table onto the page carrying them, which is
- * what `content` does for `tt_content` alone. A record declares the table it
- * belongs to itself, exactly as an inline child does:
- *
- *     pages:
- *       - identifier: storage
- *         doktype: 254
- *         title: 'Storage'
- *         records:
- *           - identifier: category-news
- *             table: sys_category
- *             title: 'News'
- *
- * That is what makes a seed definition able to describe the data a plugin
- * reads, rather than only the pages and content elements around it.
- *
- * `inline` nests records into a *relation* rather than below a page, as a map
- * of the parent field carrying the relation to the records declared for it:
- *
- *     content:
- *       - identifier: links
- *         CType: example_linklist
- *         inline:
- *           tx_example_items:
- *             - identifier: links-docs
- *               table: tx_example_item
- *               label: 'Documentation'
- *
- * An inline child may carry `files` and `inline` of its own, and nests
- * arbitrarily deep that way. It may **not** nest records onto itself: those
- * keys nest onto the page that declares them, and an inline child sits in a
- * relation rather than on a page of its own. `children` and `content` are
- * therefore refused on an inline child, and `records` is where it is structure
- * at all - on a child of the `pages` table. The declaration is refused rather
- * than ignored.
- *
- * An inline child declares the `table` it belongs to itself. Inferring it from
- * `config.foreign_table` of the parent's field would make a seed definition
- * depend on the TCA being loaded, and would fail with a null dereference rather
- * than a message when it is not - so `table` is structural on an inline child,
- * exactly as `identifier` is. It is structural under `records` for the same
- * reason and a simpler one: there is no parent field to infer anything from.
- *
- * `uid` is optional. Where it is given it is passed to DataHandler as a
- * *suggested* uid, which makes a seed reproducible - a site configuration can
- * then reference a root page id that is known in advance instead of whatever
- * the database happened to assign.
+ * The key set is **closed**, at the top level and on a site. An unknown key is
+ * a typo, not a field of anything; accepting it silently is how `scenario:`
+ * instead of `scenarios:` becomes an import that reports success and writes
+ * nothing.
  *
  * @internal Part of the seeding implementation, not public API.
  */
@@ -100,26 +54,19 @@ final readonly class SeedDefinitionParser
     private const TITLE = 'title';
     private const DESCRIPTION = 'description';
     private const IMPORTS = 'imports';
-    private const PAGES = 'pages';
-    private const SITES = 'sites';
-    private const CONTENT = 'content';
-    private const CHILDREN = 'children';
-    private const RECORDS = 'records';
-    private const UID = 'uid';
+    private const SCENARIOS = 'scenarios';
     private const FILES = 'files';
-    private const INLINE = 'inline';
-    private const TABLE = 'table';
+    private const SITES = 'sites';
     private const SOURCE = 'source';
+    private const FOLDER = 'folder';
+    private const NAME = 'name';
+    private const STORAGE = 'storage';
     private const ROOT_PAGE = 'rootPage';
     private const TEMPLATE = 'template';
     private const BASE = 'base';
 
     /**
-     * The keys a definition may carry at the top level.
-     *
-     * Unlike a record level, this one is closed: an unknown key here is a typo,
-     * not a field of anything. Accepting it silently is how `page:` instead of
-     * `pages:` becomes an import that reports success and writes nothing.
+     * The keys a set descriptor may carry.
      *
      * `imports` is listed although the parser never sees it in practice -
      * `YamlFileLoader` merges and removes it - so that {@see self::parse()} can
@@ -131,33 +78,24 @@ final readonly class SeedDefinitionParser
         self::TITLE,
         self::DESCRIPTION,
         self::IMPORTS,
+        self::SCENARIOS,
         self::FILES,
-        self::PAGES,
         self::SITES,
     ];
 
     /**
-     * Keys that describe the shape of the definition rather than a field of the
-     * record they appear on.
-     *
-     * `table` is deliberately not in here: it is structural only on an inline
-     * or `records` child, and `tt_content` and `pages` both have fields whose
-     * name starts with `table`. A key that is structure in one place and a
-     * field in another has to be decided where the context is known, which is
-     * per level.
-     *
-     * `records` is the same case and is decided the same way. `tt_content` has
-     * a **column** of that name - the one the "Insert records" element writes
-     * `tt_content_<uid>` into - so the key can only be structure on a record of
-     * the `pages` table, which is also the only place it means anything.
+     * The keys a `files` entry may carry - closed for the same reason as
+     * {@see self::SET_KEYS}. A file declaration is configuration, not a record:
+     * nothing here is written verbatim to anything, so an unknown key can only
+     * be a mistake, and `folder:` misspelled as `foldr:` would otherwise put the
+     * file in the storage root and report success.
      */
-    private const STRUCTURAL_KEYS = [
+    private const FILE_KEYS = [
         self::IDENTIFIER,
-        self::UID,
-        self::CHILDREN,
-        self::CONTENT,
-        self::FILES,
-        self::INLINE,
+        self::SOURCE,
+        self::FOLDER,
+        self::NAME,
+        self::STORAGE,
     ];
 
     /**
@@ -173,19 +111,7 @@ final readonly class SeedDefinitionParser
     ];
 
     /**
-     * An identifier ends up inside the `NEW…` placeholder of the record, and a
-     * placeholder naming a relation target must not contain an underscore - see
-     * the docblock of {@see SeedRecord::placeholder()} for what DataHandler does
-     * with one. Restricting the identifier itself is what keeps that guarantee,
-     * and doing it here means the definition is rejected with a message rather
-     * than seeding an empty relation without a word.
-     */
-    private const IDENTIFIER_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9-]*$/';
-
-    /**
-     * A site identifier never reaches a DataHandler placeholder, so the
-     * underscore rule of {@see self::IDENTIFIER_PATTERN} does not apply to it.
-     * It does become the name of a directory below the instance's
+     * A site identifier becomes the name of a directory below the instance's
      * `config/sites/`, which is what this pattern guards: no separator, no
      * `.` or `..`, nothing that has to be escaped anywhere.
      */
@@ -198,18 +124,15 @@ final readonly class SeedDefinitionParser
      * the loader the core reads its own site configurations with. It resolves a
      * resource relative to the file declaring it, accepts `EXT:` paths, and
      * merges an imported list into the importing one instead of replacing it -
-     * which is exactly what a set split over several files needs, and it means
+     * which is what a descriptor split over several files needs, and it means
      * this extension requires nothing beyond `typo3/cms-core`.
      *
      * Two deliberate deviations from how the core calls it:
      *
      * - **Placeholders are switched off** (`PROCESS_IMPORTS` without
-     *   `PROCESS_PLACEHOLDERS`). A seed definition is content, not
-     *   configuration: `%` occurs in pairs in perfectly ordinary titles and
-     *   body texts, and a `%…%` fragment that happens to name a key of the
-     *   definition would be substituted with that key's value. Seeded content
-     *   has to arrive in the database as it was written, and environment
-     *   variables have no business being interpolated into it.
+     *   `PROCESS_PLACEHOLDERS`). A `%…%` fragment that happens to name a key of
+     *   the descriptor would be substituted with that key's value, and a title
+     *   or a description is content that has to arrive as it was written.
      * - **A failing import raises** rather than being logged, through
      *   {@see ThrowOnErrorLogger}, which the loader's own error handling makes
      *   necessary.
@@ -305,28 +228,51 @@ final readonly class SeedDefinitionParser
             );
         }
 
-        $pages = $definition[self::PAGES] ?? [];
-        if (!$this->isList($pages)) {
-            throw new InvalidSeedDefinitionException(
-                sprintf('The "pages" of the seed definition "%s" are not a list.', $source),
-                1787072815,
-            );
-        }
-
-        $seen = [];
-        $files = $this->parseFiles($definition[self::FILES] ?? [], $source);
-        $records = $this->parseRecords($pages, self::PAGES, $source, $seen);
-        $sites = $this->parseSites($definition[self::SITES] ?? [], $source, $seen);
-
         return new SeedDefinition(
             identifier: $identifier,
             title: $title,
             description: $description,
             basePath: rtrim($basePath, '/'),
-            records: $records,
-            files: $files,
-            sites: $sites,
+            scenarios: $this->parseScenarios($definition[self::SCENARIOS] ?? null, $source),
+            files: $this->parseFiles($definition[self::FILES] ?? [], $source),
+            sites: $this->parseSites($definition[self::SITES] ?? [], $source),
         );
+    }
+
+    /**
+     * The scenario files of the set, in declared order.
+     *
+     * Required and non-empty: a set that names no scenario writes no record,
+     * and a descriptor that says so by omission is indistinguishable from one
+     * that misspelled the key.
+     *
+     * @return list<string>
+     */
+    private function parseScenarios(mixed $scenarios, string $source): array
+    {
+        if (!$this->isList($scenarios) || $scenarios === []) {
+            throw new InvalidSeedDefinitionException(
+                sprintf(
+                    'The seed definition "%s" declares no "scenarios". It is a non-empty list of the scenario'
+                    . ' files the set is written from, in the order they are applied.',
+                    $source,
+                ),
+                1787256301,
+            );
+        }
+
+        $parsed = [];
+        foreach ($scenarios as $scenario) {
+            if (!is_string($scenario) || trim($scenario) === '') {
+                throw new InvalidSeedDefinitionException(
+                    sprintf('A scenario of the seed definition "%s" is not a path.', $source),
+                    1787256302,
+                );
+            }
+            $parsed[] = $scenario;
+        }
+
+        return $parsed;
     }
 
     /**
@@ -350,6 +296,20 @@ final readonly class SeedDefinitionParser
                     1787072821,
                 );
             }
+            foreach (array_keys($file) as $key) {
+                if (!in_array($key, self::FILE_KEYS, true)) {
+                    throw new InvalidSeedDefinitionException(
+                        sprintf(
+                            'A file of the seed definition "%s" declares the unknown key "%s". Known keys are: %s.',
+                            $source,
+                            (string)$key,
+                            implode(', ', self::FILE_KEYS),
+                        ),
+                        1787256303,
+                    );
+                }
+            }
+
             $identifier = $file[self::IDENTIFIER] ?? null;
             if (!is_string($identifier) || $identifier === '') {
                 throw new InvalidSeedDefinitionException(
@@ -373,9 +333,9 @@ final readonly class SeedDefinitionParser
                 );
             }
 
-            $folder = $file['folder'] ?? '/';
-            $name = $file['name'] ?? null;
-            $storage = $file['storage'] ?? null;
+            $folder = $file[self::FOLDER] ?? '/';
+            $name = $file[self::NAME] ?? null;
+            $storage = $file[self::STORAGE] ?? null;
 
             $parsed[] = new SeedFile(
                 $identifier,
@@ -390,395 +350,18 @@ final readonly class SeedDefinitionParser
     }
 
     /**
-     * The file references of one record, as a map of field name to the
-     * references declared for it.
+     * The site configurations of the set.
      *
-     * A reference is either the bare identifier of a seeded file, or a map
-     * naming that identifier alongside the fields of the `sys_file_reference`
-     * record - the alternative text, title, description and link an editor
-     * fills in on a file relation:
+     * `rootPage` is the **uid** of the page that becomes the site root. A
+     * scenario record carries no symbolic name, so the declared `id` is its
+     * stable handle - and that id is the uid the record is written with. Only
+     * the shape is checked here; that the uid is a page the set actually
+     * declares can be known once the scenario is composed, and is checked
+     * there.
      *
-     *     files:
-     *       image:
-     *         - placeholder
-     *         - identifier: portrait
-     *           alternative: 'A portrait placeholder'
-     *           description: 'Shown as the caption'
-     *
-     * A field declared with an empty list creates no reference at all and the
-     * field is left alone. Seeding writes; an empty declaration is not an
-     * instruction to clear a relation.
-     *
-     * @return array<string, list<SeedFileReference>>
-     */
-    private function parseFileReferences(mixed $files, string $recordIdentifier, string $source): array
-    {
-        if ($files === [] || $files === null) {
-            return [];
-        }
-        if (!is_array($files)) {
-            throw new InvalidSeedDefinitionException(
-                sprintf('The "files" of "%s" in "%s" are not a map of field to file identifiers.', $recordIdentifier, $source),
-                1787072850,
-            );
-        }
-
-        $references = [];
-        foreach ($files as $field => $identifiers) {
-            if (!is_string($field) || $field === '') {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('A file field of "%s" in "%s" is not a field name.', $recordIdentifier, $source),
-                    1787072851,
-                );
-            }
-            if (!$this->isList($identifiers)) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('The file field "%s" of "%s" in "%s" is not a list.', $field, $recordIdentifier, $source),
-                    1787072852,
-                );
-            }
-            foreach ($identifiers as $reference) {
-                $references[$field][] = $this->parseFileReference($reference, $recordIdentifier, $source);
-            }
-        }
-
-        return $references;
-    }
-
-    private function parseFileReference(mixed $reference, string $recordIdentifier, string $source): SeedFileReference
-    {
-        if (!is_array($reference)) {
-            if (!is_string($reference) || $reference === '') {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('A file reference of "%s" in "%s" is not an identifier.', $recordIdentifier, $source),
-                    1787072853,
-                );
-            }
-
-            return new SeedFileReference($reference);
-        }
-
-        $identifier = $reference[self::IDENTIFIER] ?? null;
-        if (!is_string($identifier) || $identifier === '') {
-            throw new InvalidSeedDefinitionException(
-                sprintf('A file reference of "%s" in "%s" has no "identifier".', $recordIdentifier, $source),
-                1787072854,
-            );
-        }
-
-        $values = [];
-        foreach ($reference as $key => $value) {
-            if ($key === self::IDENTIFIER) {
-                continue;
-            }
-            if (!is_string($key)) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'A field name of the file reference "%s" of "%s" in "%s" is not a string.',
-                        $identifier,
-                        $recordIdentifier,
-                        $source,
-                    ),
-                    1787072855,
-                );
-            }
-            if ($value !== null && !is_scalar($value)) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'The field "%s" of the file reference "%s" of "%s" in "%s" is not a scalar value.',
-                        $key,
-                        $identifier,
-                        $recordIdentifier,
-                        $source,
-                    ),
-                    1787072856,
-                );
-            }
-            $values[$key] = $value;
-        }
-
-        return new SeedFileReference($identifier, $values);
-    }
-
-    /**
-     * @param array<mixed> $records
-     * @param string|null $table The table these records belong to, or null when
-     *        each of them declares its own - which is the case for inline
-     *        children, where one field may even point at a different table than
-     *        the next, and for the records of a page.
-     * @param array<string, string> $seen Identifiers already used and the table
-     *        they were used on, by reference, so a duplicate is caught across
-     *        the whole definition rather than per level - and so a site can be
-     *        told whether its root page exists.
-     * @param string $childContext Names the structural key these records were
-     *        declared under, for the messages of the levels that do not have a
-     *        table to name themselves by.
-     * @param bool $inlineChild Whether these records are the children of a
-     *        relation rather than of a page, which decides whether they may
-     *        nest records of their own - see the rejection below.
-     * @return list<SeedRecord>
-     */
-    private function parseRecords(
-        array $records,
-        ?string $table,
-        string $source,
-        array &$seen,
-        string $childContext = self::INLINE,
-        bool $inlineChild = false,
-    ): array {
-        $context = $table ?? $childContext;
-        $parsed = [];
-        foreach ($records as $record) {
-            if (!is_array($record)) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('A record of "%s" in the seed definition "%s" is not a map.', $context, $source),
-                    1787072830,
-                );
-            }
-
-            $identifier = $record[self::IDENTIFIER] ?? null;
-            if (!is_string($identifier) || $identifier === '') {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('A record of "%s" in the seed definition "%s" has no "identifier".', $context, $source),
-                    1787072831,
-                );
-            }
-            if (preg_match(self::IDENTIFIER_PATTERN, $identifier) !== 1) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'The identifier "%s" in the seed definition "%s" is not usable. An identifier may contain letters, digits and dashes only, and has to start with a letter or a digit: it becomes part of the "NEW…" placeholder DataHandler resolves relations by, and an underscore in that placeholder makes the relation resolve to nothing.',
-                        $identifier,
-                        $source,
-                    ),
-                    1787072832,
-                );
-            }
-            if (isset($seen[$identifier])) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'The identifier "%s" is used more than once in the seed definition "%s". Identifiers have to be unique.',
-                        $identifier,
-                        $source,
-                    ),
-                    1787072833,
-                );
-            }
-
-            $uid = $record[self::UID] ?? null;
-            if ($uid !== null && (!is_int($uid) || $uid < 1)) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'The "uid" of "%s" in the seed definition "%s" has to be a positive integer.',
-                        $identifier,
-                        $source,
-                    ),
-                    1787072834,
-                );
-            }
-
-            $recordTable = $table;
-            if ($recordTable === null) {
-                $declaredTable = $record[self::TABLE] ?? null;
-                if (!is_string($declaredTable) || $declaredTable === '') {
-                    throw new InvalidSeedDefinitionException(
-                        sprintf(
-                            'The "%s" child "%s" in the seed definition "%s" has no "table". It is never inferred: under "inline" it would have to come from the TCA of the parent field, and under "records" there is no field it could come from at all.',
-                            $context,
-                            $identifier,
-                            $source,
-                        ),
-                        1787072835,
-                    );
-                }
-                $recordTable = $declaredTable;
-            }
-            $seen[$identifier] = $recordTable;
-
-            if ($inlineChild) {
-                // "children", "content" and "records" describe what sits on a
-                // page, and an inline child is not a page: it is nested into a
-                // relation, and its own pid is the page its parent sits on.
-                //
-                // This is a rejection rather than a semantic, because the
-                // format has none to offer here. It is also not a lost
-                // feature: the data map factory reaches the "children" of a
-                // record from the page level and the "inline" of any record,
-                // and page-style children of an inline child were reached by
-                // neither - they were parsed, dropped from the data map and
-                // never mentioned again, by the parser, by DataHandler or by
-                // the import. Refusing them costs nothing that ever worked,
-                // and it keeps the promise the rest of the format makes: what
-                // is declared is either written or refused with a message.
-                //
-                // Only the keys that are structure on this record: "records"
-                // is a field on everything but a page, see STRUCTURAL_KEYS.
-                $nestingKeys = [self::CHILDREN, self::CONTENT];
-                if ($recordTable === self::PAGES) {
-                    $nestingKeys[] = self::RECORDS;
-                }
-                foreach ($nestingKeys as $nestingKey) {
-                    if (($record[$nestingKey] ?? []) === []) {
-                        continue;
-                    }
-                    throw new InvalidSeedDefinitionException(
-                        sprintf(
-                            'The inline child "%s" in the seed definition "%s" declares "%s". An inline child cannot carry nested records: "children", "content" and "records" nest onto the page declaring them, and an inline child is nested into a relation instead. Declare those records on a page, and reference them from there.',
-                            $identifier,
-                            $source,
-                            $nestingKey,
-                        ),
-                        1787078001,
-                    );
-                }
-            }
-
-            $children = [];
-            $nestedContent = $record[self::CONTENT] ?? [];
-            if ($nestedContent !== []) {
-                if (!$this->isList($nestedContent)) {
-                    throw new InvalidSeedDefinitionException(
-                        sprintf('The "content" of "%s" in the seed definition "%s" is not a list.', $identifier, $source),
-                        1787072836,
-                    );
-                }
-                $children = [...$children, ...$this->parseRecords($nestedContent, 'tt_content', $source, $seen)];
-            }
-            // Only on a record of the "pages" table, where "records" cannot be
-            // a field: see the docblock of STRUCTURAL_KEYS. The resolved table
-            // decides, not the level, so a page declared below "records" is
-            // still a page and may carry records of its own.
-            $nestedRecords = $recordTable === self::PAGES ? ($record[self::RECORDS] ?? []) : [];
-            if ($nestedRecords !== []) {
-                if (!$this->isList($nestedRecords)) {
-                    throw new InvalidSeedDefinitionException(
-                        sprintf('The "records" of "%s" in the seed definition "%s" is not a list.', $identifier, $source),
-                        1787072837,
-                    );
-                }
-                // Parsed with no table of their own, so each declares one. They
-                // join the children of this record like content does: the page
-                // carrying them becomes their pid, and the data map factory
-                // chains the declaration order per table, so records of three
-                // tables on one page do not disturb each other's sorting.
-                $children = [...$children, ...$this->parseRecords($nestedRecords, null, $source, $seen, self::RECORDS)];
-            }
-            $nestedChildren = $record[self::CHILDREN] ?? [];
-            if ($nestedChildren !== []) {
-                if (!$this->isList($nestedChildren)) {
-                    throw new InvalidSeedDefinitionException(
-                        sprintf('The "children" of "%s" in the seed definition "%s" is not a list.', $identifier, $source),
-                        1787072838,
-                    );
-                }
-                $children = [...$children, ...$this->parseRecords($nestedChildren, self::PAGES, $source, $seen)];
-            }
-
-            $inline = $this->parseInline($record[self::INLINE] ?? [], $identifier, $source, $seen);
-
-            // "table" is a field everywhere but on an inline or "records"
-            // child, where it is the structural key naming the table the record
-            // belongs to; "records" is a field everywhere but on a page.
-            $structuralKeys = self::STRUCTURAL_KEYS;
-            if ($table === null) {
-                $structuralKeys[] = self::TABLE;
-            }
-            if ($recordTable === self::PAGES) {
-                $structuralKeys[] = self::RECORDS;
-            }
-
-            $values = [];
-            foreach ($record as $key => $value) {
-                if (in_array($key, $structuralKeys, true)) {
-                    continue;
-                }
-                if (!is_string($key)) {
-                    throw new InvalidSeedDefinitionException(
-                        sprintf('A field name of "%s" in the seed definition "%s" is not a string.', $identifier, $source),
-                        1787072839,
-                    );
-                }
-                if ($value !== null && !is_scalar($value)) {
-                    throw new InvalidSeedDefinitionException(
-                        sprintf(
-                            'The field "%s" of "%s" in the seed definition "%s" is not a scalar value.',
-                            $key,
-                            $identifier,
-                            $source,
-                        ),
-                        1787072840,
-                    );
-                }
-                $values[$key] = $value;
-            }
-
-            $parsed[] = new SeedRecord(
-                $recordTable,
-                $identifier,
-                $values,
-                $uid,
-                $children,
-                $this->parseFileReferences($record[self::FILES] ?? [], $identifier, $source),
-                $inline,
-            );
-        }
-
-        return $parsed;
-    }
-
-    /**
-     * The inline children of one record, as a map of the parent field carrying
-     * the relation to the records declared for it.
-     *
-     * @param array<string, string> $seen Identifiers already used, by reference,
-     *        so an inline child cannot reuse an identifier either.
-     * @return array<string, list<SeedRecord>>
-     */
-    private function parseInline(mixed $inline, string $recordIdentifier, string $source, array &$seen): array
-    {
-        if ($inline === [] || $inline === null) {
-            return [];
-        }
-        if (!is_array($inline)) {
-            throw new InvalidSeedDefinitionException(
-                sprintf('The "inline" of "%s" in "%s" is not a map of field name to child records.', $recordIdentifier, $source),
-                1787072860,
-            );
-        }
-
-        $parsed = [];
-        foreach ($inline as $field => $children) {
-            if (!is_string($field) || $field === '') {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('An inline field of "%s" in "%s" is not a field name.', $recordIdentifier, $source),
-                    1787072861,
-                );
-            }
-            if (!$this->isList($children)) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf('The inline field "%s" of "%s" in "%s" is not a list of records.', $field, $recordIdentifier, $source),
-                    1787072862,
-                );
-            }
-            $parsed[$field] = $this->parseRecords($children, null, $source, $seen, self::INLINE, true);
-        }
-
-        return $parsed;
-    }
-
-    /**
-     * The site configurations a definition declares.
-     *
-     * They are parsed last, because `rootPage` names a page by its seed
-     * identifier and that can only be checked once every record of the
-     * definition has been seen. Catching it here is the difference between a
-     * message naming the unknown page and a site written with a root page id of
-     * zero much later in the run.
-     *
-     * @param array<string, string> $seen Every identifier of the definition and
-     *        the table it belongs to.
      * @return list<SeedSiteConfiguration>
      */
-    private function parseSites(mixed $sites, string $source, array $seen): array
+    private function parseSites(mixed $sites, string $source): array
     {
         if (!$this->isList($sites)) {
             throw new InvalidSeedDefinitionException(
@@ -836,33 +419,15 @@ final readonly class SeedDefinitionParser
             $declared[$identifier] = true;
 
             $rootPage = $site[self::ROOT_PAGE] ?? null;
-            if (!is_string($rootPage) || $rootPage === '') {
+            if (!is_int($rootPage) || $rootPage < 1) {
                 throw new InvalidSeedDefinitionException(
-                    sprintf('The site "%s" in "%s" has no "rootPage".', $identifier, $source),
+                    sprintf(
+                        'The site "%s" in "%s" declares no usable "rootPage". It is the uid a scenario entity'
+                        . ' declares as its "id" for the page that becomes the site root.',
+                        $identifier,
+                        $source,
+                    ),
                     1787072874,
-                );
-            }
-            if (!isset($seen[$rootPage])) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'The site "%s" in "%s" declares the root page "%s", which no record of this definition declares.',
-                        $identifier,
-                        $source,
-                        $rootPage,
-                    ),
-                    1787072875,
-                );
-            }
-            if ($seen[$rootPage] !== self::PAGES) {
-                throw new InvalidSeedDefinitionException(
-                    sprintf(
-                        'The site "%s" in "%s" declares the root page "%s", which is a record of "%s" rather than a page.',
-                        $identifier,
-                        $source,
-                        $rootPage,
-                        $seen[$rootPage],
-                    ),
-                    1787072876,
                 );
             }
 

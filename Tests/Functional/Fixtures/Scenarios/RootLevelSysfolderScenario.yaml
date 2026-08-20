@@ -1,0 +1,23 @@
+##
+# A single sysfolder on the page tree root, written by
+# "SiteConfigurationSeederTest".
+#
+# It is on the page tree root, so the "pid = 0" half of the site root rule
+# matches, and its doktype is not one "CreateSiteConfiguration" would have
+# written a configuration for. That combination is the one the uncovered-root
+# report has to stay silent about: a sysfolder has no frontend, so warning that
+# no site covers it would be a warning about nothing.
+##
+entitySettings:
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues:
+      pid: 0
+      hidden: 0
+      doktype: 254
+
+entities:
+  page:
+    - self: {id: 800, title: 'Storage'}

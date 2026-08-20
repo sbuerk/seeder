@@ -1,0 +1,31 @@
+#
+# The records of the set "import-full", in the scenario format.
+#
+# "hidden" sits on the wildcard entity and "doktype" on the page entity, and
+# that is not a matter of taste: the wildcard settings are merged into the
+# entity settings with array_merge_recursive(), so a key declared on both sides
+# does not override, it becomes a list - and a "hidden" of [0, 0] is written to
+# the database as the string "Array".
+#
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    defaultValues: {doktype: 1}
+  content:
+    tableName: 'tt_content'
+    columnNames: {title: 'header', type: 'CType'}
+
+entities:
+  page:
+    - self: {id: 11, title: 'Import home', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 21, title: 'Imported content', type: 'header'}
+      children:
+        - self: {id: 12, title: 'About', slug: '/about'}

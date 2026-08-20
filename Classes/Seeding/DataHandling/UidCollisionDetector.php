@@ -19,7 +19,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
  * element is taken - after which `DataHandler` writes it with the next free
  * uid instead and the seed silently no longer matches its own definition,
  * because a suggested uid is a suggestion and not a demand
- * (`DataHandler::insertDB()`, quoted in {@see DataMapFactory}).
+ * (`DataHandler::insertDB()`, quoted in {@see ScenarioSeeder}).
  *
  * So the question is asked per uid and per table, which is the granularity a
  * collision has, and the answer names the records that are in the way rather
@@ -44,13 +44,13 @@ final readonly class UidCollisionDetector
 
     /**
      * @param array<string, true> $suggestedUids The uids of the run, keyed
-     *        `<table>:<uid>` - the `suggestedUids` of
-     *        {@see DataMapFactory::createFromDefinition()}, which is what
-     *        `DataHandler::$suggestedInsertUids` is handed. Taking the check
-     *        from there rather than from the definition is deliberate: what is
-     *        checked is then literally what will be written, and a set whose
-     *        uid never reaches the data map cannot be refused for a collision
-     *        it does not have.
+     *        `<table>:<uid>` - what
+     *        {@see \SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory::getSuggestedIds()}
+     *        returns and `DataHandler::$suggestedInsertUids` is handed. Taking
+     *        the check from there rather than from the scenario file is
+     *        deliberate: what is checked is then literally what will be
+     *        written, including the dynamic uids the factory hands out for an
+     *        entity that declares none.
      * @return list<OccupiedUid> Empty when nothing collides, which is the case
      *         a caller checks for. Ordered by table and uid, so two runs of the
      *         same set report the same list.

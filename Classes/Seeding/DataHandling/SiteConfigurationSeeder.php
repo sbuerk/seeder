@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Seeding\DataHandling;
 
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedRecord;
 use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\ThrowOnErrorLogger;
@@ -30,10 +29,10 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  * ## Why this runs after the records, and through `SiteWriter`
  *
  * A site cannot be written before its root page exists: `rootPageId` is the uid
- * of a page the same definition creates. The definition therefore names the
- * page by its *seed* identifier and this class resolves it from the uid map
- * {@see RecordSeeder::seed()} returns. The resolved uid always wins over
- * whatever the template declares, so a template cannot point the site
+ * of a page the same set creates. The set therefore names the page by the `id`
+ * its scenario declares, and this class resolves that against what
+ * {@see ScenarioSeeder::seed()} actually wrote. The resolved uid always wins
+ * over whatever the template declares, so a template cannot point the site
  * somewhere else - that is the one value a seed set cannot delegate.
  *
  * `TYPO3\CMS\Core\Configuration\SiteWriter` is the only supported writer and a
@@ -153,9 +152,8 @@ final readonly class SiteConfigurationSeeder
     ) {}
 
     /**
-     * @param array<string, int> $seededUids The uids the records were written
-     *        with, keyed by their seed identifier - what
-     *        {@see RecordSeeder::seed()} returns.
+     * @param ScenarioSeedResult $seedResult What the scenario wrote - the uid a
+     *        declared page id ended up under, and every page uid of the run.
      * @param string|null $base Replaces the `base` of every site written by
      *        this run, whatever the template and the definition declare. It is
      *        what makes one set usable in more than one instance - the seed
@@ -165,7 +163,7 @@ final readonly class SiteConfigurationSeeder
      *        configurations are written at all. `false` skips them and keeps
      *        everything else, which is deliberately *not* the same as calling
      *        this method not at all: the suppression of the automatic site
-     *        configuration is unconditional ({@see RecordSeeder}), so skipping
+     *        configuration is unconditional ({@see ScenarioSeeder}), so skipping
      *        the declared ones is exactly the case where the uncovered site
      *        roots of {@see SiteConfigurationSeedResult} have to be reported -
      *        and this is what still finds them.
@@ -173,26 +171,25 @@ final readonly class SiteConfigurationSeeder
      */
     public function seed(
         SeedDefinition $definition,
-        array $seededUids,
+        ScenarioSeedResult $seedResult,
         ?string $base = null,
         bool $writeSiteConfigurations = true,
     ): SiteConfigurationSeedResult {
         $written = [];
         if ($writeSiteConfigurations) {
             foreach ($definition->sites as $site) {
-                $this->writeSite($definition, $site, $seededUids, $base);
+                $this->writeSite($definition, $site, $seedResult, $base);
                 $written[] = $site->identifier;
             }
         }
 
         return new SiteConfigurationSeedResult(
             $written,
-            $this->findUncoveredSiteRoots($definition, $seededUids),
+            $this->findUncoveredSiteRoots($seedResult),
         );
     }
 
     /**
-     * @param array<string, int> $seededUids
      * @param string|null $base The override of {@see self::seed()}, which wins
      *        over the `base` of the definition and over the one of the
      *        template alike.
@@ -201,19 +198,20 @@ final readonly class SiteConfigurationSeeder
     private function writeSite(
         SeedDefinition $definition,
         SeedSiteConfiguration $site,
-        array $seededUids,
+        ScenarioSeedResult $seedResult,
         ?string $base = null,
     ): void {
-        // The parser already refuses a "rootPage" that names no page of the
-        // definition, so reaching this is not a broken definition but a record
-        // that was not written - which cannot happen while RecordSeeder turns
-        // the DataHandler error log into an exception, and would be a site
-        // pointing at uid 0 if it ever could.
-        $rootPageId = $seededUids[$site->rootPage] ?? 0;
+        // "rootPage" is the uid a scenario entity declares for the page. It is
+        // missing from the map when no entity of the "pages" table declared it,
+        // and it differs from what was written when "--force" gave up the uid
+        // suggestions of that table - both of which would produce a site
+        // pointing somewhere the set never seeded.
+        $rootPageId = $seedResult->writtenUid('pages', $site->rootPage) ?? 0;
         if ($rootPageId <= 0) {
             throw new SeedingFailedException(
                 sprintf(
-                    'The site "%s" of the seed set "%s" declares the root page "%s", which was not written.',
+                    'The site "%s" of the seed set "%s" declares the root page %d, which the scenario of this'
+                    . ' set does not write. It names the "id" an entity of the "pages" table declares.',
                     $site->identifier,
                     $definition->identifier,
                     $site->rootPage,
@@ -421,56 +419,25 @@ final readonly class SiteConfigurationSeeder
      * flushed the caches of `SiteConfiguration` and `SiteFinder` on its way
      * out.
      *
-     * @param array<string, int> $seededUids
-     * @return array<string, int>
+     * @return list<int>
      */
-    private function findUncoveredSiteRoots(SeedDefinition $definition, array $seededUids): array
+    private function findUncoveredSiteRoots(ScenarioSeedResult $seedResult): array
     {
-        $seededPages = $this->seededPageUids($definition->records, $seededUids);
+        $seededPages = $seedResult->pageUids();
         if ($seededPages === []) {
             return [];
         }
 
         $uncovered = [];
-        foreach ($this->siteRootsAmong(array_values($seededPages)) as $rootPageId) {
+        foreach ($this->siteRootsAmong($seededPages) as $rootPageId) {
             try {
                 $this->siteFinder->getSiteByPageId($rootPageId);
             } catch (SiteNotFoundException) {
-                $identifier = array_search($rootPageId, $seededPages, true);
-                if (is_string($identifier)) {
-                    $uncovered[$identifier] = $rootPageId;
-                }
+                $uncovered[] = $rootPageId;
             }
         }
 
         return $uncovered;
-    }
-
-    /**
-     * The uids of the seeded `pages` records, keyed by their seed identifier.
-     *
-     * The uid map alone cannot answer this: it is keyed by seed identifier
-     * across every table, and a `tt_content` record may perfectly well carry
-     * the uid of a page. Walking the records is what tells the two apart.
-     *
-     * @param list<SeedRecord> $records
-     * @param array<string, int> $seededUids
-     * @return array<string, int>
-     */
-    private function seededPageUids(array $records, array $seededUids): array
-    {
-        $pages = [];
-        foreach ($records as $record) {
-            if ($record->table === 'pages' && isset($seededUids[$record->identifier])) {
-                $pages[$record->identifier] = $seededUids[$record->identifier];
-            }
-            $pages = [...$pages, ...$this->seededPageUids($record->children, $seededUids)];
-            foreach ($record->inline as $inlineChildren) {
-                $pages = [...$pages, ...$this->seededPageUids($inlineChildren, $seededUids)];
-            }
-        }
-
-        return $pages;
     }
 
     /**

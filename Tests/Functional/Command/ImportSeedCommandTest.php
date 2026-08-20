@@ -76,22 +76,27 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
             $this->pages(),
         );
         $content = $this->rows('tt_content', ['uid', 'pid', 'CType', 'header']);
-        $this->assertCount(2, $content);
+        $this->assertCount(1, $content);
         $this->assertSame(21, (int)$content[0]['uid']);
+        $this->assertSame(11, (int)$content[0]['pid']);
         $this->assertSame('Imported content', $content[0]['header']);
     }
 
+    /**
+     * The file is copied into the storage and indexed. What it is *referenced*
+     * by is not asserted here, because the scenario format has no concept of a
+     * file: a set provisions files, and nothing writes a `sys_file_reference`
+     * row for one yet.
+     */
     #[Test]
-    public function theFilesOfTheSetAreCopiedAndReferenced(): void
+    public function theFilesOfTheSetAreCopiedAndIndexed(): void
     {
         $this->assertSame(Command::SUCCESS, $this->execute()->getStatusCode());
 
         $this->assertFileExists($this->seededFileFolder() . '/placeholder.svg');
-        $this->assertCount(1, $this->rows('sys_file', ['uid']));
-        $references = $this->rows('sys_file_reference', ['uid', 'uid_foreign', 'tablenames', 'fieldname']);
-        $this->assertCount(1, $references);
-        $this->assertSame('tt_content', $references[0]['tablenames']);
-        $this->assertSame('tx_testsfilefields_media', $references[0]['fieldname']);
+        $files = $this->rows('sys_file', ['uid', 'name']);
+        $this->assertCount(1, $files);
+        $this->assertSame('placeholder.svg', $files[0]['name']);
     }
 
     #[Test]
@@ -112,28 +117,35 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
 
         $this->assertStringContainsString('Table Records', $display);
         $this->assertStringContainsString('pages 2', $display);
-        $this->assertStringContainsString('tt_content 2', $display);
+        $this->assertStringContainsString('tt_content 1', $display);
         $this->assertStringContainsString('Written below page 0 (the page tree root)', $display);
         $this->assertStringContainsString('Files indexed: 1', $display);
         $this->assertStringContainsString('Site configurations written: import-main', $display);
         $this->assertStringContainsString('Imported "import-full"', $display);
-        // The identifier-to-uid table is what "-v" adds, and nothing else does.
-        $this->assertStringNotContainsString('Seed identifier', $display);
+        // The declared-to-written uid table is what "-v" adds, and nothing
+        // else does.
+        $this->assertStringNotContainsString('Declared Uid', $display);
         // The set declares the site of its root page, so there is nothing to
         // warn about - the assertion below is what keeps the warning of
         // "noSiteConfigIsSkippedAndTheUncoveredSiteRootIsReported" meaningful.
         $this->assertStringNotContainsString('No site configuration covers', $display);
     }
 
+    /**
+     * A scenario record has no symbolic name: the `id` its entity declares is
+     * its handle, and the table maps that declaration onto the uid the record
+     * was written with - which are the same number until "--force" gives the
+     * suggestions of a table up.
+     */
     #[Test]
-    public function raisedVerbosityAddsTheIdentifierToUidTable(): void
+    public function raisedVerbosityAddsTheDeclaredToWrittenUidTable(): void
     {
         $display = $this->normalize($this->execute(verbosity: OutputInterface::VERBOSITY_VERBOSE)->getDisplay());
 
-        $this->assertStringContainsString('Seed identifier Uid', $display);
-        $this->assertStringContainsString('home 11', $display);
-        $this->assertStringContainsString('about 12', $display);
-        $this->assertStringContainsString('home-heading 21', $display);
+        $this->assertStringContainsString('Declared Uid', $display);
+        $this->assertStringContainsString('pages:11 11', $display);
+        $this->assertStringContainsString('pages:12 12', $display);
+        $this->assertStringContainsString('tt_content:21 21', $display);
     }
 
     #[Test]
@@ -145,7 +157,6 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $this->assertSame([], $this->pages());
         $this->assertSame([], $this->rows('tt_content', ['uid']));
         $this->assertSame([], $this->rows('sys_file', ['uid']));
-        $this->assertSame([], $this->rows('sys_file_reference', ['uid']));
         $this->assertDirectoryDoesNotExist($this->seededFileFolder());
         $this->assertDirectoryDoesNotExist(Environment::getConfigPath() . '/sites/import-main');
 
@@ -165,9 +176,10 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
             $this->execute(['--dry-run' => true], OutputInterface::VERBOSITY_VERBOSE)->getDisplay(),
         );
 
-        $this->assertStringContainsString('Seed identifier Table Suggested uid', $display);
-        $this->assertStringContainsString('home pages 11', $display);
-        $this->assertStringContainsString('home-image tt_content assigned by DataHandler', $display);
+        $this->assertStringContainsString('Table Suggested uid', $display);
+        $this->assertStringContainsString('pages 11', $display);
+        $this->assertStringContainsString('pages 12', $display);
+        $this->assertStringContainsString('tt_content 21', $display);
     }
 
     #[Test]
@@ -195,7 +207,7 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
 
         $display = $this->normalize($commandTester->getDisplay());
         $this->assertStringContainsString('Site configurations written: 0', $display);
-        $this->assertStringContainsString('No site configuration covers "home" (page 11)', $display);
+        $this->assertStringContainsString('No site configuration covers page 11', $display);
     }
 
     /**
@@ -212,7 +224,7 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $this->assertSame(Command::SUCCESS, $commandTester->getStatusCode());
         $this->assertSame([], $this->automaticSiteConfigurations());
         $this->assertStringContainsString(
-            'No site configuration covers "home"',
+            'No site configuration covers page 2000',
             $this->normalize($commandTester->getDisplay()),
         );
     }
@@ -276,12 +288,17 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         );
     }
 
+    /**
+     * Forced past a collision with the set that declares no site: the tables
+     * that collide give their suggestions up, and every record of them is
+     * written with a free uid.
+     */
     #[Test]
     public function theSameSetIsImportedUnderForceWithFreeUids(): void
     {
         $this->importCSVDataSet(dirname(__DIR__) . '/Fixtures/Database/OccupiedUids.csv');
 
-        $commandTester = $this->execute(['--force' => true]);
+        $commandTester = $this->execute(['--force' => true], identifier: 'import-no-sites');
 
         $this->assertSame(Command::SUCCESS, $commandTester->getStatusCode());
         $pages = $this->pages();
@@ -297,6 +314,71 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
         $this->assertStringContainsString('"--force" was given', $display);
         $this->assertStringContainsString('pages:11 is occupied by "An existing page"', $display);
         $this->assertStringContainsString('tt_content:21 is occupied by "An existing element"', $display);
+    }
+
+    /**
+     * The one collision "--force" does not override.
+     *
+     * A site names its root page by the uid the scenario declares, and forcing
+     * gives the suggested uids of the colliding table up - so the page tree
+     * would be written under uids the site does not name, and the site would
+     * point at a page of somebody else or at nothing. It is refused before the
+     * first record is written rather than repaired afterwards, because the uid
+     * the page ends up with is only known once it exists.
+     */
+    #[Test]
+    public function forcingASetThatDeclaresSitesPastAPageCollisionIsRefused(): void
+    {
+        $this->importCSVDataSet(dirname(__DIR__) . '/Fixtures/Database/OccupiedUids.csv');
+
+        $commandTester = $this->execute(['--force' => true]);
+
+        $this->assertSame(ImportSeedCommand::EXIT_UID_COLLISION, $commandTester->getStatusCode());
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString('declares site configurations and suggests page uids', $display);
+        $this->assertStringContainsString('import the set with "--no-site-config"', $display);
+        // Nothing was written, not even the tables that do not collide.
+        $this->assertSame([11], array_map(static fn(array $row): int => (int)$row['uid'], $this->pages()));
+        $this->assertCount(1, $this->rows('tt_content', ['uid']));
+        $this->assertSame([], $this->rows('sys_file', ['uid']));
+        $this->assertDirectoryDoesNotExist(Environment::getConfigPath() . '/sites/import-main');
+    }
+
+    /**
+     * The way past the refusal above, and the only path that tells the guard
+     * from a guard that ignores "--no-site-config".
+     *
+     * What makes the forced run unsafe is a site naming a root page by a uid
+     * the run is about to give up. A run that writes no site configuration
+     * names nothing, so the collision is the ordinary one: the colliding
+     * tables lose their suggestions, everything else is written as declared,
+     * and the seeded site root is reported as covered by nothing - which is
+     * exactly what it is.
+     */
+    #[Test]
+    public function aSetDeclaringSitesIsForcedPastAPageCollisionWithNoSiteConfig(): void
+    {
+        $this->importCSVDataSet(dirname(__DIR__) . '/Fixtures/Database/OccupiedUids.csv');
+
+        $commandTester = $this->execute(['--force' => true, '--no-site-config' => true]);
+
+        $this->assertSame(Command::SUCCESS, $commandTester->getStatusCode());
+        $pages = $this->pages();
+        $this->assertCount(3, $pages);
+        // The record that was in the way is untouched.
+        $this->assertSame(['uid' => 11, 'pid' => 0, 'title' => 'An existing page', 'slug' => '/existing'], $pages[0]);
+        $home = $this->pageTitled('Import home');
+        $about = $this->pageTitled('About');
+        $this->assertNotSame(11, $home['uid']);
+        $this->assertSame($home['uid'], $about['pid']);
+        // No site configuration, neither the declared one nor an automatic one.
+        $this->assertDirectoryDoesNotExist(Environment::getConfigPath() . '/sites/import-main');
+        $this->assertSame([], $this->automaticSiteConfigurations());
+
+        $display = $this->normalize($commandTester->getDisplay());
+        $this->assertStringContainsString('"--force" was given', $display);
+        $this->assertStringContainsString('Site configurations written: 0', $display);
+        $this->assertStringContainsString('Imported "import-full"', $display);
     }
 
     /**

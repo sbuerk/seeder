@@ -1,28 +1,26 @@
 # Seed definitions
 
-The authoritative specification of the YAML format. `SeedDefinitionParser` is
-the implementation; where this page and the parser disagree, the parser is what
-ships and the disagreement is a bug in one of them.
+A seed set is written in **two** formats, and keeping them apart is the point of
+the construct:
 
-The reasoning behind the format is on
-[Seeding](../architecture/seeding.md) — this page says what is accepted, at
-which level, and what happens when it is not.
+| File               | Format                                                         | Owner                          |
+|--------------------|----------------------------------------------------------------|--------------------------------|
+| `config.yml`       | the **set descriptor**: identity, scenario files, files, sites | this extension, closed key set |
+| the scenario files | the YAML **scenario format** of `typo3/testing-framework`      | upstream, key for key          |
 
-## The one property everything else follows from
+`SeedDefinitionParser` implements the first, `ScenarioComposer` reads and merges
+the second, and `DataHandlerFactory` turns the merge into the DataHandler maps.
+Where this page and those classes disagree, they are what ships and the
+disagreement is a bug in one of them.
 
-**Everything that is not a structural key on that level is a field of the
-record, and is written verbatim.** A field needs no support in the seeder to be
-seedable: no allow list, no mapping table, no `switch`. The absence of that
-branch is deliberate, and a unit test keeps it true.
+Nothing this extension invents is mixed into a scenario file. That is what lets
+a scenario file be lifted out of TYPO3 Core's own functional tests and seeded
+unchanged, and it means every key below is upstream's with upstream's meaning.
+Why that format rather than a bespoke one, and why its engine is a port rather
+than a dependency, is on
+[The scenario engine](../architecture/scenario-engine.md).
 
-The cost is that a typo in a field name is a field, not an error. That is
-accepted for a record — the seeder cannot know the TCA of every table — and
-explicitly **not** accepted where a level has a closed set of keys, which is the
-top level of the definition and a `sites` entry. There, an unknown key is
-refused: accepting `page:` instead of `pages:` silently is how an import reports
-success and writes nothing.
-
-## Where a definition lives
+## Where a set lives
 
 A seed set is a directory `Configuration/Seeder/<name>/` in any active package,
 with `config.yml` as its entry file:
@@ -30,7 +28,8 @@ with `config.yml` as its entry file:
 ```
 Configuration/Seeder/demo/
 ├── config.yml               entry file, and the only mandatory one
-├── Pages.yaml               optional, pulled in through "imports"
+├── Scenario.yaml            the records, named under "scenarios"
+├── Files.yaml               optional, pulled in through "imports"
 ├── Files/
 │   └── placeholder.svg      resources named by "files"
 └── Sites/
@@ -39,15 +38,20 @@ Configuration/Seeder/demo/
         └── settings.yaml    optional site settings
 ```
 
-Every relative path inside a set — a file `source`, a site `template`, an
-`imports` resource — resolves against the directory holding the **entry file**,
-not against the file declaring it. That is what lets a set be moved or renamed
-without touching its paths. `EXT:` paths are accepted everywhere a path is and
-ignore the base directory.
+Every relative path inside a set - a `scenarios` entry, a file `source`, a site
+`template`, an `imports` resource - resolves against the directory holding the
+**entry file**, not against the file declaring it. That is what lets a set be
+moved or renamed without touching its paths. `EXT:` paths are accepted
+everywhere a path is and ignore the base directory.
+
+An absolute path is taken as it is and is deliberately **not** sent through
+`GeneralUtility::getFileAbsFileName()`, which answers with an empty string for
+anything outside the project path and would turn "a set below `vendor/`" into
+"the scenario does not exist".
 
 Discovery is described in [Seed sets and the CLI](seed-sets.md).
 
-## Set level
+## The set descriptor
 
 ```yaml
 identifier: demo
@@ -55,158 +59,511 @@ title: 'Demo page tree'
 description: 'Pages, content and a site configuration.'
 
 imports:
-  - { resource: Pages.yaml }
+  - { resource: Files.yaml }
+
+scenarios:
+  - Pages.yaml
+  - Content.yaml
 
 files: []
-pages: []
 sites: []
 ```
 
 | Key           | Required | Type   | Default | Meaning                                                                                                                                      |
 |---------------|----------|--------|---------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `identifier`  | yes      | string | —       | Globally unique across all active packages. Declared, never derived from the directory name — a derived identifier makes a collision silent. |
-| `title`       | yes      | string | —       | Shown by `seeder:list`.                                                                                                                      |
+| `identifier`  | yes      | string | -       | Globally unique across all active packages. Declared, never derived from the directory name - a derived identifier makes a collision silent. |
+| `title`       | yes      | string | -       | Shown by `seeder:list`.                                                                                                                      |
 | `description` | no       | string | `''`    | Long text. Carried on the set and the definition; no command prints it today.                                                                |
-| `imports`     | no       | list   | `[]`    | Further YAML files merged into this one. Consumed by `YamlFileLoader` before the parser sees the definition.                                 |
+| `imports`     | no       | list   | `[]`    | Further YAML files merged into **this descriptor**. Consumed by `YamlFileLoader` before the parser sees it.                                  |
+| `scenarios`   | **yes**  | list   | -       | The scenario files the records come from, in the order they are applied. Non-empty.                                                          |
 | `files`       | no       | list   | `[]`    | Files copied into a storage before any record is written.                                                                                    |
-| `pages`       | no       | list   | `[]`    | The top level records of the set. They are `pages` records.                                                                                  |
 | `sites`       | no       | list   | `[]`    | Site configurations written after the records.                                                                                               |
 
-This list is **closed**. Any other key is refused, and the message names the
-known ones.
+This list is **closed**: any other key is refused and the message names the
+known ones. Accepting `scenario:` for `scenarios:` silently is how an import
+reports success and writes nothing.
 
 `description:` with nothing behind it decodes to `null` and is treated exactly
 like an absent key.
 
-A definition that parses and produces no record at all is refused when it is
-imported, not when it is parsed — the message is *"contains no records"*.
+`scenarios` is required rather than optional-and-empty. A set that names no
+scenario writes no record, and a descriptor saying so by omission cannot be told
+apart from one that misspelled the key.
 
-## Structural keys, and where they are structural
-
-| Key          | Structural on                  | An ordinary field on |
-|--------------|--------------------------------|----------------------|
-| `identifier` | every record                   | —                    |
-| `uid`        | every record                   | —                    |
-| `children`   | every record                   | —                    |
-| `content`    | every record                   | —                    |
-| `files`      | every record                   | —                    |
-| `inline`     | every record                   | —                    |
-| `table`      | an `inline` or `records` child | every other record   |
-| `records`    | a record of `pages`            | every other record   |
-
-The last two rows are the reason this is decided per level rather than once:
-
-- `tt_content` and `pages` both have real columns whose name begins with
-  `table`, so `table` can only be structure where there is no other way to know
-  the table — which is an `inline` child (the alternative would be reading
-  `config.foreign_table` out of the parent's TCA) and a `records` child (where
-  there is no parent field at all).
-- `tt_content` has a real `records` column — the one the *Insert records*
-  element writes `tt_content_<uid>` into. So `records` is structure only on a
-  record whose **resolved table** is `pages`. Note *resolved*: a page declared
-  below `records` is still a page and may carry `records` of its own.
-
-## Record level
-
-```yaml
-pages:
-  - identifier: home            # required, unique across the whole definition
-    uid: 1                      # optional, a suggested uid, positive integer
-    title: 'Demo'               # any non-structural key is a field
-    slug: '/'
-    is_siteroot: 1
-    files:                      # file references, per field
-      media:
-        - placeholder
-        - identifier: portrait
-          alternative: 'A placeholder graphic'
-    content:                    # tt_content records on this page
-      - identifier: home-heading
-        CType: header
-        header: 'A frontend to look at'
-    records:                    # records of any table on this page
-      - identifier: category-news
-        table: sys_category
-        title: 'News'
-    inline:                     # children of a relation, per parent field
-      tx_example_items:
-        - identifier: item-docs
-          table: tx_example_item
-          title: 'Documentation'
-    children:                   # sub pages
-      - identifier: about
-        title: 'About'
-        slug: '/about'
-```
-
-A field value has to be a **scalar or null**. There is no support for writing an
-array into a column, because there is no column that takes one — a relation is
-expressed by `inline`, by `files`, or by writing the uid of the target into the
-relation field like any other value.
+**`imports` does not import records.** It is a mechanism of the descriptor: a
+set may split its own `files:` or `sites:` into a second file, and that file is
+merged into `config.yml`. A scenario file is *never* pulled in that way - it is
+named under `scenarios` and read by `ScenarioComposer` with a plain
+`Yaml::parseFile()`. A scenario file carrying `imports:` is refused as an
+unknown key, and `config.yml` carrying `entitySettings:` or `entities:` is
+refused for the same reason. One rule, no ambiguity.
 
 ### Validation
 
-| Rule                                                                      | On violation                               |
-|---------------------------------------------------------------------------|--------------------------------------------|
-| `identifier` is a non-empty string                                        | refused, naming the level it was found on  |
-| `identifier` matches `/^[A-Za-z0-9][A-Za-z0-9-]*$/`                       | refused, with the DataHandler reason       |
-| `identifier` is unique across the **whole** definition, `inline` included | refused, naming the duplicate              |
-| `uid`, where present, is an integer ≥ 1                                   | refused                                    |
-| an `inline` or `records` child declares `table`                           | refused, stating that it is never inferred |
-| `content`, `children`, `records` are lists                                | refused, naming the key and the record     |
-| an `inline` child declares no `children`, `content` or `records`          | refused, naming the child and the key      |
-| `inline` and `files` are maps of field name to a list                     | refused, naming the field                  |
-| a field name is a string                                                  | refused                                    |
-| a field value is scalar or null                                           | refused, naming the field                  |
+Everything below is checked before a single row is written.
 
-Record identifiers and file identifiers are **separate namespaces**: a file may
-be called `home` while a page is, and neither shadows the other.
+| Code         | Condition                                                                           |
+|--------------|-------------------------------------------------------------------------------------|
+| `1787072801` | the `config.yml` does not exist                                                     |
+| `1787072802` | the `config.yml` cannot be read                                                     |
+| `1787072803` | the `config.yml` is not readable YAML                                               |
+| `1787072810` | the descriptor is not a map                                                         |
+| `1787072811` | no `identifier`, or not a non-empty string                                          |
+| `1787072812` | no `title`, or not a non-empty string                                               |
+| `1787072813` | `description` is not a string                                                       |
+| `1787072814` | the descriptor declares an unknown key                                              |
+| `1787256301` | `scenarios` is missing, is not a list, or is empty                                  |
+| `1787256302` | a `scenarios` entry is not a non-empty string                                       |
+| `1787256303` | a `files` entry declares an unknown key                                             |
+| `1787256401` | a scenario file does not exist, with the path it was looked for at                  |
+| `1787256402` | a scenario file cannot be read                                                      |
+| `1787256403` | a scenario file is not readable YAML                                                |
+| `1787256404` | a scenario file is not a map                                                        |
+| `1787256405` | a scenario file declares a key other than `entitySettings`/`entities`/`__variables` |
+| `1787256406` | the `entitySettings` of a scenario file are not a map                               |
+| `1787256407` | the `entities` of a scenario file are not a map                                     |
+| `1787256408` | an entity is not a list of items                                                    |
+| `1787256409` | an item of an entity is not a map                                                   |
 
-Nothing validates a `uid` against the other `uid` values of the definition, and
-nothing validates a table name or a field name against the TCA. The first is a
-gap worth knowing about; the second two are what makes a set portable across
-installations that have different extensions loaded, and DataHandler reports
-both at import time.
+The last five exist because `DataHandlerFactory` would answer the same input
+with a `TypeError` out of a private method. Naming the scenario file and the
+entity is worth the walk.
 
-### The identifier character set is not cosmetic
+The `LogicException` codes the factory itself raises - `1533734368`,
+`1533734369`, `1534872399`, `1534872400`, `1568146788`, `1574365935`,
+`1574365936` - are **not** wrapped. They are upstream's codes and stay traceable
+to the class that raised them; the command turns them into
+`EXIT_INVALID_DEFINITION` all the same.
 
-An identifier ends up inside the placeholder DataHandler resolves relations by —
-`NEW<table without underscores>-<identifier>`. A placeholder containing an
-underscore is read as the `<table>_<uid>` form the backend writes for a group
-field and is split there, after which the relation is written **empty, with an
-empty error log**. Rejecting the identifier is what keeps that from happening
-silently. The full quotation of the branch is on
-[Seeding](../architecture/seeding.md#the-placeholder-carries-no-underscore).
+## The scenario format
 
-## Nesting
+A scenario file has three top level keys, and only three:
 
-| Key        | Produces                                                                                           |
-|------------|----------------------------------------------------------------------------------------------------|
-| `children` | `pages` records with the declaring page as their `pid`                                             |
-| `content`  | `tt_content` records with the declaring page as their `pid`                                        |
-| `records`  | records of the declared `table` with the declaring page as their `pid`                             |
-| `inline`   | records tied to the parent through the named field; their `pid` is the page the **parent** sits on |
+```yaml
+__variables: []       # YAML anchors, ignored by the engine
+entitySettings: {}    # how an entity name maps onto a table
+entities: {}          # the records
+```
 
-`children`, `content` and `records` join the same sibling chain of the declaring
-page, and declaration order is preserved through the negative-`pid` convention
-**tracked per table** — so pages, content elements and records of three further
-tables on one page do not disturb each other's sorting.
+An **entity** is a name a scenario gives to a kind of record. `entitySettings`
+says which table that name writes to and how its values are translated;
+`entities` lists the records themselves under that name. The indirection is what
+lets one scenario read as a page tree rather than as a table dump.
 
-An inline child's `pid` is the page its parent sits on, never the parent itself:
-a relation is not a containment, and writing the parent's placeholder there would
-put content records on a content record. Its order comes from the parent's field
-value, which the seeder writes as the comma separated list of the children's
-placeholders in declaration order.
+### `entitySettings`
 
-Inline nests arbitrarily deep, and an inline child may carry `files` and
-`inline` of its own.
+```yaml
+entitySettings:
+  '*':
+    nodeColumnName: 'pid'
+    columnNames: {id: 'uid', language: 'sys_language_uid'}
+    defaultValues: {pid: 0, hidden: 0}
+  page:
+    isNode: true
+    tableName: 'pages'
+    parentColumnName: 'pid'
+    languageColumnNames: ['l10n_parent', 'l10n_source']
+    columnNames: {type: 'doktype', root: 'is_siteroot'}
+    defaultValues: {doktype: 1}
+    valueInstructions:
+      shortcut:
+        first: {shortcut: 0, shortcut_mode: 1}
+  content:
+    tableName: 'tt_content'
+    languageColumnNames: ['l18n_parent', 'l10n_source']
+    columnNames: {title: 'header', type: 'CType'}
+```
 
-An inline child must **not** carry `children`, `content` or `records`, and the
-parser refuses a definition that declares one of them, naming the child and the
-key. Those keys nest onto the page that declares them, and an inline child sits
-in a relation rather than on a page — the format has no meaning to give them
-there. `records` stays a *field* on an inline child that is not a page, exactly
-as it is on a content element.
+| Key                   | Type              | Default         | Does                                                                                                          |
+|-----------------------|-------------------|-----------------|---------------------------------------------------------------------------------------------------------------|
+| `isNode`              | bool              | `false`         | Items of this entity may carry nested `entities`, and become the node those are written below.                |
+| `tableName`           | string            | the entity name | The table the records are written to.                                                                         |
+| `parentColumnName`    | string            | none            | The column an item declared under `children` receives its parent's identifier in.                             |
+| `nodeColumnName`      | string            | none            | The column an item receives the identifier of its enclosing node in.                                          |
+| `columnNames`         | map alias->column | `[]`            | Renames a declared key on its way into the record. `title: 'header'` writes a declared `title` into `header`. |
+| `languageColumnNames` | list of columns   | `[]`            | The columns a `languageVariants` item receives its ancestor identifiers in.                                   |
+| `defaultValues`       | map               | `[]`            | Written into every record of the entity, unless the item declares the column itself.                          |
+| `valueInstructions`   | map               | `[]`            | Expands one declared value into a set of values. See below.                                                   |
+
+Two of them are easy to mix up. `nodeColumnName` is the pointer to the
+**structure** an item sits in - the page a content element is on - and it is
+inherited downwards. `parentColumnName` is the pointer to the item that
+*declared* this one under `children`. On `pages` both are `pid`, and the parent
+pointer is assigned second, so it wins where an item has both.
+
+`tableName` defaulting to the entity name is why an entity called `sys_category`
+needs no `entitySettings` entry at all to write categories - and why a typo in
+an entity name produces an attempt to write a table of that name rather than an
+error.
+
+#### `columnNames` and `defaultValues`
+
+`EntityConfiguration::processValues()` starts from `defaultValues`, then copies
+every declared value in under its resolved column name. A declared value
+therefore always wins over a default, and a default is never applied to a column
+the item declares.
+
+#### `valueInstructions`
+
+```yaml
+valueInstructions:
+  shortcut:
+    first: {shortcut: 0, shortcut_mode: 1}
+```
+
+Read as: when an item declares `shortcut: first`, merge `shortcut: 0` and
+`shortcut_mode: 1` into its values. It is a named macro for a combination of
+columns that has to be right together - here "shortcut to the first subpage",
+which is a `shortcut` of `0` **and** a `shortcut_mode` of `1`, and is
+meaningless as either half.
+
+Three details decide what it does:
+
+- it is keyed by the **declared** name, before `columnNames` resolves it, and by
+  the raw declared value;
+- the values it merges in are **column names**, not aliases, and they overwrite
+  what is already there - which is what lets `shortcut: first` end up as a
+  numeric `shortcut`;
+- an instruction whose value is empty or falsy is skipped, and a column whose
+  instruction map is not an array raises `1533734368` while the configuration is
+  built.
+
+#### `languageColumnNames`
+
+A list, filled from the chain of ancestors of a language variant: every column
+but the last gets the ancestor at its own position, the last gets the *nearest*
+ancestor. With the usual `['l10n_parent', 'l10n_source']` that means
+`l10n_parent` always points at the original record and `l10n_source` at the
+record the variant was translated from - the same value for a first level
+translation, different values for a translation of a translation.
+
+Declared values are merged **over** the language columns, so an item may still
+name `l10n_source` itself.
+
+#### The `'*'` entity
+
+`'*'` is not a table. It holds the settings every *declared* entity gets merged
+in, which is how a scenario states `nodeColumnName: pid` and
+`columnNames: {id: uid}` once instead of on every entity.
+
+It is also where the two traps of this format live.
+
+##### Trap 1: the merge is recursive, not overriding
+
+`DataHandlerFactory::buildEntityConfigurations()` merges with
+`array_merge_recursive()`. For a key declared on **both** sides that does not
+override - it **appends**:
+
+```yaml
+entitySettings:
+  '*':
+    defaultValues: {hidden: 0}
+  page:
+    defaultValues: {hidden: 0}     # <- both sides
+```
+
+produces `defaultValues: {hidden: [0, 0]}`, and an array reaching a `check`
+column is written to the database as the string `Array`. Nothing warns; the page
+is simply not visible and the column does not look like what the scenario says.
+
+The rule that follows is mechanical: **a key belongs to `'*'` or to the entity,
+never to both.** The fixture set of this repository states it in a comment above
+its `entitySettings` for exactly that reason.
+
+##### Trap 2: `'*'` reaches only declared entities
+
+`buildEntityConfigurations()` iterates `entitySettings` and skips `'*'`. An
+entity that is **used** under `entities:` but is **not listed** in
+`entitySettings:` never goes through that loop at all:
+`provideEntityConfiguration()` creates a bare `EntityConfiguration` for it, with
+
+- no default values, so no `pid`, no `hidden`, nothing;
+- no node and no parent column, so it is written wherever the TCA defaults put
+  it rather than below its node;
+- a table name equal to the **entity name itself**.
+
+Writing `sys_category` records by naming the entity `sys_category` and nothing
+else therefore works and is not the same as declaring it - it opts out of every
+`'*'` setting the scenario has. Where that matters, list the entity with an
+empty settings map.
+
+This is also why `--root-page` is applied to the declared items rather than to
+`'*'.defaultValues.pid`; see [below](#--root-page).
+
+### `entities`
+
+```yaml
+entities:
+  page:
+    - self: {id: 11, title: 'Import home', slug: '/', is_siteroot: 1}
+      entities:
+        content:
+          - self: {id: 21, title: 'Imported content', type: 'header'}
+      children:
+        - self: {id: 12, title: 'About', slug: '/about'}
+```
+
+A map of entity name to a **list of items**. Everything an item declares under
+`self` or `version` is a value of the record, resolved through `columnNames` and
+merged onto `defaultValues`. The keys of the item itself are the fixed set
+below, and the factory reads no others - it also refuses none, so a misspelled
+`childern:` is dropped in silence.
+
+| Key                | Does                                                                                                       |
+|--------------------|------------------------------------------------------------------------------------------------------------|
+| `self`             | The record's own values, in the live workspace.                                                            |
+| `version`          | The record's own values, in the workspace it names. Mutually exclusive with `self`.                        |
+| `children`         | Items of the **same** entity, carrying this item's identifier in `parentColumnName`.                       |
+| `entities`         | Items of **other** entities, written below this item as their node. Honoured only when `isNode` is `true`. |
+| `languageVariants` | Translations of this item, wired through `languageColumnNames`.                                            |
+| `versionVariants`  | Workspace overlays of this item.                                                                           |
+| `actions`          | DataHandler commands on this item, run after every record was written.                                     |
+
+#### `self` and `version`
+
+```yaml
+- self: {id: 1100, title: 'EN: Welcome'}
+- version: {id: 1240, title: 'EN: Managing data', workspace: 1}
+```
+
+`self` writes the record in workspace 0. `version` writes it in the workspace it
+names, and the `workspace` key is mandatory there. Declaring both raises
+`1534872399`, a `version` without `workspace` raises `1534872400`, and an item
+with neither raises `1533734369`.
+
+Both accept `id`, which is the **uid** the record is written with - see
+[Uids](#uids-declared-dynamic-and-suggested).
+
+#### `children`
+
+Items of the same entity, one level down. The declaring item's identifier is
+written into `parentColumnName`; the node pointer is passed through unchanged.
+For `pages`, where `parentColumnName` is `pid`, that is what builds the tree.
+
+An entity **without** a `parentColumnName` may still declare `children`, and
+they are then written as plain siblings - the nesting in the YAML says nothing
+about the records. That is a property of the format worth knowing before reading
+a nesting as a relation.
+
+#### Nested `entities`
+
+The other direction: records of a *different* entity, below this item. The
+declaring item's identifier goes into the child entity's `nodeColumnName`, which
+is how content elements land on their page.
+
+It is honoured **only when the declaring entity has `isNode: true`**. On any
+other entity, `entities:` is silently ignored - no error, no record. This is
+upstream behaviour and it is the single most likely way to write a scenario that
+seeds less than it says.
+
+#### `languageVariants`
+
+```yaml
+- self: {id: 1100, title: 'EN: Welcome'}
+  languageVariants:
+    - self: {id: 1101, title: 'FR: Welcome', language: 1}
+      languageVariants:
+        - self: {id: 1102, title: 'FR-CA: Welcome', language: 2}
+```
+
+Items of the same entity, with `languageColumnNames` filled from the ancestor
+chain. They nest: a variant of a variant carries both ancestors, which is what
+distinguishes `l10n_parent` from `l10n_source`.
+
+The node pointer differs by entity kind, and deliberately. For a **node** entity
+the variant is given `-<identifier of the original>` - the "insert directly
+after" convention, so a translated page sits next to its original rather than at
+the top of the page tree. For any other entity the enclosing node is passed
+through unchanged, so a translated content element stays on its page.
+
+A language variant may carry `versionVariants` and further `languageVariants`,
+and it may carry `actions`. It may not carry `children` or `entities` - those
+keys are not read there.
+
+#### `versionVariants`
+
+```yaml
+- self: {id: 1400, title: 'EN: ACME in your Region'}
+  versionVariants:
+    - version: {title: 'EN: Features modified', workspace: 1}
+      actions:
+        - {action: 'delete'}
+```
+
+A workspace overlay of the declaring record. Two things are different from every
+other item:
+
+- it declares `version:` and **must not** declare `self` (`1574365935`) or an
+  `id` (`1574365936`) - the uid is the ancestor's;
+- it is written into the data map under the **ancestor's key**, in the workspace
+  its `version.workspace` names, so `DataHandler` sees an overlay of that record
+  rather than a new one.
+
+The second point is what makes a `columnNames` remap of `workspace` dangerous,
+and that is one of the pinned upstream defects - see
+[What the engine does that a scenario cannot](#what-the-engine-does-that-a-scenario-cannot).
+
+#### `actions`
+
+Actions are not values; they become the DataHandler **command map**, which
+`DataHandlerWriter` processes after every data map of every workspace. An action
+may therefore target a record the same scenario creates.
+
+| Declaration                                      | Command                                             |
+|--------------------------------------------------|-----------------------------------------------------|
+| `{action: move, type: toPage, target: 110}`      | `move` to page `110`                                |
+| `{action: move, type: toTop}`                    | `move` to the enclosing node, at the top            |
+| `{action: move, type: afterRecord, target: 300}` | `move` to `-300`, directly after that record        |
+| `{action: delete}`                               | `delete`                                            |
+| `{action: discard}`                              | `clearWSID`, **only** in a workspace greater than 0 |
+
+`toTop` needs an enclosing node and does nothing on a top level item; `toPage`
+and `afterRecord` need a `target`. An action that matches none of the rows is
+dropped without a word - there is no unknown-action error in this format.
+
+`delete` on a record the same scenario just wrote is not pointless: it is how a
+scenario produces a deleted row to test against, and how a workspace overlay
+expresses "this record is deleted in that workspace".
+
+### `__variables`
+
+```yaml
+__variables:
+  - &pageStandard 0
+  - &contentText 'text'
+
+entities:
+  page:
+    - self: {id: 1000, type: *pageStandard}
+```
+
+A place to declare YAML **anchors**, and nothing else. The anchors are resolved
+by the YAML parser, so what reaches the engine is the substituted value and the
+key itself is inert. `ScenarioComposer` accepts and drops it rather than
+refusing it, because every TYPO3 Core scenario carries one.
+
+Anchors are a property of the parse of **one file**. A scenario split over
+several files needs its own `__variables` in each of them; an anchor declared in
+the first file is not defined in the second.
+
+### Uids: declared, dynamic, and suggested
+
+Every record of a scenario gets a uid before it is written, and every one of
+them is registered as a **suggested uid**.
+
+- An item declaring `id` gets that uid.
+- An item declaring none gets one from a counter that starts at **10000** and
+  runs **per entity name**.
+- A `version` item advances that counter by two rather than one, so it leaves a
+  gap in the dynamic sequence.
+
+Two consequences are worth stating.
+
+**A scenario without a single declared `id` still suggests uids**, from 10000
+upwards, and `seeder:import` checks those against the installation exactly like
+declared ones. There is no "let the database decide" mode.
+
+**The counter is per entity name, the suggestion is per table.** Two entities
+mapping onto the same table - a `page` and a `folder`, both
+`tableName: 'pages'` - each start at 10000, so the first item of each collides
+on `pages:10000` and the composition fails with `1568146788`. Declaring `id` on
+one of them, or on all of them, is the way out.
+
+A duplicate suggestion is caught while the scenario is composed, before anything
+is written, and the message names the `<table>:<uid>` identifier. Why that check
+is the one that fires rather than a duplicate primary key at insert time is a
+consequence of composing everything into one factory; see below.
+
+### `hidden` is not defaulted for you
+
+The `pages` TCA ships `$GLOBALS['TCA']['pages']['columns']['hidden']['config']['default'] = 1`
+(`EXT:core/Configuration/TCA/Overrides/pages.php`), so a page written without a
+`hidden` value is **hidden**. `tt_content` and the tables enriched by
+`TcaEnrichment::enrichDisabledField()` default to `0`.
+
+Nothing in this extension overrides that any more. The old record format wrote
+`hidden = 0` unless a record said otherwise; a scenario has to say so itself,
+which is why every TYPO3 Core scenario carries `defaultValues: {hidden: 0}` on
+its `'*'` entity. A seeded tree that exists and renders nothing is almost always
+this.
+
+The same applies to `doktype`, `l10n_parent` and `sys_language_uid`: they come
+from the TCA of the installation unless the scenario declares them. A seed that
+wants the same records in two installations declares them.
+
+## Composing several scenario files
+
+`scenarios` is a list, and the files are composed into **one**
+`DataHandlerFactory` rather than one per file. That is not a convenience:
+`DataHandlerFactory` hands out its dynamic uids per entity name starting at
+10000, so two factories would suggest the same uid twice and the second insert
+would fail as a duplicate primary key - an `SQL error` line in
+`DataHandler::$errorLog` naming neither file. Composed, the same collision is
+`1568146788` naming the identifier, before anything is written.
+
+The merge is defined per key, because the two keys mean opposite things:
+
+| Key              | Rule                                                          |
+|------------------|---------------------------------------------------------------|
+| `entitySettings` | merged recursively, a later file wins a conflicting scalar    |
+| `entities`       | appended per entity name, in the order the files are declared |
+| `__variables`    | ignored - it holds YAML anchors, which never cross a file     |
+| anything else    | `1787256405`                                                  |
+
+`entitySettings` describes *how* a table is written and is naturally overridden.
+`entities` are the records, and a later file adds to them rather than replacing
+them. A set may therefore ship a base scenario and a second file that extends
+it, and the extending file may redeclare `columnNames` for an entity without
+losing the records of the first.
+
+Note that the `entitySettings` merge is `ArrayUtility::mergeRecursiveWithOverrule()`
+and *does* override, unlike the `'*'` merge inside the factory. The two merges
+are not the same operation and only one of them has
+[trap 1](#trap-1-the-merge-is-recursive-not-overriding).
+
+## `--root-page`
+
+`seeder:import --root-page=<uid>` writes the set below an existing page instead
+of at the page tree root. The transformation is applied to the **merged
+settings**, before the factory is built, and it touches exactly this:
+
+> For every item of every **top level** entity, the `self` or `version` map gets
+> `pid: <rootPageId>` - unless it already declares a `pid` that is not `0`.
+
+Nested items are untouched. A `children` item, a nested `entities` item, a
+language variant and a version variant all take their `pid` from their parent or
+their node, and moving them would take them off the tree they were declared in.
+Applied only when the option is greater than zero, so a default run leaves the
+scenario byte identical to what it declares.
+
+The two obvious alternatives do not work:
+
+- **Overriding `entitySettings.*.defaultValues.pid`** misses every entity that
+  is not listed in `entitySettings`, because of
+  [trap 2](#trap-2--reaches-only-declared-entities).
+- **Rewriting the built data map** would mean changing the port:
+  `DataHandlerFactory` exposes its maps read-only and `DataHandlerWriter` takes
+  the factory, not the maps.
+
+One limitation follows from where it acts: the check for an already declared
+`pid` reads the literal key `pid`, so an item declaring its `pid` through a
+`columnNames` alias is moved anyway. Declare the column under its own name where
+that matters.
+
+## What the engine does that a scenario cannot
+
+Two properties of the engine reach through the format and are documented with
+the engine rather than here, because they are properties of the ported code:
+
+- **Sibling ordering only really works for `pages`.** The back references that
+  keep declaration order are resolved for that table name only, so three content
+  elements on one page come out in the order c1, c3, c2. See
+  [Sibling ordering only really works for pages](../architecture/scenario-engine.md#sibling-ordering-only-really-works-for-pages).
+- **Three upstream defects are carried unchanged and pinned by tests** - an
+  unreachable duplicate-id guard, a version variant reading its workspace from
+  the processed values, and a lost "insert after" marker from the second
+  workspace round on. See
+  [Tests](../architecture/scenario-engine.md#tests).
 
 ## Files
 
@@ -221,153 +578,119 @@ files:
 
 | Key          | Required | Type   | Default                    |
 |--------------|----------|--------|----------------------------|
-| `identifier` | yes      | string | —                          |
-| `source`     | yes      | string | —                          |
+| `identifier` | yes      | string | -                          |
+| `source`     | yes      | string | -                          |
 | `folder`     | no       | string | `/`, the storage root      |
 | `name`       | no       | string | the basename of the source |
 | `storage`    | no       | int    | the default storage        |
 
 A `folder` that does not exist is created. The file is copied into the storage
-through the storage API, which is what indexes it — a file copied into
-`fileadmin/` with `cp` exists on disk and does not exist for TYPO3, so nothing
-can reference it. An existing file of the same name is **replaced**.
+through the storage API, which is what indexes it - a file copied into
+`fileadmin/` with `cp` exists on disk and does not exist for TYPO3. An existing
+file of the same name is **replaced**.
 
-`folder`, `name` and `storage` fall back to their default when they carry a value
-of the wrong type, rather than refusing the definition. A missing source file
-*is* refused, naming both the declared path and the absolute path it resolved
-to.
+The key set is closed, like the set level and a site: a misspelled `foldr:` is
+refused with `1787256303` rather than silently putting the file in the storage
+root. What is *not* refused is a value of the wrong type - `folder`, `name` and
+`storage` fall back to their default instead, which is the older behaviour and
+is left alone. A missing source file *is* refused, naming both the declared path
+and the absolute path it resolved to.
 
-### References
-
-A record points at a seeded file per field:
-
-```yaml
-files:
-  media:
-    - placeholder
-    - identifier: portrait
-      alternative: 'A portrait placeholder'
-      description: 'Shown as the caption'
-```
-
-The short form is the bare identifier of a declared file. The long form names it
-under `identifier` and carries the fields of the `sys_file_reference` record
-itself — `alternative`, `title`, `description`, `link`, `crop`: what an editor
-fills in on a file relation. They live on the reference rather than on the file,
-which is what lets the same image carry a different alternative text in two
-places. A field the TCA of `sys_file_reference` does not know is dropped by
-DataHandler without a word.
-
-`uid_local`, `uid_foreign`, `tablenames`, `fieldname` and `pid` are written by
-the seeder and always win over a declared value, so a definition cannot detach a
-reference from the record carrying it.
-
-A field declared with an **empty list creates no reference and leaves the field
-alone**. Seeding writes; an empty declaration is not an instruction to clear a
-relation.
-
-Referencing a file the definition does not declare is refused — before anything
-is written, because the data map is built first.
+Files are written **before** the records, and the `sys_file` uid each one was
+indexed under is reported by the command. A scenario record that wants to point
+at a seeded file has to name that uid, because
+[file references are not part of this format yet](#what-is-not-in-the-format).
 
 ## Site configurations
 
 ```yaml
 sites:
   - identifier: main                    # required, becomes config/sites/<identifier>/
-    rootPage: home                      # required, the *seed* identifier of a page
+    rootPage: 1000                      # required, the uid a "pages" entity declares
     template: 'Sites/main'              # optional, default Sites/<identifier>
     base: 'https://example.com/'        # optional, overrides the template's base
 ```
 
-| Key          | Required | Type   | Default              | Notes                                                                     |
-|--------------|----------|--------|----------------------|---------------------------------------------------------------------------|
-| `identifier` | yes      | string | —                    | Matches `/^[A-Za-z0-9][A-Za-z0-9_-]*$/`, unique within the definition.    |
-| `rootPage`   | yes      | string | —                    | Has to name a record of the definition, and that record has to be a page. |
-| `template`   | no       | string | `Sites/<identifier>` | Directory, relative to the set or `EXT:`.                                 |
-| `base`       | no       | string | the template's own   | `null` leaves the template alone, which is not the same as an empty base. |
+| Key          | Required | Type   | Default              | Notes                                                                  |
+|--------------|----------|--------|----------------------|------------------------------------------------------------------------|
+| `identifier` | yes      | string | -                    | Matches `/^[A-Za-z0-9][A-Za-z0-9_-]*$/`, unique within the definition. |
+| `rootPage`   | yes      | int    | -                    | An integer >= 1: the `id` a `pages` entity of the scenario declares.   |
+| `template`   | no       | string | `Sites/<identifier>` | Directory, relative to the set or `EXT:`.                              |
+| `base`       | no       | string | the template's own   | `null` leaves the template alone, which is not an empty base.          |
 
 This list of keys is **closed** as well: a site is configuration rather than a
 record, nothing here is written verbatim, and an unknown key can only be a
 mistake.
 
-A site identifier **may** contain underscores, unlike a record identifier: it
-never reaches a DataHandler placeholder. What its pattern guards is the directory
-name below `config/sites/` — no separator, no `.` or `..`, nothing that has to be
-escaped anywhere.
+**`rootPage` is a page uid, not a name.** A scenario record has no symbolic
+identifier - the `id` an entity declares *is* its handle, and it is the uid the
+record is written with. The parser checks the shape only; that the uid is one a
+`pages` entity of this set declares is checked once the scenario is composed,
+and the import is refused with `EXIT_INVALID_DEFINITION` when it is not.
 
-`rootPage` is validated against the records of the definition at parse time,
-which is the difference between a message naming the unknown page and a site
-written with a root page id of zero much later in the run. What the template
-declares as `rootPageId` is always overwritten with the resolved uid.
+Two consequences of naming a uid:
 
-The template directory and everything else about the writing side is described on
+- a set whose scenario declares no `id` for its root page cannot declare a site,
+  because the dynamic uid is not knowable from the descriptor;
+- `--force` gives up the uid suggestions of a colliding table. When that table
+  is `pages` and the set declares sites, the import is **refused** rather than
+  forced: the root page would silently be written under a different uid than the
+  site points at.
+
+What the template directory is and what happens to it is on
 [Site configurations](../architecture/site-configuration.md).
 
 ## Imports
 
 ```yaml
 imports:
-  - { resource: Pages.yaml }
-  - { resource: 'EXT:my_extension/Configuration/Seeder/shared/Content.yaml' }
+  - { resource: Files.yaml }
+  - { resource: 'EXT:my_extension/Configuration/Seeder/shared/Sites.yaml' }
 ```
 
-`imports` is handled by `TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader`, the
-loader the core reads its own site configurations with. It resolves a resource
-relative to the file declaring it, accepts `EXT:` paths, and **merges** an
-imported list into the importing one instead of replacing it — which is what a
-set split over several files needs, and it means this extension requires nothing
-beyond `typo3/cms-core`.
+`imports` is handled by `TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader`,
+the loader the core reads its own site configurations with. It resolves a
+resource relative to the file declaring it, accepts `EXT:` paths, and **merges**
+an imported list into the importing one instead of replacing it - which means
+this extension requires nothing beyond `typo3/cms-core` for it.
+
+It applies to the **descriptor only**. An imported file carries the same keys as
+`config.yml`, so it may contribute `files:`, `sites:` and further `scenarios:`
+entries. It cannot contribute records: those live in the files `scenarios` names
+and are read outside the loader.
 
 Two deliberate deviations from how the core calls it:
 
-- **Placeholders are switched off.** A seed definition is content, not
-  configuration: `%` occurs in pairs in perfectly ordinary titles and body texts,
-  and a `%…%` fragment that happens to name a key of the definition would be
-  substituted with that key's value. Seeded content has to arrive in the database
-  as it was written, and environment variables have no business being
-  interpolated into it. Note that this differs from a **site template**, where
-  `%env(…)%` *is* meaningful and is deliberately left unresolved for the instance
-  to evaluate.
+- **Placeholders are switched off.** A `%…%` fragment that happens to name a key
+  of the descriptor would be substituted with that key's value, and a title or a
+  description is content that has to arrive as it was written. Note that this
+  differs from a **site template**, where `%env(…)%` *is* meaningful and is
+  deliberately left unresolved for the instance to evaluate.
 - **A failing import raises** instead of being logged. The loader catches its
-  exceptions per import and reports them to its logger; for a seed definition
-  that is data loss — a typo in a resource path means those pages are silently
-  not seeded and the import reports success.
+  exceptions per import and reports them to its logger; for a seed descriptor
+  that is data loss - a typo in a resource path means those files or sites are
+  silently not seeded and the import reports success.
 
-An imported file carries the same keys as the entry file. The three metadata keys
-`identifier`, `title` and `description` are the exception: they have to be
+The three metadata keys `identifier`, `title` and `description` have to be
 declared in `config.yml` itself, because discovery reads them without the
-importing loader. That is not a restriction worth regretting — the identity of a
-set is the one thing that cannot sensibly live somewhere else.
+importing loader; see
+[Discovery reads metadata](seed-sets.md#discovery-reads-metadata).
 
-## What the seeder writes by itself
+## What is not in the format
 
-| Column                                                       | On                     | Rule                                                                 |
-|--------------------------------------------------------------|------------------------|----------------------------------------------------------------------|
-| `pid`                                                        | every record           | Structure. Never taken from the definition.                          |
-| `hidden`                                                     | every record           | Defaults to `0`; a declared value wins.                              |
-| `doktype`, `l10n_parent`, `sys_language_uid`                 | `pages` records        | Default to `1`, `0`, `0`; a declared value wins.                     |
-| `uid`                                                        | records declaring one  | Suggested, and dropped again before the insert.                      |
-| `sorting`                                                    | every record           | Computed by DataHandler out of the negative-`pid` convention.        |
-| `uid_local`, `uid_foreign`, `tablenames`, `fieldname`, `pid` | `sys_file_reference`   | Structure. Always win over a declared value.                         |
-| the counter field of a file relation                         | the referencing record | Written in the second pass, which is what numbers `sorting_foreign`. |
-
-Everything else in a row comes from the definition or from the TCA of the
-installation, in that order.
-
-## Deliberate limitations
-
-| Not covered                             | Why                                                                                                                                                        |
-|-----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `sys_file_metadata`                     | An alternative text describes what an image means *in this place*, which is a property of the reference, not of the file.                                  |
-| Translations and `l10n_parent` chains   | Both fields are writable as ordinary fields; a first-class translation construct is a later feature, not a workaround.                                     |
-| Updating an existing tree               | Seeding writes. It does not reconcile an existing tree against a definition, and nothing here is idempotent.                                               |
-| Explicit MM relation construction       | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names. |
-| A `be_users` record without credentials | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                             |
-| Deleting or overwriting anything        | An import refuses a uid collision and refuses an existing site identifier. There is no mode in which it removes data.                                      |
+| Not covered                             | Why                                                                                                                                                                                                                                                      |
+|-----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| File **references**                     | The scenario format has no concept of a file: the factory emits one flat data map entry per item and cannot write a child's `NEW` id into a field of the parent. File *provisioning* through `files:` works; `sys_file_reference` rows are a later step. |
+| Inline relations                        | Expressed by uid instead. Every record of a scenario has a declared or a suggested uid, so a relation is a value like any other.                                                                                                                         |
+| Updating an existing tree               | Seeding writes. It does not reconcile an existing tree against a definition, and nothing here is idempotent.                                                                                                                                             |
+| Explicit MM relation construction       | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names.                                                                                               |
+| A `be_users` record without credentials | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                                                                                                                           |
+| Deleting or overwriting anything        | An import refuses a uid collision and refuses an existing site identifier. There is no mode in which it removes data.                                                                                                                                    |
 
 ## See also
 
-- [Seeding](../architecture/seeding.md) — why the format looks like this
-- [Seed sets and the CLI](seed-sets.md) — discovery, ordering and the commands
+- [The scenario engine](../architecture/scenario-engine.md) - why this format, and what the port changed
+- [Seeding](../architecture/seeding.md) - what happens between the composition and the database
+- [Seed sets and the CLI](seed-sets.md) - discovery, ordering and the commands
 - [Site configurations](../architecture/site-configuration.md)
 - [Quality gates](quality-gates.md)
