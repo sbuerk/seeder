@@ -1,9 +1,8 @@
-# What "export-ignore" leaves out is what ships. It decides the composer dist
-# Packagist builds *and* — since the publish workflow hands "git archive" output
-# to "tailor create-artefact --path" instead of pointing it at the checkout —
-# the zip attached to the GitHub release and uploaded to the TER. Tailor has its
-# own hardcoded exclusion list and no notion of this file, so keeping the two
-# artefacts in agreement means the export has to be the thing tailor packs.
+# What "export-ignore" leaves out is what ships in the composer dist Packagist
+# builds. It does not decide the TER artefact: "tailor create-artefact" walks
+# the checkout and filters it against a hardcoded list of its own, with no
+# notion of this file, and what it produces is repacked by the TER on upload.
+# The two therefore agree by review rather than by construction.
 #
 # The list is therefore only about *tracked* entries. ".Build", ".cache", "var",
 # ".agent", ".idea", ".envrc" and "composer.lock" are git-ignored and never

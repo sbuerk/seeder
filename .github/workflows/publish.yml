@@ -95,39 +95,9 @@ jobs:
           composer global require typo3/tailor:^2.0 --prefer-dist --no-progress
           echo "$(composer --no-interaction config --global home)/vendor/bin" >> "$GITHUB_PATH"
 
-      - name: Export the release tree
-        # "tailor create-artefact" does not read ".gitattributes". It walks a
-        # directory and filters it against a list of its own — ".git", "vendor",
-        # "tests" and a fixed set of tool configs — which knows nothing about
-        # "docs/", "AGENTS.md" or "CONTRIBUTING.md". Pointed at the checkout it
-        # would put a quarter of a megabyte of internal development
-        # documentation into the published zip. "CLAUDE.md" and "GEMINI.md" are
-        # symlinks to "AGENTS.md" on top of that, and tailor names every entry
-        # after the resolved path — so all three are read and all three land on
-        # the single entry "AGENTS.md", the last write winning. Not a duplicate,
-        # then, but three files walked to ship one that has no business in a
-        # release.
-        #
-        # Its only lever is a replacement exclusion list, which would mean
-        # copying tailor's sixty-odd defaults into this repository and watching
-        # them drift. Exporting with "git archive" applies "export-ignore"
-        # instead — the same filter Packagist uses for the composer dist — and
-        # handing that export to tailor with "--path" makes the two artefacts
-        # the same set of files, decided in one place. Tailor's own list still
-        # runs on top of the export; it finds nothing left to remove.
-        run: |
-          set -euo pipefail
-          rm -rf .release-tree
-          mkdir -p .release-tree
-          git archive --format=tar HEAD | tar -x -C .release-tree
-          test -f .release-tree/composer.json
-          test -f .release-tree/ext_emconf.php
-          echo "Files in the release tree:"
-          find .release-tree -type f | sort
-
       # Note that step will fail when the tag does not match the `ext_emconf.php` version.
       - name: Create local TER package upload artifact
-        run: tailor create-artefact --path=.release-tree "$version"
+        run: tailor create-artefact "$version"
 
       # Note that when release already exists for tag, only files will be uploaded and lets this acting as a
       # fallback to ensure that a real GitHub release is created for the tag along with extension artifacts.
