@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Command\ListSeedsCommand;
-use SBUERK\Seeder\Seeding\Exception\SeedSetNotFoundException;
-use SBUERK\Seeder\Seeding\SeedSetRepository;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Command\ListSeedsCommand;
+use SBUERK\DataFactory\Seeding\Exception\SeedSetNotFoundException;
+use SBUERK\DataFactory\Seeding\SeedSetRepository;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -16,7 +16,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  * An installation in which no extension provides a seed set.
  *
  * This is the state of every installation that has just added this extension,
- * and it is **not** an error: discovery returns nothing, and `seeder:list` says
+ * and it is **not** an error: discovery returns nothing, and `data-factory:list` says
  * so and succeeds. A non-zero exit code here would make the extension fail
  * every pipeline that runs the command to see what is available.
  *
@@ -29,10 +29,10 @@ final class InstallationWithoutSeedSetsTest extends AbstractFunctionalTestCase
 {
     /**
      * The extension itself ships no seed set, and "tests/example-fixture" has
-     * no "Configuration/Seeder/" directory at all.
+     * no "Configuration/DataFactory/" directory at all.
      */
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/example-fixture',
     ];
 

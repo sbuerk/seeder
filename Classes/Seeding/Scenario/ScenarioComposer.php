@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Scenario;
+namespace SBUERK\DataFactory\Seeding\Scenario;
 
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedDefinitionNotFoundException;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use TYPO3\CMS\Core\Utility\ArrayUtility;

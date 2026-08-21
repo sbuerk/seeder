@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileReferenceSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeedResult;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -20,7 +20,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * What `languageVariants` puts in the database.
  *
  * The data map a translation produces is pinned by
- * {@see \SBUERK\Seeder\Tests\Unit\Seeding\Scenario\DataHandlerFactoryLanguageVariantTest},
+ * {@see \SBUERK\DataFactory\Tests\Unit\Seeding\Scenario\DataHandlerFactoryLanguageVariantTest},
  * key by key and without a database. This test is about the other half: what
  * survives `DataHandler`. The two are not the same thing, and the difference is
  * the reason this file exists rather than a second unit test - a translation

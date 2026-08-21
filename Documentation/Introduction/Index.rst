@@ -9,7 +9,7 @@ Introduction
 What does it do?
 ================
 
-The :guilabel:`Seeder` extension rebuilds the content of a TYPO3 installation
+The :guilabel:`Data Factory` extension rebuilds the content of a TYPO3 installation
 from YAML files that ship inside extensions: pages, content elements, records
 of any table, the relations between them, files, the references attaching those
 files to records, and site configurations.
@@ -26,20 +26,20 @@ Two console commands are all there is to it:
 
     *   -   Command
         -   Purpose
-    *   -   :bash:`seeder:list`
+    *   -   :bash:`data-factory:list`
         -   List every seed set the active extensions provide.
-    *   -   :bash:`seeder:import <identifier>`
+    *   -   :bash:`data-factory:import <identifier>`
         -   Import one seed set into this installation.
 
 What a seed set is
 ==================
 
-A **seed set** is a directory :file:`Configuration/Seeder/<name>/` inside any
+A **seed set** is a directory :file:`Configuration/DataFactory/<name>/` inside any
 active extension, with a :file:`config.yml` as its entry file. The descriptor
 says what the set is and which files it is written from:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     identifier: demo
     title: 'Demo page tree'
@@ -56,7 +56,7 @@ format of :php:`typo3/testing-framework` - the format the TYPO3 Core writes its
 own functional test fixtures in:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/Scenario.yaml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/Scenario.yaml
 
     entitySettings:
       '*':
@@ -195,4 +195,4 @@ Contributing
 
 Contributions are welcome. The development setup, the quality gates and the
 commit message rules are described in the :file:`CONTRIBUTING.md` file of the
-`source repository <https://github.com/sbuerk/seeder>`__.
+`source repository <https://github.com/sbuerk/data-factory>`__.

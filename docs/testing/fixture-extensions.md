@@ -7,17 +7,17 @@ service overrides or a plugin to render.
 
 This repository ships six:
 
-| Fixture            | Extension key            | Provides                                                                                                                                          |
-|--------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `example-fixture`  | `tests_example_fixture`  | The plugin, model and dummy service the mechanism itself is proven with.                                                                          |
-| `seeds-demo`       | `tests_seeds_demo`       | Two seed sets and four site configuration templates, plus a directory below `Configuration/Seeder/` that is not a set.                            |
-| `seeds-collision`  | `tests_seeds_collision`  | A seed set claiming the identifier of `seeds-demo`, so a collision can be tested.                                                                 |
-| `seeds-import`     | `tests_seeds_import`     | The set `seeder:import` is driven with — declared uids, a file, a reference, a site, an `imports` — and one that is discoverable and unparseable. |
-| `inline-relations` | `tests_inline_relations` | A content element with an inline relation to an item table, which carries a file field and an inline relation to a link table of its own.         |
-| `file-fields`      | `tests_file_fields`      | A content element with a `type => 'file'` column and a CType of its own.                                                                          |
+| Fixture            | Extension key            | Provides                                                                                                                                                |
+|--------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `example-fixture`  | `tests_example_fixture`  | The plugin, model and dummy service the mechanism itself is proven with.                                                                                |
+| `seeds-demo`       | `tests_seeds_demo`       | Two seed sets and four site configuration templates, plus a directory below `Configuration/DataFactory/` that is not a set.                             |
+| `seeds-collision`  | `tests_seeds_collision`  | A seed set claiming the identifier of `seeds-demo`, so a collision can be tested.                                                                       |
+| `seeds-import`     | `tests_seeds_import`     | The set `data-factory:import` is driven with — declared uids, a file, a reference, a site, an `imports` — and one that is discoverable and unparseable. |
+| `inline-relations` | `tests_inline_relations` | A content element with an inline relation to an item table, which carries a file field and an inline relation to a link table of its own.               |
+| `file-fields`      | `tests_file_fields`      | A content element with a `type => 'file'` column and a CType of its own.                                                                                |
 
 A fixture providing seed data needs nothing but a `composer.json` and its
-`Configuration/Seeder/<name>/config.yml` — no `Classes/`, no autoload section,
+`Configuration/DataFactory/<name>/config.yml` — no `Classes/`, no autoload section,
 no `ext_localconf.php`. The plugin adopts what is there and says so for what is
 not. `file-fields` and `inline-relations` are the same thing for TCA: a
 `composer.json` and `Configuration/TCA/`, with no PHP class in them at all.
@@ -300,7 +300,7 @@ the class was found and instantiated, not what it computes.
 
    ```php
    protected array $testExtensionsToLoad = [
-       'sbuerk/seeder',
+       'sbuerk/data-factory',
        'tests/example-fixture',
    ];
    ```

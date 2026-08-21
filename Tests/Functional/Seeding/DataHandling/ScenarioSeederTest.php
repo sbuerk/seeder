@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileReferenceSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeedResult;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
@@ -230,7 +230,7 @@ final class ScenarioSeederTest extends AbstractFunctionalTestCase
         $definition = new SeedDefinition(
             identifier: 'scenario-seeding',
             title: 'A scenario named by an extension path',
-            scenarios: ['EXT:seeder/Tests/Functional/Fixtures/Scenarios/PageTreeScenario.yaml'],
+            scenarios: ['EXT:data_factory/Tests/Functional/Fixtures/Scenarios/PageTreeScenario.yaml'],
         );
 
         $result = $this->subject()->seed(

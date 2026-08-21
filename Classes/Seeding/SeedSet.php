@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding;
+namespace SBUERK\DataFactory\Seeding;
 
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * it, and where it lives.
  *
  * This is what discovery returns, and it is deliberately *not* a parsed
- * definition. It carries the three metadata keys `seeder:list` shows and the
+ * definition. It carries the three metadata keys `data-factory:list` shows and the
  * two paths every later step needs - and nothing that would require reading
  * the page tree, the files or the site configurations of the set. See
  * {@see SeedSetRepository} for why that separation exists.
@@ -28,7 +28,7 @@ final readonly class SeedSet
      *        across all active packages, and never derived from the directory
      *        holding the set - a derived identifier turns a collision between
      *        two packages into a silent one.
-     * @param string $title Shown by `seeder:list`.
+     * @param string $title Shown by `data-factory:list`.
      * @param string $description Optional long text, empty when the set
      *        declares none.
      * @param string $packageName The composer name of the providing package,
@@ -36,7 +36,7 @@ final readonly class SeedSet
      *        composer manifest to read it from, which the extension key never
      *        is.
      * @param string $extensionKey The extension key of the providing package.
-     *        It is what `seeder:list` names as the provider, because it is what
+     *        It is what `data-factory:list` names as the provider, because it is what
      *        an integrator sees in the extension list.
      * @param string $basePath Absolute path of the directory holding the set,
      *        without a trailing slash. Every relative resource path of the set

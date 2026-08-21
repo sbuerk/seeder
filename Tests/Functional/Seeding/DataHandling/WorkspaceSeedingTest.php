@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileReferenceSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeedResult;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -25,7 +25,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * in `$coreExtensionsToLoad` the table `sys_workspace` does not exist in the
  * test instance, a record carrying a `t3ver_wsid` has nothing to point at, and
  * the whole workspace half of the engine cannot be written at all - which is
- * why {@see \SBUERK\Seeder\Tests\Functional\Seeding\Scenario\DataHandlerWriterTest}
+ * why {@see \SBUERK\DataFactory\Tests\Functional\Seeding\Scenario\DataHandlerWriterTest}
  * says in its own docblock that it does not cover it.
  *
  * The workspaces themselves are records of the scenario, exactly as TYPO3

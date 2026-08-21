@@ -25,14 +25,14 @@ is rebuilt:
 
 ..  code-block:: bash
 
-    composer require --dev sbuerk/seeder
+    composer require --dev sbuerk/data-factory
 
 Require it normally when a project provisions itself from a seed set — the
 commands then exist in the deployed installation as well:
 
 ..  code-block:: bash
 
-    composer require sbuerk/seeder
+    composer require sbuerk/data-factory
 
 ..  note::
 
@@ -42,7 +42,7 @@ commands then exist in the deployed installation as well:
 
     ..  code-block:: bash
 
-        composer require --dev sbuerk/seeder:^2.0@dev
+        composer require --dev sbuerk/data-factory:^2.0@dev
 
     This additionally requires ``minimum-stability`` to be set to ``dev``
     together with ``prefer-stable`` set to ``true`` in the root
@@ -54,13 +54,13 @@ Classic mode
 #.  **Get it from the Extension Manager**:
     Switch to the module :guilabel:`Admin Tools > Extensions`, switch to
     :guilabel:`Get Extensions` and search for the extension key
-    *seeder*, then import the extension from the repository.
+    *data_factory*, then import the extension from the repository.
 
 #.  **Get it from typo3.org**:
     You can always get the current version from `TER`_ by downloading the zip
     version. Upload the file afterwards in the Extension Manager.
 
-..  _TER: https://extensions.typo3.org/extension/seeder
+..  _TER: https://extensions.typo3.org/extension/data_factory
 
 After the installation
 ======================
@@ -72,7 +72,7 @@ is run.
 
 ..  code-block:: bash
 
-    vendor/bin/typo3 seeder:list
+    vendor/bin/typo3 data-factory:list
 
 An installation whose extensions provide no seed set answers with
 :bash:`No active extension provides a seed set.` and exits successfully — that is
@@ -82,7 +82,7 @@ the normal state of most installations. Writing a seed set is described in
 Requirements for an import
 ==========================
 
-Two conditions have to be met for :bash:`seeder:import`, and both are refusals
+Two conditions have to be met for :bash:`data-factory:import`, and both are refusals
 with an explanation rather than silent failures:
 
 *   **It runs on the command line, as an administrator.** The TYPO3 console

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Command;
+namespace SBUERK\DataFactory\Command;
 
-use SBUERK\Seeder\Seeding\Exception\SeedingException;
-use SBUERK\Seeder\Seeding\SeedSetRepository;
+use SBUERK\DataFactory\Seeding\Exception\SeedingException;
+use SBUERK\DataFactory\Seeding\SeedSetRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,7 +25,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * @internal Part of the seeding implementation, not public API.
  */
 #[AsCommand(
-    name: 'seeder:list',
+    name: 'data-factory:list',
     description: 'Lists the seed sets provided by the active extensions.',
 )]
 final class ListSeedsCommand extends Command
@@ -40,7 +40,7 @@ final class ListSeedsCommand extends Command
     {
         $this->setHelp(
             'Lists identifier, title and providing extension of every seed set found in'
-            . ' "Configuration/Seeder/*/config.yml" of an active extension. Increase the'
+            . ' "Configuration/DataFactory/*/config.yml" of an active extension. Increase the'
             . ' verbosity with -v to add the directory a set lives in.' . PHP_EOL . PHP_EOL
             . 'An identifier provided by more than one extension is reported with all of'
             . ' its providers, and makes the command exit non-zero: the sets cannot be'

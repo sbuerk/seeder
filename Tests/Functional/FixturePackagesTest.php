@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional;
+namespace SBUERK\DataFactory\Tests\Functional;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -28,7 +28,7 @@ final class FixturePackagesTest extends AbstractFunctionalTestCase
      * the parent class, because redeclaring the property replaces it.
      */
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/example-fixture',
     ];
 

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Exception\DuplicateSeedSetIdentifierException;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedSetNotFoundException;
-use SBUERK\Seeder\Seeding\SeedSet;
-use SBUERK\Seeder\Seeding\SeedSetRepository;
+use SBUERK\DataFactory\Seeding\Exception\DuplicateSeedSetIdentifierException;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedSetNotFoundException;
+use SBUERK\DataFactory\Seeding\SeedSet;
+use SBUERK\DataFactory\Seeding\SeedSetRepository;
 use TYPO3\CMS\Core\Package\PackageInterface;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
@@ -23,7 +23,7 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  * key, and a mock provides both.
  *
  * That the repository is handed the *active* packages of a real installation,
- * that a real extension shipping a real set is found, and that "seeder:list"
+ * that a real extension shipping a real set is found, and that "data-factory:list"
  * prints what it found is a different claim, and it is covered by the
  * functional tests in "Tests/Functional/Seeding/" and "Tests/Functional/Command/".
  */
@@ -79,9 +79,9 @@ final class SeedSetRepositoryTest extends UnitTestCase
     }
 
     #[Test]
-    public function aPackageWithoutASeederDirectoryIsSkipped(): void
+    public function aPackageWithoutADataFactoryDirectoryIsSkipped(): void
     {
-        // "ProviderNone" has a "Configuration/" but no "Configuration/Seeder/",
+        // "ProviderNone" has a "Configuration/" but no "Configuration/DataFactory/",
         // which is the normal state of nearly every package of an installation.
         $subject = $this->subjectFor('ProviderNone', 'ProviderOne');
 
@@ -97,7 +97,7 @@ final class SeedSetRepositoryTest extends UnitTestCase
     #[Test]
     public function aDirectoryWithoutAConfigFileIsNotASeedSet(): void
     {
-        // "ProviderOne" holds a third directory below "Configuration/Seeder/"
+        // "ProviderOne" holds a third directory below "Configuration/DataFactory/"
         // which has no "config.yml" in it.
         $subject = $this->subjectFor('ProviderOne');
 
@@ -116,8 +116,8 @@ final class SeedSetRepositoryTest extends UnitTestCase
         $this->assertSame('Carries a description, the set next to it does not.', $seedSet->description);
         $this->assertSame('tests/provider-one', $seedSet->packageName);
         $this->assertSame('provider_one', $seedSet->extensionKey);
-        $this->assertSame($this->packagePath('ProviderOne') . 'Configuration/Seeder/bbb', $seedSet->basePath);
-        $this->assertSame($this->packagePath('ProviderOne') . 'Configuration/Seeder/bbb/config.yml', $seedSet->configFile);
+        $this->assertSame($this->packagePath('ProviderOne') . 'Configuration/DataFactory/bbb', $seedSet->basePath);
+        $this->assertSame($this->packagePath('ProviderOne') . 'Configuration/DataFactory/bbb/config.yml', $seedSet->configFile);
     }
 
     #[Test]

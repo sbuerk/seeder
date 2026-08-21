@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Parser;
+namespace SBUERK\DataFactory\Seeding\Parser;
 
-use SBUERK\Seeder\Tests\Unit\Seeding\Parser\SeedDefinitionParserTest;
+use SBUERK\DataFactory\Tests\Unit\Seeding\Parser\SeedDefinitionParserTest;
 
 /**
  * Shadows `is_readable()` for {@see SeedDefinitionParser} - and for one path

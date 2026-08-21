@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Scenario;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Scenario;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedDefinitionNotFoundException;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;

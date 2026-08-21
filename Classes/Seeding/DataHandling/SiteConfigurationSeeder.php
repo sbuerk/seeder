@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Parser\ThrowOnErrorLogger;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Definition\SeedSiteConfiguration;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Parser\ThrowOnErrorLogger;
 use TYPO3\CMS\Core\Configuration\Exception\SiteConfigurationWriteException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlFileLoadingException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlParseException;
@@ -113,7 +113,7 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  * `Environment::getPublicPath()`. A template therefore has to sit inside the
  * project, which every package of an installation does, and which is the same
  * constraint the seed definition itself is already read under
- * ({@see \SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser::parseFile()}).
+ * ({@see \SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser::parseFile()}).
  *
  * @internal Part of the seeding implementation, not public API.
  */
