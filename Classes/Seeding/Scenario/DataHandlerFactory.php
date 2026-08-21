@@ -285,9 +285,17 @@ final class DataHandlerFactory
             $nodeId
         );
         $tableName = $entityConfiguration->getTableName();
-        $this->setInDataMap($tableName, $ancestorId, $values, (int)$values['workspace']);
+        // Deliberate divergence from `typo3/testing-framework` 9.6.1, which
+        // reads `$values['workspace']` here - the *processed* values, after
+        // `columnNames` has been applied. An entity mapping `workspace` to
+        // another column therefore leaves no `workspace` key behind, the
+        // expression warns about an undefined key and evaluates to workspace 0,
+        // and the version variant is written over the live record it was meant
+        // to version. The declared value is what every other call site uses.
+        $workspaceId = (int)$itemSettings['version']['workspace'];
+        $this->setInDataMap($tableName, $ancestorId, $values, $workspaceId);
         if (isset($itemSettings['actions'])) {
-            $this->setInCommandMap($tableName, $ancestorId, $nodeId, $itemSettings['actions'], (int)$values['workspace']);
+            $this->setInCommandMap($tableName, $ancestorId, $nodeId, $itemSettings['actions'], $workspaceId);
         }
     }
 
@@ -346,6 +354,15 @@ final class DataHandlerFactory
         $incrementValue = !empty($itemSettings['version']) ? 2 : 1;
         if ($staticId > 0) {
             $suggestedId = $staticId;
+            // Deliberate divergence from `typo3/testing-framework` 9.6.1, which
+            // declares `$staticIdsPerEntity`, reads it in `hasStaticId()` and
+            // never writes it, so the guard above is always false and its
+            // exception 1533734370 cannot be raised. Registering the id here is
+            // what the property is for, and it moves the refusal of a duplicate
+            // `id:` from `addSuggestedId()` - which reports it as the table and
+            // uid it happened to resolve to - to the entity and the id the set
+            // author actually wrote down.
+            $this->staticIdsPerEntity[$entityConfiguration->getName()][] = $staticId;
             $this->incrementDynamicId($entityConfiguration, $incrementValue - 1);
         } else {
             $suggestedId = $this->incrementDynamicId($entityConfiguration, $incrementValue);
@@ -513,7 +530,20 @@ final class DataHandlerFactory
             } elseif ($action === 'delete') {
                 $this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['delete'] = true;
             } elseif ($action === 'discard' && $workspaceId > 0) {
-                $this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['clearWSID'] = true;
+                // Deliberate divergence from `typo3/testing-framework` 9.6.1,
+                // which emits `clearWSID` as the *command name*.
+                // `DataHandler::process_cmdmap()` has no case for it, in v13 or
+                // in v14, so the command is dropped with no branch and no log
+                // entry and the action does nothing at all. `clearWSID` is an
+                // action of the `version` command, which is how
+                // `TYPO3\TestingFramework\Core\Functional\Framework\DataHandling\ActionService`
+                // itself discards a record.
+                //
+                // @todo v14 added a `discard` command that says what it does.
+                //       Emit that one instead once TYPO3 v13 support is
+                //       dropped - core carries a `@todo` of its own to remove
+                //       the `clearWSID` action once nothing uses it any more.
+                $this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['version'] = ['action' => 'clearWSID'];
             }
         }
     }
@@ -531,9 +561,10 @@ final class DataHandlerFactory
         }
         return array_filter(
             $this->dataMapPerWorkspace[$workspaceId][$tableName] ?? [],
-            function (array $item) use ($pageId, $workspaceId) {
+            function (array $item) use ($pageId, $workspaceId, $tableName) {
                 $itemPageId = $this->resolveDataMapPageId(
                     $workspaceId,
+                    $tableName,
                     $item['pid'] ?? null
                 );
                 return $itemPageId === $pageId;
@@ -541,7 +572,18 @@ final class DataHandlerFactory
         );
     }
 
-    private function resolveDataMapPageId(int $workspaceId, int|string|null $pageId = null): int|string|null
+    /**
+     * Deliberate divergence from `typo3/testing-framework` 9.6.1, which looks
+     * the back reference up in `dataMapPerWorkspace[$workspaceId]['pages']`
+     * whatever table it is resolving. A `-NEW…` pointer is written by
+     * `setInDataMap()` against the data map of the record's own table, so on
+     * every table but `pages` the lookup misses, the pointer resolves to
+     * `null`, and the record drops out of `filterDataMapByPageId()`. The
+     * filtered list therefore never grows past its first entry and from the
+     * third record of a page onwards every one of them is chained behind the
+     * first, which reverses the declared order in the backend.
+     */
+    private function resolveDataMapPageId(int $workspaceId, string $tableName, int|string|null $pageId = null): int|string|null
     {
         $normalizePageId = (string)$pageId;
         if ($pageId === null || $normalizePageId[0] !== '-') {
@@ -549,8 +591,8 @@ final class DataHandlerFactory
         }
 
         $regularPageId = substr($normalizePageId, 1);
-        $resolvedPageId = $this->dataMapPerWorkspace[$workspaceId]['pages'][$regularPageId]['pid'] ?? null;
-        return $this->resolveDataMapPageId($workspaceId, $resolvedPageId);
+        $resolvedPageId = $this->dataMapPerWorkspace[$workspaceId][$tableName][$regularPageId]['pid'] ?? null;
+        return $this->resolveDataMapPageId($workspaceId, $tableName, $resolvedPageId);
     }
 
     /**

@@ -143,8 +143,8 @@ with a `TypeError` out of a private method. Naming the scenario file and the
 entity is worth the walk.
 
 The `LogicException` codes the factory itself raises - `1533734368`,
-`1533734369`, `1534872399`, `1534872400`, `1568146788`, `1574365935`,
-`1574365936` - are **not** wrapped. They are upstream's codes and stay traceable
+`1533734369`, `1533734370`, `1534872399`, `1534872400`, `1568146788`,
+`1574365935`, `1574365936` - are **not** wrapped. They are upstream's codes and stay traceable
 to the class that raised them; the command turns them into
 `EXIT_INVALID_DEFINITION` all the same.
 
@@ -437,9 +437,11 @@ other item:
   its `version.workspace` names, so `DataHandler` sees an overlay of that record
   rather than a new one.
 
-The second point is what makes a `columnNames` remap of `workspace` dangerous,
-and that is one of the pinned upstream defects - see
-[What the engine does that a scenario cannot](#what-the-engine-does-that-a-scenario-cannot).
+A `columnNames` remap of `workspace` changes the column the value is written
+to, and nothing else: the workspace a variant belongs to is read from the
+declaration. `typo3/testing-framework` reads it from the processed values and
+loses it in exactly that case - see
+[A workspace read from the values instead of the declaration](../architecture/scenario-engine.md#a-workspace-read-from-the-values-instead-of-the-declaration).
 
 #### `actions`
 
@@ -447,27 +449,24 @@ Actions are not values; they become the DataHandler **command map**, which
 `DataHandlerWriter` processes after every data map of every workspace. An action
 may therefore target a record the same scenario creates.
 
-| Declaration                                      | Command                                             |
-|--------------------------------------------------|-----------------------------------------------------|
-| `{action: move, type: toPage, target: 110}`      | `move` to page `110`                                |
-| `{action: move, type: toTop}`                    | `move` to the enclosing node, at the top            |
-| `{action: move, type: afterRecord, target: 300}` | `move` to `-300`, directly after that record        |
-| `{action: delete}`                               | `delete`                                            |
-| `{action: discard}`                              | `clearWSID`, **only** in a workspace greater than 0 |
+| Declaration                                      | Command                                            |
+|--------------------------------------------------|----------------------------------------------------|
+| `{action: move, type: toPage, target: 110}`      | `move` to page `110`                               |
+| `{action: move, type: toTop}`                    | `move` to the enclosing node, at the top           |
+| `{action: move, type: afterRecord, target: 300}` | `move` to `-300`, directly after that record       |
+| `{action: delete}`                               | `delete`                                           |
+| `{action: discard}`                              | `version`/`clearWSID`, **only** in a workspace > 0 |
 
 `toTop` needs an enclosing node and does nothing on a top level item; `toPage`
 and `afterRecord` need a `target`. An action that matches none of the rows is
 dropped without a word - there is no unknown-action error in this format.
 
-**`discard` has no effect on TYPO3 v13 or v14.** `clearWSID` is a *command
-name* there, and `DataHandler::process_cmdmap()` switches over the command name
-and has no case for it - the spelling core still understands is
-`['version' => ['action' => 'clearWSID']]`, forwarded to `discard()` under a
-`@todo` naming the testing framework as its last caller. An unknown command
-falls through the switch with no branch and no log entry, so the version
-survives and the import reports success. Pinned by `WorkspaceSeedingTest`;
-repairing it means changing `DataHandlerFactory::setInCommandMap()`, which the
-conformance test holds to the letter.
+`discard` deletes the workspace version outright rather than soft deleting it,
+and leaves the live record alone. It is one of the places this extension
+diverges from `typo3/testing-framework`, which emits `clearWSID` as the
+*command name* - a spelling `DataHandler::process_cmdmap()` has no case for in
+v13 or in v14, so upstream's `discard` does nothing at all and reports success.
+See [An action DataHandler no longer knows](../architecture/scenario-engine.md#an-action-datahandler-no-longer-knows).
 
 `delete` on a record the same scenario just wrote is not pointless: it is how a
 scenario produces a deleted row to test against, and how a workspace overlay
@@ -521,6 +520,11 @@ A duplicate suggestion is caught while the scenario is composed, before anything
 is written, and the message names the `<table>:<uid>` identifier. Why that check
 is the one that fires rather than a duplicate primary key at insert time is a
 consequence of composing everything into one factory; see below.
+
+**Declaring the same `id` twice on one entity** is caught one step earlier, by
+`1533734370`, whose message names the id rather than the table it resolved to.
+`typo3/testing-framework` never reaches that guard - it declares the registry it
+reads and never writes it - so upstream reports this case as `1568146788` too.
 
 ### `hidden` is not defaulted for you
 
@@ -603,14 +607,16 @@ that matters.
 Two properties of the engine reach through the format and are documented with
 the engine rather than here, because they are properties of the ported code:
 
-- **Sibling ordering only really works for `pages`.** The back references that
-  keep declaration order are resolved for that table name only, so three content
-  elements on one page come out in the order c1, c3, c2. See
-  [Sibling ordering only really works for pages](../architecture/scenario-engine.md#sibling-ordering-only-really-works-for-pages).
-- **Three upstream defects are carried unchanged and pinned by tests** - an
-  unreachable duplicate-id guard, a version variant reading its workspace from
-  the processed values, and a lost "insert after" marker from the second
-  workspace round on. See
+- **A scenario file behaves the same here and in a TYPO3 Core functional test,
+  with seven stated exceptions.** All seven are defects of
+  `typo3/testing-framework` that are fixed here - among them the sibling
+  ordering of every table other than `pages`, and `{action: 'discard'}`, which
+  upstream drops without a word. See
+  [The deliberate divergences](../architecture/scenario-engine.md#the-deliberate-divergences).
+- **Two behaviours are pinned rather than fixed**, because neither belongs to
+  the engine: a translation of a translation reaches the database with the
+  original as its `l10n_source`, and a translated page is positioned by
+  `nodeColumnName` rather than by `parentColumnName`. See
   [Tests](../architecture/scenario-engine.md#tests).
 
 ## Files

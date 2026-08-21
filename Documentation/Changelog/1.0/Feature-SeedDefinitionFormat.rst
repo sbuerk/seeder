@@ -96,9 +96,8 @@ Properties of the format:
     no support in this extension to be seedable.
 *   :yaml:`children:` nests further records of the same entity through the
     parent column, and a nested :yaml:`entities:` block puts records of other
-    entities onto a node. Pages come out in the order they are declared; from
-    the third record of any other table on one page they do not, which is
-    behaviour of the scenario engine and is documented with the format.
+    entities onto a node. Records come out in the order they are declared,
+    whatever table they belong to.
 *   :yaml:`languageVariants:` is a first-class translation construct: the
     columns named by :yaml:`languageColumnNames` are filled with the uids of
     the ancestors of the variant. A translation of a translation is built with
@@ -108,10 +107,9 @@ Properties of the format:
 *   :yaml:`versionVariants:` writes a workspace version of a record, and
     :yaml:`version:` in place of :yaml:`self:` writes a record that only exists
     in a workspace.
-*   :yaml:`actions:` becomes a :php:`DataHandler` command - :yaml:`move` and
-    :yaml:`delete` - run after every record exists, so an action can name a
-    record the same set creates. The third action the format declares,
-    :yaml:`discard`, is accepted and has no effect on TYPO3 v13 and v14.
+*   :yaml:`actions:` becomes a :php:`DataHandler` command - :yaml:`move`,
+    :yaml:`delete` and :yaml:`discard` - run after every record exists, so an
+    action can name a record the same set creates.
 *   **Every record has a uid before it is written**: the declared :yaml:`id`,
     or a dynamic one from ``10000`` upwards. Every one of them is checked
     against the installation up front, and an import that would collide is

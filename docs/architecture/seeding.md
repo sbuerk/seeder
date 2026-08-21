@@ -106,11 +106,13 @@ the children of a page are a mix of sub pages, content elements and records of
 other tables - pointing a content element at the page before it would place it
 somewhere else entirely.
 
-**The back references are only resolved for `pages`.** That is upstream
-behaviour, it is carried unchanged, and it is the single most consequential
-property of the engine for anyone reading a seeded site: content elements on one
-page come out in the order c1, c3, c2. It is pinned by a test and described in
-[Sibling ordering only really works for pages](scenario-engine.md#sibling-ordering-only-really-works-for-pages).
+**A back reference is resolved through the data map of the record's own
+table.** `typo3/testing-framework` hard-codes `pages` there, which made every
+other table lose its declared order from the third record of a page onwards -
+content elements declared 1, 2, 3 came out as 1, 3, 2. That is one of the
+divergences of this port, and it is the single most consequential property of
+the engine for anyone reading a seeded site. See
+[A back reference resolved through the wrong table](scenario-engine.md#a-back-reference-resolved-through-the-wrong-table).
 
 A **language variant of a node entity** is given the same convention - a `pid`
 of `-<identifier of the original>` - so a translated page sits next to its
@@ -202,7 +204,7 @@ constructor makes the instance and keeps it private. The second reason is
 `isImporting`, which has to be set before the first `start()`. What the named
 constructor adds on top - carrying `uc['copyLevels']` into
 `DataHandler::$copyTree` - applies to a `copy` command, and the command map a
-scenario produces knows `move`, `delete` and `clearWSID` only.
+scenario produces knows `move`, `delete` and `version` only.
 
 A record of a later workspace round whose key was already substituted has no
 entry in `substNEWwithIDs`: it updated an existing row rather than inserting
@@ -416,8 +418,9 @@ Three properties of that layout are worth naming because they are easy to erode:
   which seeded *file* hangs on which record, which is a statement about the set
   and not a record of a scenario.
 - **`Scenario/` is a boundary.** Three of its four classes are upstream's and
-  are held to what upstream does by a conformance test; anything this extension
-  invents belongs beside them, not inside them. `ScenarioComposer` is on the
+  are held to what upstream does by a conformance test, minus a written list of
+  divergences that fix upstream defects; anything this extension *invents*
+  belongs beside them, not inside them. `ScenarioComposer` is on the
   right side of that line: it composes and transforms *input*, and hands a
   finished settings array to an unmodified factory.
 - **Discovery does not parse.** `SeedSetRepository` reads three keys with

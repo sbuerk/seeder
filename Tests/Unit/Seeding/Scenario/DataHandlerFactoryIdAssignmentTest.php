@@ -18,15 +18,16 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  * scenario file, and a wrong uid surfaces only as a foreign key pointing at
  * the wrong row, so the arithmetic is pinned here rather than trusted.
  *
- * One behaviour pinned below is a defect that is deliberately kept:
- * {@see DataHandlerFactory} declares `$staticIdsPerEntity`, reads it in
- * `hasStaticId()` and never writes it, so that guard is always false and its
- * exception 1533734370 cannot be reached — in this port and in
- * `typo3/testing-framework` 9.6.1 alike. Duplicate ids are caught one step
- * later by `addSuggestedId()` as 1568146788 instead. These tests describe what
- * the code does today, not what the dead branch suggests it should do. Fixing
- * the guard is a production change and would rightly turn the two tests naming
- * it red; do not "repair" them to match the dead code.
+ * Two guards refuse a duplicate, and which one speaks decides how readable the
+ * message is. `hasStaticId()` knows the entity and the id that was written
+ * down; `addSuggestedId()` knows only the table and the uid the declaration
+ * resolved to, and it also fires for a collision nobody declared — a static id
+ * the dynamic counter walks into. `typo3/testing-framework` 9.6.1 declares
+ * `$staticIdsPerEntity`, reads it in `hasStaticId()` and never writes it, so
+ * upstream only ever reaches the second one and its exception 1533734370 is
+ * dead code. This port registers the id, which is the fourth divergence listed
+ * on {@see UpstreamConformanceTest}; the tests below say which guard is
+ * expected to fire for which collision.
  */
 final class DataHandlerFactoryIdAssignmentTest extends UnitTestCase
 {
@@ -164,23 +165,49 @@ final class DataHandlerFactoryIdAssignmentTest extends UnitTestCase
     }
 
     #[Test]
-    public function theStaticIdRegistryIsNeverWrittenSoItsGuardIsUnreachable(): void
+    public function everyDeclaredIdIsRecordedUnderTheEntityThatDeclaredIt(): void
     {
         $factory = self::factory(
-            ['pages' => []],
-            ['pages' => [
-                ['self' => ['id' => 5, 'title' => 'a']],
-                ['self' => ['id' => 6, 'title' => 'b']],
-            ]]
+            ['pages' => [], 'content' => ['tableName' => 'tt_content']],
+            [
+                'pages' => [
+                    ['self' => ['id' => 5, 'title' => 'a']],
+                    ['self' => ['title' => 'no id of its own']],
+                    ['self' => ['id' => 6, 'title' => 'b']],
+                ],
+                'content' => [
+                    ['self' => ['id' => 300, 'title' => 'c']],
+                ],
+            ]
         );
 
         $property = new \ReflectionProperty(DataHandlerFactory::class, 'staticIdsPerEntity');
 
-        // Two static ids were assigned and none of them was recorded: nothing
-        // in the class ever writes this property. `hasStaticId()` therefore
-        // always returns false and exception 1533734370 is dead code — see the
-        // class docblock before changing this.
-        $this->assertSame([], $property->getValue($factory));
+        // The registry `hasStaticId()` reads. It is keyed by entity name, like
+        // the dynamic counter and unlike the suggested id map, and an item
+        // without an `id:` leaves no entry behind — a dynamic id is not a
+        // static one, and registering it would refuse the next item that
+        // happens to declare that number.
+        $this->assertSame(
+            ['pages' => [5, 6], 'content' => [300]],
+            $property->getValue($factory)
+        );
+    }
+
+    #[Test]
+    public function theSameIdDeclaredTwiceIsRefusedByTheStaticIdGuard(): void
+    {
+        $this->expectException(\LogicException::class);
+        // Not 1568146788: the id was declared twice on the same entity, which
+        // is what `hasStaticId()` is there to catch, and its message names the
+        // number the set author wrote rather than the table it resolved to.
+        $this->expectExceptionCode(1533734370);
+        $this->expectExceptionMessage('Cannot assign ID "5" multiple times');
+
+        self::factory(['pages' => []], ['pages' => [
+            ['self' => ['id' => 5, 'title' => 'a']],
+            ['self' => ['id' => 5, 'title' => 'b']],
+        ]]);
     }
 
     /**
@@ -188,13 +215,6 @@ final class DataHandlerFactoryIdAssignmentTest extends UnitTestCase
      */
     public static function collidingIds(): \Generator
     {
-        yield 'the same static id twice' => [
-            'entities' => ['pages' => [
-                ['self' => ['id' => 5, 'title' => 'a']],
-                ['self' => ['id' => 5, 'title' => 'b']],
-            ]],
-            'identifier' => 'pages:5',
-        ];
         yield 'a static id the dynamic counter starts on' => [
             'entities' => ['pages' => [
                 ['self' => ['id' => 10000, 'title' => 'a']],
@@ -236,15 +256,36 @@ final class DataHandlerFactoryIdAssignmentTest extends UnitTestCase
      */
     #[DataProvider('collidingIds')]
     #[Test]
-    public function aDuplicateIdIsRefusedByTheSuggestedIdGuardAndNotByTheStaticIdGuard(array $entities, string $identifier): void
+    public function aCollisionThatIsNotADuplicateDeclarationIsRefusedByTheSuggestedIdGuard(array $entities, string $identifier): void
     {
         $this->expectException(\LogicException::class);
-        // Not 1533734370: that guard reads a registry nothing writes, so the
-        // duplicate is only noticed once the identifier is registered.
+        // Not 1533734370: none of these declares the same id twice on one
+        // entity. They collide on the table, which only the suggested id map
+        // knows about.
         $this->expectExceptionCode(1568146788);
         $this->expectExceptionMessage(sprintf('Cannot redeclare identifier "%s"', $identifier));
 
         self::factory(['pages' => []], $entities);
+    }
+
+    #[Test]
+    public function theSameIdOnTwoEntitiesOfOneTableIsRefusedByTheSuggestedIdGuard(): void
+    {
+        $this->expectException(\LogicException::class);
+        // The static id registry is keyed by entity name, so it sees two
+        // entities each declaring 5 once. The collision is on the table, and
+        // that is what the suggested id map is for - the two guards are not
+        // redundant, they cover different halves.
+        $this->expectExceptionCode(1568146788);
+        $this->expectExceptionMessage('Cannot redeclare identifier "pages:5"');
+
+        self::factory(
+            ['page' => ['tableName' => 'pages'], 'morePages' => ['tableName' => 'pages']],
+            [
+                'page' => [['self' => ['id' => 5, 'title' => 'a']]],
+                'morePages' => [['self' => ['id' => 5, 'title' => 'b']]],
+            ]
+        );
     }
 
     #[Test]

@@ -17,17 +17,16 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  * fixture in TYPO3 Core makes its two surprises visible:
  *
  * - The chain is complete only for `pages`. `resolveDataMapPageId()` resolves a
- *   `-<identifier>` back-reference by looking the identifier up in the `pages`
- *   data map - the table name is hard coded - so a `tt_content` record that has
- *   already been chained no longer resolves to any page and drops out of the
- *   filter. Every further record on that page is therefore appended after the
- *   *first* record, not after its predecessor.
+ *   `-<identifier>` back-reference by looking the identifier up in the data map
+ *   of the table it is resolving for. `typo3/testing-framework` 9.6.1 hard
+ *   codes `pages` there, which is the second divergence listed on
+ *   {@see UpstreamConformanceTest} and the reason the chain of every other
+ *   table used to collapse onto its first record.
  * - The same method reads `$normalizePageId[0]` unguarded, so a record with an
- *   empty `pid` makes it read an uninitialized string offset.
- *
- * Both are pinned here as characterization: the assertions describe what the
- * ported code does today, so that changing it is a decision someone takes with
- * a red test in front of them rather than by accident.
+ *   empty `pid` makes it read an uninitialized string offset. That one is
+ *   pinned as characterization: the assertion describes what the ported code
+ *   does today, so that changing it is a decision someone takes with a red test
+ *   in front of them rather than by accident.
  *
  * Data map keys are `uniqid('NEW', true)` and therefore differ on every run.
  * Nothing here asserts a literal key; assertions are made on values, on
@@ -143,7 +142,7 @@ final class DataHandlerFactorySortingTest extends UnitTestCase
     }
 
     #[Test]
-    public function recordsOfAnyOtherTableAllChainBehindTheFirstRecordOnThePage(): void
+    public function recordsOfAnyOtherTableChainBehindTheirPredecessorAsPagesDo(): void
     {
         $factory = self::factory([
             'page' => [[
@@ -164,13 +163,14 @@ final class DataHandlerFactorySortingTest extends UnitTestCase
 
         $this->assertSame($page, $pids[0]);
         $this->assertSame('-' . $content[0], $pids[1]);
-        // The defect this test pins: "Third" should point at "Second", but
-        // "Second" has a pid of `-<First>` by now, and resolveDataMapPageId()
-        // looks `<First>` up in the *pages* data map, where a tt_content
-        // identifier never is. So "Second" resolves to null, drops out of the
-        // page filter and is not seen as the predecessor.
-        $this->assertSame('-' . $content[0], $pids[2]);
-        $this->assertNotSame('-' . $content[1], $pids[2]);
+        // Reaching "Second" as the predecessor means resolving the `-<First>`
+        // it already carries, and that lookup goes through the data map of the
+        // record's own table. `typo3/testing-framework` 9.6.1 hard codes
+        // `pages` there, where a tt_content identifier never is, so "Second"
+        // resolved to null, dropped out of the page filter and "Third" was
+        // chained behind "First" instead - reversing the declared order from
+        // the third record onwards.
+        $this->assertSame('-' . $content[1], $pids[2]);
     }
 
     #[Test]

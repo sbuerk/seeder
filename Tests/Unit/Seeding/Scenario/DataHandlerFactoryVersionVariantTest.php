@@ -158,50 +158,48 @@ final class DataHandlerFactoryVersionVariantTest extends UnitTestCase
     }
 
     /**
-     * The workspace of a version variant is read from the *processed* values,
-     * that is after `columnNames` was applied. An entity that renames its
-     * `workspace` column therefore loses it, and the variant lands in workspace
-     * 0 — under the key of the live record, which it overwrites.
+     * The workspace a version variant belongs to is the one it declares, and it
+     * is read from the declaration rather than from the processed values.
      *
-     * This pins today's behaviour rather than endorsing it. It is upstream
-     * behaviour and is left untouched, but it is a data loss that reports
-     * success, so it is worth having in writing.
+     * `typo3/testing-framework` 9.6.1 reads `$values['workspace']`, that is
+     * after `columnNames` was applied, so an entity that renames its
+     * `workspace` column loses it: the expression warns about an undefined key,
+     * evaluates to workspace 0, and the variant is written under the key of the
+     * live record - overwriting the record it was declared to version, with an
+     * empty error log. That is the fifth divergence listed on
+     * {@see UpstreamConformanceTest}, which also pins upstream's half of it.
+     *
+     * The renamed column is still renamed in the values: `columnNames` decides
+     * what is written, it does not decide where.
      */
     #[Test]
-    public function remappingTheWorkspaceColumnOverwritesTheLiveRecord(): void
+    public function aRemappedWorkspaceColumnDoesNotMoveTheVariantIntoTheLiveWorkspace(): void
     {
-        $errors = [];
-        set_error_handler(static function (int $severity, string $message) use (&$errors): bool {
-            $errors[] = [$severity, $message];
-            return true;
-        });
-        try {
-            $factory = new DataHandlerFactory([
-                'entitySettings' => [
-                    'page' => ['tableName' => 'pages', 'columnNames' => ['workspace' => 't3ver_wsid']],
-                ],
-                'entities' => [
-                    'page' => [
-                        [
-                            'self' => ['title' => 'EN'],
-                            'versionVariants' => [
-                                ['version' => ['title' => 'EN in workspace 1', 'workspace' => 1]],
-                            ],
+        $factory = new DataHandlerFactory([
+            'entitySettings' => [
+                'page' => ['tableName' => 'pages', 'columnNames' => ['workspace' => 't3ver_wsid']],
+            ],
+            'entities' => [
+                'page' => [
+                    [
+                        'self' => ['title' => 'EN'],
+                        'versionVariants' => [
+                            ['version' => ['title' => 'EN in workspace 1', 'workspace' => 1]],
                         ],
                     ],
                 ],
-            ]);
-        } finally {
-            restore_error_handler();
-        }
+            ],
+        ]);
 
-        $this->assertSame([[E_WARNING, 'Undefined array key "workspace"']], $errors);
-        // No workspace 1 map at all, and the live record is gone: the version
-        // variant was written under its key, in its workspace.
-        $this->assertSame([0], array_keys($factory->getDataMapPerWorkspace()));
-        $records = self::recordsOf($factory, 0, 'pages');
-        $this->assertCount(1, $records);
-        $this->assertSame(['title' => 'EN in workspace 1', 't3ver_wsid' => 1, 'uid' => 10001], $records[0]);
+        $this->assertSame([0, 1], array_keys($factory->getDataMapPerWorkspace()));
+        $this->assertSame(
+            [['title' => 'EN', 'uid' => 10000]],
+            self::recordsOf($factory, 0, 'pages')
+        );
+        $this->assertSame(
+            [['title' => 'EN in workspace 1', 't3ver_wsid' => 1, 'uid' => 10001]],
+            self::recordsOf($factory, 1, 'pages')
+        );
     }
 
     #[Test]

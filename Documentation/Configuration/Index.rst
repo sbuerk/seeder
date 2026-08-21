@@ -351,23 +351,11 @@ through :yaml:`columnNames` and written as it stands. A table therefore needs no
 support in this extension to be seedable - declare an entity for it, and if the
 column exists and TYPO3 accepts the value, the seed writes it.
 
-Pages come out in the order they are declared, and records of different tables
-on one page do not disturb each other's sorting.
-
-..  warning::
-
-    **From the third record of a table other than** :sql:`pages` **on one
-    page, the declared order is not kept.** The seeder chains each record
-    behind the previous one on its page, and it resolves that chain only
-    through :sql:`pages`: for any other table the second record is invisible to
-    the third, which is placed behind the *first* one instead. Three content
-    elements declared 1, 2, 3 are listed 1, 3, 2.
-
-    This is behaviour of the scenario engine as :php:`typo3/testing-framework`
-    ships it, and it is carried unchanged. Declare an
-    :ref:`actions <configuration-actions>` entry with
-    :yaml:`{action: 'move', type: 'afterRecord', target: <uid>}` when the order
-    of more than two records of one table has to be exact.
+Records come out in the order they are declared, whatever table they belong to,
+and records of different tables on one page do not disturb each other's
+sorting. Where the order has to be something other than the declared one,
+declare an :ref:`actions <configuration-actions>` entry with
+:yaml:`{action: 'move', type: 'afterRecord', target: <uid>}`.
 
 ..  warning::
 
@@ -566,13 +554,10 @@ creates.
     *   -   :yaml:`{action: 'delete'}`
         -   Delete the record.
     *   -   :yaml:`{action: 'discard'}`
-        -   Meant to discard the workspace version, and **without effect on
-            TYPO3 v13 and v14**. The action produces the command
-            :php:`clearWSID`, which :php:`DataHandler::process_cmdmap()` no
-            longer knows: it is dropped with no branch and no log entry, so the
-            version survives and the import still reports success. The action
-            is one of the three the upstream format declares that nothing in
-            TYPO3 Core uses, which is why nothing noticed.
+        -   Discard the workspace version, leaving the live record as it is.
+            The version row is deleted outright rather than soft deleted, so it
+            cannot be recovered. Only inside a workspace: on a record of the
+            live workspace the action is dropped.
 
 An unknown :yaml:`action` is ignored rather than refused, in line with the rest
 of the scenario format.

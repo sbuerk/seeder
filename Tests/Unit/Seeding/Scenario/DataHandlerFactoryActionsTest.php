@@ -253,12 +253,17 @@ final class DataHandlerFactoryActionsTest extends UnitTestCase
 
         $identifier = self::identifiers($factory, 'pages')[0];
 
-        // `discard` becomes DataHandler's `clearWSID`, which only means
-        // anything inside a workspace - hence the `> 0` guard. The provider
-        // above pins the other half: the same action in the live workspace is
-        // dropped instead of reported.
+        // `discard` becomes the `clearWSID` action of DataHandler's `version`
+        // command, which only means anything inside a workspace - hence the
+        // `> 0` guard. The provider above pins the other half: the same action
+        // in the live workspace is dropped instead of reported.
+        //
+        // Upstream emits `clearWSID` as the command name instead, which
+        // `process_cmdmap()` has no case for; the divergence is stated in
+        // `UpstreamConformanceTest` and its effect on a real run in
+        // `WorkspaceSeedingTest`.
         $this->assertSame(
-            ['clearWSID' => true],
+            ['version' => ['action' => 'clearWSID']],
             $factory->getCommandMapPerWorkspace()[1]['pages'][$identifier]
         );
     }
