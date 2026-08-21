@@ -1,10 +1,11 @@
 {
     "name": "sbuerk/data-factory",
-    "description": "Seeds pages, records, files and site configurations into a TYPO3 installation from YAML definitions shipped by extensions.",
+    "description": "TYPO3 Data Factory - Seeds pages, records, files and site configurations into a TYPO3 installation from YAML definitions shipped by extensions.",
     "type": "typo3-cms-extension",
     "homepage": "https://github.com/sbuerk/data-factory",
     "support": {
         "issues": "https://github.com/sbuerk/data-factory/issues",
+        "docs": "https://docs.typo3.org/p/sbuerk/data-factory/main/en-us/",
         "source": "https://github.com/sbuerk/data-factory"
     },
     "license": "GPL-2.0-or-later",
@@ -93,7 +94,7 @@
             "web-dir": ".Build/Web",
             "version": "2.0.0-dev",
             "Package": {
-                "providesPackages": []
+                "providesPackages": {}
             }
         }
     }

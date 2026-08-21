@@ -19,7 +19,7 @@ Data Factory
     en
 
 :Author:
-    sbuerk
+    Stefan Bürk
 
 :License:
     This document is published under the
@@ -38,9 +38,8 @@ base.
 
 ..  note::
 
-    This extension has not reached a stable release yet. The seed definition
-    format and the public API may change without a deprecation phase until the
-    first stable release.
+    This is the documentation of the **2.x** line. TYPO3 v12.4 is served by the
+    **1.x** line - see :ref:`Compatibility <compatibility>`.
 
 ----
 
@@ -68,6 +67,23 @@ base.
     ..  card:: :ref:`Changelog <changelog>`
 
         Overview of the changes per released version.
+
+----
+
+Getting help
+============
+
+Report a problem or ask a question in the
+`issue tracker of the repository <https://github.com/sbuerk/data-factory/issues>`__.
+An import that refuses to run says why and exits with a code of its own - quote
+the message and the code, and the
+:bash:`data-factory:import <identifier> --dry-run -v` output if you have it. The
+exit codes are listed under
+:ref:`data-factory:import <configuration-command-import>`.
+
+Contributions are welcome: the development setup, the quality gates and the
+commit message rules are in :file:`CONTRIBUTING.md` of the
+`source repository <https://github.com/sbuerk/data-factory>`__.
 
 ..  toctree::
     :maxdepth: 2

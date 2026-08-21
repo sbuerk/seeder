@@ -19,8 +19,9 @@ versions, so a set written for v13.4 imports unchanged on v14.3.
 Impact
 ======
 
-Where an implementation has to differ between the two core versions, the classes
-are split per version - below :file:`Core13/` and :file:`Core14/` - and the
-dependency injection container registers the ones matching the running
-installation. None of that is visible in a seed set, or to anything calling the
-commands.
+No part of the implementation differs between the two core versions: v13.4 and
+v14.3 run the same classes. The mechanism for a difference is in place - a
+:file:`Core13/` and a :file:`Core14/` directory, of which the dependency
+injection container registers only the one matching the running installation -
+and both are currently empty. None of that is visible in a seed set, or to
+anything calling the commands.

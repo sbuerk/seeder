@@ -34,11 +34,11 @@ never the format. That is why the engine needs no core version aware split.
 ```
 typo3/testing-framework requires:
   phpunit/phpunit: ^11.2.5 || ^12.1.2 || ^13.0.2
-  typo3/cms-backend|extbase|fluid|frontend: 13.*.*@dev || 14.*.*@dev
+  typo3/cms-backend|core|extbase|fluid|frontend: 13.*.*@dev || 14.*.*@dev
 ```
 
 `data-factory:import` runs in real installations. Moving that package into `require`
-would install PHPUnit on every site that seeds anything, and would pull four
+would install PHPUnit on every site that seeds anything, and would pull five
 sysexts in as hard runtime requirements. The classes themselves have no such
 problem — `DataHandlerFactory` imports **only** `Symfony\Component\Yaml\Yaml`,
 and `DataHandlerWriter` only `DataHandler`, `BackendUserAuthentication` and
@@ -46,9 +46,19 @@ and `DataHandlerWriter` only `DataHandler`, `BackendUserAuthentication` and
 `FunctionalTestCase`. They are a leaf that happens to sit in a test package.
 
 So the three classes — `DataHandlerFactory`, `DataHandlerWriter` and
-`EntityConfiguration`, 779 lines together — are ported into
-`SBUERK\DataFactory\Seeding\Scenario`, and `typo3/testing-framework` stays in
-`require-dev`.
+`EntityConfiguration`, 779 lines of upstream code — are ported into
+`SBUERK\DataFactory\Seeding\Scenario`, where the added array shape annotations
+and the divergence comments bring them to roughly 1,070, and
+`typo3/testing-framework` stays in `require-dev`.
+
+The version this branch is a port of is `typo3/testing-framework` **9.6.1**, for
+`-t 13` and `-t 14` alike — the same package on both legs, which is what lets
+`UpstreamConformanceTest` compare against one upstream rather than two. Every
+divergence comment in the ported classes names that version, as do the docblocks
+of the three classes and the four `Build/phpunit/` files; raising the constraint
+in `composer.json` means re-reading all of them. Branch `1` resolves
+`^8.3.3` instead, because the 8.x line is the one covering TYPO3 v12 — the
+divergences below are the same there, but the version in the comments is not.
 
 The cost of that decision is drift: upstream can change and we would not
 notice. That cost is paid by a test, see below.
@@ -65,6 +75,7 @@ Everything that is not listed here is unchanged.
 | PHPStan level 8 array shapes throughout                                                          | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |
 | `?int $workspaceId` became `int $workspaceId` on two private methods                             | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
 | The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. Upstream indexes a list of identifiers by an identifier.                                                                                    |
+| `assignValueInstructions()` spells the null offset out as `$value ?? ''`                         | See below. PHP 8.5 deprecates coercing a `null` array offset; the key arrived at is unchanged.                                                         |
 | `resolveDataMapPageId()` resolves through the record's own table                                 | See below. Upstream hard-codes `pages`, which collapses the declared order of every other table.                                                       |
 | `{action: 'discard'}` emits `version`/`clearWSID` rather than the command `clearWSID`            | See below. `DataHandler::process_cmdmap()` has no case for the latter, in v13 or in v14.                                                               |
 | `processEntityValues()` records a declared `id` in `$staticIdsPerEntity`                         | See below. Upstream declares the registry, reads it and never writes it.                                                                               |

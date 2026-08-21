@@ -39,15 +39,27 @@ Configuration/DataFactory/demo/
 ```
 
 Every relative path inside a set - a `scenarios` entry, a file `source`, a site
-`template`, an `imports` resource - resolves against the directory holding the
-**entry file**, not against the file declaring it. That is what lets a set be
-moved or renamed without touching its paths. `EXT:` paths are accepted
-everywhere a path is and ignore the base directory.
+`template` - resolves against the directory holding the **entry file**, not
+against the file declaring it. That is what lets a set be moved or renamed
+without touching its paths. `EXT:` paths are accepted everywhere a path is and
+ignore the base directory.
 
-An absolute path is taken as it is and is deliberately **not** sent through
+An `imports` resource is the one exception, because it is not this extension
+that resolves it: `YamlFileLoader::getStreamlinedFileName()` resolves a relative
+import against the **importing file**. The two coincide for an import declared
+in `config.yml`, and diverge for an import of an import - see
+[`imports`](#imports).
+
+Which path kinds an **absolute** path may leave the project with is a second,
+independent split, and it does not run along the same line. An absolute
+`scenarios` entry and an absolute file `source` are taken as they are and are
+deliberately **not** sent through
 `GeneralUtility::getFileAbsFileName()`, which answers with an empty string for
-anything outside the project path and would turn "a set below `vendor/`" into
-"the scenario does not exist".
+anything outside the project path and would turn "a set in a path repository
+during development" into "the scenario does not exist". A site `template`, an
+`imports` resource and `config.yml` itself *are* resolved through it, and
+therefore have to sit inside the project — see
+[Where templates may live](../architecture/site-configuration.md#where-templates-may-live).
 
 Discovery is described in [Seed sets and the CLI](seed-sets.md).
 
@@ -102,7 +114,12 @@ refused for the same reason. One rule, no ambiguity.
 
 ### Validation
 
-Everything below is checked before a single row is written.
+Everything below is checked before a single row is written. These are the codes
+an integrator meets while a descriptor is being read and its scenario files are
+being composed; `SeedDefinitionParser` raises a further fourteen, in the same
+shape, for a malformed `files` or `sites` entry — among them the site identifier
+pattern and the `rootPage` shape this page describes under
+[Site configurations](#site-configurations).
 
 | Code         | Condition                                                                           |
 |--------------|-------------------------------------------------------------------------------------|
@@ -138,13 +155,20 @@ Everything below is checked before a single row is written.
 | `1787256408` | an entity is not a list of items                                                    |
 | `1787256409` | an item of an entity is not a map                                                   |
 
-The last five exist because `DataHandlerFactory` would answer the same input
-with a `TypeError` out of a private method. Naming the scenario file and the
-entity is worth the walk.
+Three of the last five - `1787256406`, `1787256407` and `1787256409` - exist
+because `DataHandlerFactory` would answer the same input with a `TypeError` out
+of a private method: `buildEntityConfigurations(array $settings)`,
+`processEntities(array $settings)` and
+`processEntityItem(…, array $itemSettings, …)`. `1787256408` guards a bare
+`foreach()` over a non-array, which is a warning rather than a `TypeError`, and
+`1787256405` is there for the reason every key set on this page is closed - the
+factory reads `entitySettings` and `entities` and would ignore an unknown key in
+silence. Naming the scenario file and the entity is worth the walk.
 
-The `LogicException` codes the factory itself raises - `1533734368`,
-`1533734369`, `1533734370`, `1534872399`, `1534872400`, `1568146788`,
-`1574365935`, `1574365936` - are **not** wrapped. They are upstream's codes and stay traceable
+The `LogicException` codes the engine itself raises - `1533734368` out of
+`EntityConfiguration`, and `1533734369`, `1533734370`, `1534872399`,
+`1534872400`, `1568146788`, `1574365935`, `1574365936` out of
+`DataHandlerFactory` - are **not** wrapped. They are upstream's codes and stay traceable
 to the class that raised them; the command turns them into
 `EXIT_INVALID_DEFINITION` all the same.
 
@@ -501,8 +525,10 @@ them is registered as a **suggested uid**.
 - An item declaring `id` gets that uid.
 - An item declaring none gets one from a counter that starts at **10000** and
   runs **per entity name**.
-- A `version` item advances that counter by two rather than one, so it leaves a
-  gap in the dynamic sequence.
+- A `version` item declaring no `id` advances that counter by two rather than
+  one, so it leaves a gap in the dynamic sequence. Declaring an `id` takes one
+  off that: a `version` item with an `id` advances the counter by one, and a
+  `self` item with an `id` leaves it where it was.
 
 Two consequences are worth stating.
 
@@ -870,14 +896,14 @@ importing loader; see
 
 ## What is not in the format
 
-| Not covered                                    | Why                                                                                                                                                                                                                                                   |
-|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| A file reference in a **scenario file**        | The scenario format has no concept of a file and does not gain one. A `sys_file_reference` needs the `sys_file` uid the FAL indexer assigns, which cannot be declared, so it is declared in [`references`](#file-references) of `config.yml` instead. |
-| A reference to a record the run does not write | `uid` is resolved against what the run wrote, not looked up in the installation. Naming a record no scenario of the set declares is refused before anything is written.                                                                               |
-| Updating an existing tree                      | Seeding writes. It does not reconcile an existing tree against a definition, and nothing here is idempotent.                                                                                                                                          |
-| Explicit MM relation construction              | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names.                                                                                            |
-| A `be_users` record without credentials        | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                                                                                                                        |
-| Deleting or overwriting anything               | An import refuses a uid collision and refuses an existing site identifier. There is no mode in which it removes data.                                                                                                                                 |
+| Not covered                                    | Why                                                                                                                                                                                                                                                                                       |
+|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| A file reference in a **scenario file**        | The scenario format has no concept of a file and does not gain one. A `sys_file_reference` needs the `sys_file` uid the FAL indexer assigns, which cannot be declared, so it is declared in [`references`](#file-references) of `config.yml` instead.                                     |
+| A reference to a record the run does not write | `uid` is resolved against what the run wrote, not looked up in the installation. Naming a record no scenario of the set declares is refused before anything is written.                                                                                                                   |
+| Updating an existing tree                      | Seeding writes. It does not reconcile an existing tree against a definition, and nothing here is idempotent.                                                                                                                                                                              |
+| Explicit MM relation construction              | Not needed: a relation is expressed by writing the target into the relation field, and DataHandler writes the MM rows into a table the seeder never names.                                                                                                                                |
+| A `be_users` record without credentials        | `isImporting` disables the generated password and username, so such a record cannot log in. Declare `username` and `password`.                                                                                                                                                            |
+| Deleting anything                              | An import refuses a uid collision and refuses an existing site identifier, and there is no mode in which it removes a record. The one thing it overwrites is a file: `files:` is placed with `DuplicationBehavior::REPLACE`, so a file of the same name in the target folder is replaced. |
 
 ## A worked set that is executed
 

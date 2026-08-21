@@ -17,8 +17,10 @@ From a change in the working copy to a published release.
 - A change is not done until the gates pass for **both** core versions and the
   documentation is updated in the same commit.
 - User facing changes need a changelog entry below `Documentation/Changelog/`.
-- Releases are rehearsed: `release.sh` changes nothing remote without
-  `--execute`.
+- `--dry-run` is the mode a release is rehearsed in — it is the only one that
+  writes nothing. Without `--execute` the remote steps are withheld, but every
+  *local* one still runs and leaves branches behind, so a bare run is not a
+  rehearsal. → [The three modes](releasing.md#the-three-modes)
 
 ## See also
 

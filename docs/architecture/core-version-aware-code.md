@@ -56,7 +56,8 @@ below `Classes/`; split the class instead. Shared code stays readable, and each
 version aware implementation can be deleted as a whole once its core version is
 dropped.
 
-All three directories are tracked with a `.gitkeep` while they are still empty:
+`Core13/` and `Core14/` are tracked with a `.gitkeep` because they are still
+empty, and `Classes/` carries one as well from when it was:
 git does not track an empty directory, and `Build/phpstan/Core13/phpstan.neon`,
 `Build/phpstan/Core14/phpstan.neon` and `Build/php-cs-fixer/config.php` name
 them as analysed paths — a missing one aborts those gates. The `is_dir()` guard
@@ -123,6 +124,39 @@ core version without a consumer knowing that there are two.
 the container to verify exactly that wiring. Services that nothing fetches
 directly stay private — see
 [Dependency injection](dependency-injection.md#rules).
+
+### The checklist for a real one
+
+The sketch above is three files; a real addition touches more, and nothing in
+the container configuration is one of them. In order:
+
+1. `Classes/<Area>/<Thing>Interface.php` — the seam. This is the only one of the
+   three that is ever type hinted.
+2. `Classes/<Area>/Abstract<Thing>.php` — **only if** the two implementations
+   genuinely share behaviour. A pair that shares nothing but its signature does
+   not need a base class, and an abstract class that exists only to look
+   symmetrical is a liability.
+3. `Core13/<Area>/<Thing>.php` and `Core14/<Area>/<Thing>.php`, each carrying
+   `#[AsAlias(id: <Thing>Interface::class, public: true)]`.
+4. `Tests/Functional/Core13/<Area>/<Thing>Test.php` and its `Core14`
+   counterpart, each in `#[Group('not-core-<the other one>')]`, each asserting
+   **both** that the interface resolves to this implementation and that the
+   other one is not registered at all.
+5. Run `phpstan` for **both** `-t` values, each after its own `composerUpdate`.
+   It is the one gate configured per core version, and the one that catches an
+   implementation reaching for API the other version does not have.
+
+Nothing has to be registered by hand: `Configuration/Services.php` loads the
+whole matching directory, and `composer.json` already declares both PSR-4 roots.
+
+> [!NOTE]
+> There is currently **no** version aware implementation on this branch —
+> `Core13/` and `Core14/` hold nothing but their `.gitkeep`, and
+> `Tests/Functional/Core13/` and `Core14/` do not exist yet. Everything TYPO3
+> v13 and v14 differ in has so far been expressible in shared code. Branch `1`
+> is the worked example: it splits `FileImporter`, `SiteConfigurationWriter` and
+> `SeedYamlFileLoader` across `Core12/` and `Core13/`, because v12 and v13 differ
+> where v13 and v14 do not.
 
 ## Configuration is the exception
 

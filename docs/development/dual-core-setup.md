@@ -38,7 +38,39 @@ a switch downloads the dependency set rather than unpacking it. That is a
 deliberate precaution: switching core versions also switches the major version
 of `typo3/class-alias-loader`, and an install is never left to resolve against
 a cache belonging to the other major.
-→ [The composer cache](quality-gates.md#continuous-integration)
+→ [The composer cache](quality-gates.md#the-composer-cache)
+
+## The sets differ by more than the core
+
+Switching `-t` does not only exchange `typo3/cms-core`. The core itself is
+selected through `typo3/minimal`, which `composerUpdate` requires temporarily —
+see
+[What `composerUpdate` actually does](environment.md#what-composerupdate-actually-does)
+— and the resolution that follows picks a different **major** for four further
+packages, because their constraints are written as a two-major `||` on purpose:
+
+| Package                              | Constraint                | With `-t 13` | With `-t 14` |
+|--------------------------------------|---------------------------|--------------|--------------|
+| `typo3/cms-core`                     | `^13.4 \|\| ^14.3`        | 13.4.x       | 14.3.x       |
+| `typo3/cms-workspaces`               | `^13.4 \|\| ^14.3`        | 13.4.x       | 14.3.x       |
+| `saschaegerer/phpstan-typo3`         | `^2.1.1 \|\| ^3.0.1`      | 2.x          | 3.x          |
+| `sbuerk/typo3-site-based-test-trait` | `^2.0.1 \|\| ^3.0.0`      | 2.x          | 3.x          |
+| `typo3/class-alias-loader`           | transitive, from the core | `^1.2`       | `^2.0.1`     |
+
+Two of those change what a gate *means*. `saschaegerer/phpstan-typo3` decides
+which TYPO3 stubs PHPStan analyses against, and
+`sbuerk/typo3-site-based-test-trait` is what `AbstractFunctionalTestCase`
+ultimately extends — so a finding fixed on one leg is not automatically gone on
+the other, which is why the two PHPStan baselines are separate files.
+
+The lower bound of `saschaegerer/phpstan-typo3` is load-bearing rather than
+cosmetic: version **3.0.0** still required `typo3/cms-core: ^13.4.3`, and only
+3.0.1 moved to `^14.0`. Written as `^3.0` instead of `^3.0.1`, the v13 leg could
+resolve 3.0.0 and silently install the other major.
+
+`typo3/testing-framework` and `phpunit/phpunit` are the same on both legs, which
+is what lets `UpstreamConformanceTest` compare against one upstream rather than
+two — see [The scenario engine](../architecture/scenario-engine.md).
 
 ## The changelogs come with the dependency set
 
