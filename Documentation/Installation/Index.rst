@@ -8,6 +8,15 @@ Installation
 
 The extension has to be installed like any other TYPO3 CMS extension.
 
+This is the documentation of branch ``1``, the 1.x line of the extension. It
+requires ``typo3/cms-core`` ``^12.4.22 || ^13.4`` and PHP
+``^8.1 || ^8.2 || ^8.3 || ^8.4``, so it installs on **TYPO3 v12.4.22 up to
+v13.4** and **PHP 8.1 up to 8.4**. The v12 floor is a patch level rather than
+plain ``12.4`` - worth noting when a project pins its core version. PHP 8.1
+applies to TYPO3 v12 only, because ``typo3/cms-core`` 13.4 requires PHP
+``^8.2``. See :ref:`Compatibility <compatibility>` for the full matrix, branch
+``main`` included.
+
 Composer mode
 =============
 
@@ -29,7 +38,8 @@ commands then exist in the deployed installation as well:
 ..  note::
 
     As long as no stable version has been released, the development version of
-    the main branch has to be required explicitly:
+    the ``1`` branch has to be required explicitly - its branch alias maps
+    ``^1.0@dev`` onto ``1.0.x-dev``:
 
     ..  code-block:: bash
 

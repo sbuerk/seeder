@@ -5,24 +5,28 @@ base. Code that cannot be written for all of them at once is **core version
 aware**: it exists once per supported core version, and only the variant
 matching the running TYPO3 version is used.
 
+That structure does not depend on how many versions there happen to be. One
+`Core<major>/` directory exists per supported core version, and today there are
+two of them.
+
 ## Where the code lives
 
 | Directory  | Contains                                                                                                                |
 |------------|-------------------------------------------------------------------------------------------------------------------------|
 | `Classes/` | Everything working on **all** supported core versions: interfaces, abstract base classes, version independent services. |
+| `Core12/`  | Implementations for TYPO3 v12 only.                                                                                     |
 | `Core13/`  | Implementations for TYPO3 v13 only.                                                                                     |
-| `Core14/`  | Implementations for TYPO3 v14 only.                                                                                     |
 
-`Core13/` and `Core14/` are separate PSR-4 roots in the repository root, not
+`Core12/` and `Core13/` are separate PSR-4 roots in the repository root, not
 subdirectories of `Classes/`, and are registered in `composer.json` with the
-core version as the third namespace part:
+core version as the third namespace part — one entry per supported core version:
 
 ```json
 "autoload": {
     "psr-4": {
         "SBUERK\\Seeder\\": "Classes/",
-        "SBUERK\\Seeder\\Core13\\": "Core13/",
-        "SBUERK\\Seeder\\Core14\\": "Core14/"
+        "SBUERK\\Seeder\\Core12\\": "Core12/",
+        "SBUERK\\Seeder\\Core13\\": "Core13/"
     }
 }
 ```
@@ -48,7 +52,9 @@ if (is_dir($coreAwareDirectory)) {
 ```
 
 Because of that, a class below `Core13/` may freely use API that only exists in
-TYPO3 v13 — it is never instantiated when running on v14.
+TYPO3 v13 — it is never registered, and therefore never instantiated, when the
+running core is a different major. The same holds in the other direction: a
+class below `Core12/` may use API that v13 removed or deprecated.
 
 This is deliberately the *only* mechanism used for version differences. Do not
 write conditional code (`if ($coreMajorVersion === 13) { … }`) in shared classes
@@ -56,12 +62,12 @@ below `Classes/`; split the class instead. Shared code stays readable, and each
 version aware implementation can be deleted as a whole once its core version is
 dropped.
 
-All three directories are tracked with a `.gitkeep` while they are still empty:
-git does not track an empty directory, and `Build/phpstan/Core13/phpstan.neon`,
-`Build/phpstan/Core14/phpstan.neon` and `Build/php-cs-fixer/config.php` name
+Both directories are tracked with a `.gitkeep` in addition to their sources:
+git does not track an empty directory, and `Build/phpstan/Core12/phpstan.neon`,
+`Build/phpstan/Core13/phpstan.neon` and `Build/php-cs-fixer/config.php` name
 them as analysed paths — a missing one aborts those gates. The `is_dir()` guard
-and the glob keep the load itself harmless in the meantime: neither a missing
-nor an empty directory registers anything, and neither is an error.
+and the glob keep the load itself harmless: neither a missing nor an empty
+directory registers anything, and neither is an error.
 
 ## The pattern to follow
 
@@ -69,7 +75,9 @@ nor an empty directory registers anything, and neither is an error.
 2. Put shared behaviour into an **abstract base class** in `Classes/`. Abstract
    classes use method injection, see
    [Class design](class-design.md#abstract-classes-must-not-use-constructor-injection).
-3. Implement it once per core version in `Core13/` and `Core14/`, each
+   An implementation pair that shares nothing but its signature needs no base
+   class at all; the interface alone is the seam.
+3. Implement it once per core version in `Core12/` and `Core13/`, each
    registering itself as the default implementation of the interface with
    `#[AsAlias]`.
 
@@ -90,26 +98,26 @@ interface SeedWriterInterface
 // Classes/Seed/AbstractSeedWriter.php
 namespace SBUERK\Seeder\Seed;
 
-abstract readonly class AbstractSeedWriter implements SeedWriterInterface
+abstract class AbstractSeedWriter implements SeedWriterInterface
 {
     // Shared behaviour, and #[Required] inject*() methods for its dependencies.
 }
 ```
 
 ```php
-// Core13/Seed/SeedWriter.php — Core14/Seed/SeedWriter.php is its counterpart
-namespace SBUERK\Seeder\Core13\Seed;
+// Core12/Seed/SeedWriter.php — Core13/Seed/SeedWriter.php is its counterpart
+namespace SBUERK\Seeder\Core12\Seed;
 
 use SBUERK\Seeder\Seed\AbstractSeedWriter;
 use SBUERK\Seeder\Seed\SeedWriterInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 
 #[AsAlias(id: SeedWriterInterface::class, public: true)]
-final readonly class SeedWriter extends AbstractSeedWriter
+final class SeedWriter extends AbstractSeedWriter
 {
     public function write(string $table): int
     {
-        // May use API that exists on TYPO3 v13 only.
+        // May use API that exists on TYPO3 v12 only.
     }
 }
 ```
@@ -124,66 +132,128 @@ the container to verify exactly that wiring. Services that nothing fetches
 directly stay private — see
 [Dependency injection](dependency-injection.md#rules).
 
+> [!IMPORTANT]
+> The classes above are `final` and `abstract`, **not** `final readonly` and
+> `abstract readonly`. This branch supports PHP 8.1 for the TYPO3 v12 leg, where
+> a `readonly` class does not parse, so the keyword sits on the properties
+> instead. That is a property of the branch, not of the version aware layout.
+> → [Class design](class-design.md#the-php-81-rule-readonly-sits-on-the-properties)
+
+### What the split is actually used for
+
+The seams this extension carries are small and each of them is one API whose
+**shape**, not whose behaviour, changed between v12 and v13:
+
+- the conflict mode argument of `ResourceStorage::addFile()`, which TYPO3 v13
+  turned into a native enum (#101151) while v12 only has the class constant of
+  the older `DuplicationBehavior` — and v13 answers anything that is not an
+  instance of the enum with `E_USER_DEPRECATED`, which
+  [fails the suites](../testing/phpunit-configuration.md#strictness-policy);
+- writing a site configuration, which v12 does through
+  `Core\Configuration\SiteConfiguration` and v13 through the
+  `Core\Configuration\SiteWriter` extracted from it — a class that does not
+  exist on v12 at all;
+- handing a logger to `Core\Configuration\Loader\YamlFileLoader`, which is a
+  constructor argument on v13 and a `LoggerAwareInterface` setter on v12.
+
+Two rules fall out of those three, and both are worth copying:
+
+- **Only the operation is split, not its caller.** The implementations differ in
+  a `use` statement and an argument, sometimes in one extra call. Everything
+  around them — resolving the storage, composing the configuration, reading the
+  file — stays in the shared class.
+- **The interface models the operation, not the argument.** A method handing a
+  conflict mode back to shared code would have to declare a `mixed` return: an
+  enum case on one version, a string on the other. That is the version difference
+  pushed back into `Classes/` in a shape neither the type system nor PHPStan can
+  check. Putting the whole call inside the implementation keeps each version's
+  argument type concrete.
+
 ## Configuration is the exception
 
-The `Core13/` and `Core14/` split works for classes, because the container picks
-one of them. Configuration files — TCA, TypoScript, `ext_localconf.php` — are
-loaded by TYPO3 from a fixed path and cannot be split that way. A version
-difference there is resolved **in the file**, by building the array and adjusting
-it before returning:
+The `Core12/` and `Core13/` split works for classes, because the container picks
+one of them. Configuration files — TCA, TypoScript, `ext_localconf.php`,
+`ext_tables.sql` — are loaded by TYPO3 from a fixed path and cannot be split
+that way. A version difference there is resolved **in the file**.
 
-```php
-$tcaConfiguration = [
-    'ctrl' => [ /* … */ ],
-    'columns' => [ /* … */ ],
-];
+Three things make that acceptable where a conditional in a class would not be:
 
-// The 'searchFields' ctrl option was removed in TYPO3 v14 (Breaking #106972).
-// @todo Remove once TYPO3 v13 support is dropped.
-if ((new Typo3Version())->getMajorVersion() < 14) {
-    $tcaConfiguration['ctrl']['searchFields'] = 'title,message';
-}
-
-return $tcaConfiguration;
-```
-
-Three things make this acceptable where a conditional in a class would not be:
-
-- The difference is **at the end of the file**, applied to the finished array,
-  not scattered through it. The configuration stays readable as one thing.
+- The difference sits **at the end of the file**, applied to the finished array
+  or wrapped in a single condition block, not scattered through it. The
+  configuration stays readable as one thing.
 - It carries a `@todo` naming the condition under which it goes away. A version
   switch without an exit condition becomes permanent.
 - It names the **changelog issue**, so the reason can be looked up. The
   changelogs ship with `typo3/cms-core` in `Documentation/Changelog/` — verify
   against them rather than from memory.
 
-Dropping the option instead of guarding it is not the same thing: v14 removed it
-and warns when it is present, but v13 still evaluates it and searches *nothing*
-without it. Removing it silently changes behaviour on v13.
+Two further rules follow from experience rather than from the mechanism:
 
-The complete example is
-[`Configuration/TCA/tx_examplefixture_domain_model_greeting.php`](../../Tests/Functional/Fixtures/Extensions/example-fixture/Configuration/TCA/tx_examplefixture_domain_model_greeting.php)
-of the [fixture extension](../testing/fixture-extensions.md), and
-[`ext_localconf.php`](../../Tests/Functional/Fixtures/Extensions/example-fixture/ext_localconf.php)
-next to it shows the better outcome where one exists: passing
-`PLUGIN_TYPE_CONTENT_ELEMENT` explicitly is valid on both versions, so no switch
-is needed at all. Look for that first.
+- **Guarding an option is not the same as dropping it.** If one version ignores
+  a key and another evaluates it, removing the key changes behaviour on the
+  second one, silently and without an error anywhere. Guard, do not delete.
+- **Look for the spelling that is correct everywhere first.** Where one call is
+  valid on every supported version, that beats any switch. The
+  [fixture extension](../testing/fixture-extensions.md)'s
+  [`ext_localconf.php`](../../Tests/Functional/Fixtures/Extensions/example-fixture/ext_localconf.php)
+  is that case: it passes `ExtensionUtility::PLUGIN_TYPE_CONTENT_ELEMENT`
+  explicitly, and the constant is `'CType'` on 12.4 and 13.4 alike. Omitting it
+  would be wrong in two different ways at once — v12 silently defaults to
+  `'list_type'` and registers a *different* content element, while v13 defaults
+  to the same value and additionally raises `E_USER_DEPRECATED` for it (13.4:
+  `ExtensionUtility::configurePlugin()`, Deprecation #105076, "Plugin content
+  element and plugin sub types"). One explicit argument removes both, and the
+  file needs no version switch.
+
+### The worked example: `ext_tables.sql`
+
+[`ext_tables.sql`](../../Tests/Functional/Fixtures/Extensions/example-fixture/ext_tables.sql)
+of the fixture extension is the shape of the exception that is easiest to miss,
+because the file is **not** version aware — it exists *because* of a version
+difference, and nothing in it is conditional.
+
+TYPO3 v13.0 derives a database column from every TCA `columns` entry (Feature
+#101553, "Auto-create DB fields from TCA columns", extended by #104311 in 13.3
+for the `ctrl` derived ones). v12.4 does not: its
+`Core\Database\Schema\DefaultTcaSchema` has a single
+`enrichSingleTableFields()` that derives the management columns, the
+`category|datetime|slug|json|uuid` types and the MM tables — and no branch for
+`input`, `text`, `link`, `file` or `inline`. v13.4 splits the same class into
+`enrichSingleTableFieldsFromTcaCtrl()` and
+`enrichSingleTableFieldsFromTcaColumns()`, and the second one carries a case for
+every column type.
+
+Without an explicit definition the `title` and `message` columns of
+`tx_examplefixture_domain_model_greeting` are therefore simply never created on
+v12, and every test touching the table fails there while passing on v13.
+#101553 states that an explicit `ext_tables.sql` definition takes precedence
+over the derived one, so **one file serves both versions**: required on v12,
+redundant on v13, correct on both.
+
+The consequence for day to day work: **on this branch a TCA change can be a
+schema change that only fails on v12.** Adding a column means adding it to
+`ext_tables.sql` too, and running the functional suite against a real DBMS
+rather than SQLite alone.
 
 ## Tooling and tests
 
-- **PHPStan** is configured per core version. Each configuration analyses only
-  its own core version aware sources — `Build/phpstan/Core13/phpstan.neon` lists
-  `Classes`, `Configuration`, `Core13` and `Tests`, and excludes
-  `Tests/*/Core14/*`. Analysing the sources of the other core version would
-  report false positives about API that does not exist there. See
-  [Quality gates](../development/quality-gates.md).
-- **Tests** mirror the same layout: `Tests/Unit/Core13/`, `Tests/Unit/Core14/`,
-  `Tests/Functional/Core13/` and `Tests/Functional/Core14/`. Every core version
-  aware test class carries the PHPUnit group of the core versions it must
-  **not** run on:
+- **PHPStan** is configured per core version, one directory below
+  `Build/phpstan/` each. A configuration analyses only its own core version aware
+  sources — `Build/phpstan/Core12/phpstan.neon` lists `Classes`,
+  `Configuration`, `Core12` and `Tests` and excludes `Tests/*/Core13/*`, and
+  `Build/phpstan/Core13/phpstan.neon` is the mirror image — because a directory
+  written for a different core version uses API that does not exist here and
+  would report nothing but false positives. The two configurations also run
+  **different PHPStan majors**, see
+  [Dual core setup](../development/dual-core-setup.md#the-dependency-sets-differ-by-more-than-the-core).
+  See [Quality gates](../development/quality-gates.md).
+- **Tests** mirror the same layout: `Tests/Unit/Core12/`, `Tests/Unit/Core13/`,
+  `Tests/Functional/Core12/` and `Tests/Functional/Core13/`, one such directory
+  per supported core version. A core version aware test class carries the PHPUnit
+  group of the core version it must **not** run on:
 
   ```php
-  #[Group('not-core-14')]
+  #[Group('not-core-13')]
   final class SeedWriterTest extends UnitTestCase
   {
   }
@@ -193,7 +263,7 @@ is needed at all. Look for that first.
   the selected core version, so those tests are skipped automatically on the
   other one.
 - Both core versions must be verified before opening a pull request, each after
-  the matching `composerUpdate` — see
+  its own `composerUpdate` — see
   [Dual core setup](../development/dual-core-setup.md) and
   [Pull requests](../workflow/pull-requests.md).
 

@@ -185,12 +185,12 @@ Additionally:
 
 ## Core version aware functional tests
 
-Mirroring the source layout, they live in `Tests/Functional/Core13/` and
-`Tests/Functional/Core14/` and carry the group of the core version they must
+Mirroring the source layout, they live in `Tests/Functional/Core12/` and
+`Tests/Functional/Core13/` and carry the group of the core version they must
 **not** run on:
 
 ```php
-#[Group('not-core-14')]
+#[Group('not-core-13')]
 final class SeedWriterTest extends AbstractFunctionalTestCase
 {
     #[Test]
@@ -203,7 +203,7 @@ final class SeedWriterTest extends AbstractFunctionalTestCase
     public function implementationOfTheOtherCoreVersionIsNotRegistered(): void
     {
         $this->assertFalse($this->getContainer()->has(
-            'SBUERK\\Seeder\\Core14\\Seed\\SeedWriter',
+            'SBUERK\\Seeder\\Core13\\Seed\\SeedWriter',
         ));
     }
 }

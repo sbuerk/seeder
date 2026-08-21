@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
+use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
 use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
@@ -14,6 +15,7 @@ use SBUERK\Seeder\Seeding\Definition\SeedFile;
 use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
 use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
 use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -75,14 +77,17 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
     private function subject(): ScenarioSeeder
     {
         return new ScenarioSeeder(
-            new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class)),
+            new FileSeeder(
+                GeneralUtility::makeInstance(StorageRepository::class),
+                $this->get(FileImporterInterface::class),
+            ),
             new FileReferenceSeeder(GeneralUtility::makeInstance(ConnectionPool::class)),
         );
     }
 
     private function seed(?SeedDefinition $definition = null): ScenarioSeedResult
     {
-        $definition ??= (new SeedDefinitionParser())->parseFile(self::SEED);
+        $definition ??= $this->parser()->parseFile(self::SEED);
 
         return $this->subject()->seed(
             $definition,
@@ -220,7 +225,7 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
     #[Test]
     public function aSetWithoutReferencesWritesNone(): void
     {
-        $definition = (new SeedDefinitionParser())->parseFile(
+        $definition = $this->parser()->parseFile(
             'EXT:seeder/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml',
         );
 
@@ -233,7 +238,7 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
     #[Test]
     public function aReferenceOnARecordTheScenarioDoesNotDeclareIsRefused(): void
     {
-        $parsed = (new SeedDefinitionParser())->parseFile(self::SEED);
+        $parsed = $this->parser()->parseFile(self::SEED);
         $definition = new SeedDefinition(
             identifier: $parsed->identifier,
             title: $parsed->title,
@@ -257,7 +262,7 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
     #[Test]
     public function aReferenceToAFileTheSetDoesNotBringIsRefused(): void
     {
-        $parsed = (new SeedDefinitionParser())->parseFile(self::SEED);
+        $parsed = $this->parser()->parseFile(self::SEED);
         $definition = new SeedDefinition(
             identifier: $parsed->identifier,
             title: $parsed->title,
@@ -271,5 +276,14 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
         $this->expectExceptionCode(1787256501);
 
         $this->seed($definition);
+    }
+
+    /**
+     * The parser takes the core version aware YAML loader, so it is fetched
+     * from the container rather than the parser being newed up bare.
+     */
+    private function parser(): SeedDefinitionParser
+    {
+        return new SeedDefinitionParser($this->get(SeedYamlFileLoaderInterface::class));
     }
 }

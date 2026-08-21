@@ -42,36 +42,39 @@ Both ways produce the same result — the wrapper only adds the container.
 
 ### `--source-branch`, and the key the alias is stored under
 
-Development happens on one branch, `main`, and both scripts default
-`--source-branch` to it:
+This line is released from the branch named **`1`** — the branch carrying TYPO3
+v12.4 + v13.4 support — and both scripts default `--source-branch` to it:
 
 ```bash
-SOURCE_BRANCH="main"
+SOURCE_BRANCH="1"
 ```
 
-so nothing has to be passed here. Pass it explicitly only once a maintenance
-branch exists and its release is driven from a checkout of another branch.
+so nothing has to be passed here. Pass it explicitly only when a release is
+driven from a checkout of another branch — `--source-branch=main` for the line
+that supports the newer core pair.
 
 The key `extra.branch-alias` is stored under is **not** always
 `dev-<source-branch>`. Composer derives a version from the branch name before it
 consults the alias map, and a branch whose name looks like a version is
 normalised to `<name>.x-dev`:
 
-| Branch                    | Derived by composer | Alias key  |
-|---------------------------|---------------------|------------|
-| `main`                    | `dev-main`          | `dev-main` |
-| `1`, were such a line cut | `1.x-dev`           | `1.x-dev`  |
+| Branch | Derived by composer | Alias key  |
+|--------|---------------------|------------|
+| `1`    | `1.x-dev`           | `1.x-dev`  |
+| `main` | `dev-main`          | `dev-main` |
 
-`setVersion.sh` derives the key from the source branch, so this is not something
-to get right by hand — but it is worth knowing, because getting it wrong is
-**silent**. An alias keyed `dev-1` on a branch named `1` matches no reference
-composer ever produces, so it is ignored: the branch does not provide the
-version it claims to, and nothing reports it.
+That is why `composer.json` on this branch carries `"1.x-dev": "1.0.x-dev"` and
+not `"dev-1"`. `setVersion.sh` derives the key from the source branch, so this is
+not something to get right by hand — but it is worth knowing, because getting it
+wrong is **silent**. An alias keyed `dev-1` on a branch named `1` matches no
+reference composer ever produces, so it is ignored: the branch does not provide
+the version it claims to, and nothing reports it.
 
 `release.sh` uses the source branch for more than the alias: it is the branch it
 branches off, refreshes, targets pull requests at with `gh pr create --base`,
-and tags. Run with the default from a maintenance branch, it would open the
-release pull request against `main`.
+and tags. Running it with the default from a checkout of `main` would branch off
+and tag `1` instead — pass `--source-branch` there, or work from a checkout of
+the branch being released.
 
 ## `release.sh` — orchestrate the release
 
@@ -114,7 +117,8 @@ retry against instead of losing both.
 
 ## Before releasing
 
-- Both core versions green across the full [gate matrix](../development/quality-gates.md).
+- Both core versions green across the full [gate matrix](../development/quality-gates.md),
+  plus the PHP 8.1 leg — `-t 12 -p 8.1`, after its own `composerUpdate`.
 - Changelog entries for the version in place, see
   [Changelog and documentation](changelog-and-documentation.md).
 - `Build/Scripts/runTests.sh -s renderDocumentation` passing.

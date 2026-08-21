@@ -19,22 +19,27 @@ have had to grow into: records of any table, a page tree, translations through
 commands through `actions`, stable uids through suggested ids, and sequential
 sibling ordering. It is exercised by 60 fixtures across TYPO3 Core v12, v13 and
 v14, which is a far better proving ground than anything this repository could
-assemble.
+assemble - and two of those three are the versions this branch runs on.
 
 It is also **stable**. The recognised key set is byte for byte identical across
 testing-framework branches 7, 8, 9 and main, and across the Core fixtures of
 v12, v13 and v14. What differs between those Core branches is TCA drift inside
 the fixtures — `list_type` becoming a dedicated `CType`, `url` becoming `link` —
-never the format. That is why the engine needs no core version aware split.
+never the format. That is why the engine needs no core version aware split, and
+why `Classes/Seeding/Scenario/` has no counterpart below `Core12/` or `Core13/`.
+
+The version this branch resolves is `typo3/testing-framework` **8.3.3**, for
+`-t 12` and `-t 13` alike — the same package on both legs, which is what lets
+`UpstreamConformanceTest` compare against one upstream rather than two.
 
 ## Why it is ported and not required
 
 `typo3/testing-framework` cannot be a production dependency of this extension:
 
 ```
-typo3/testing-framework requires:
-  phpunit/phpunit: ^11.2.5 || ^12.1.2 || ^13.0.2
-  typo3/cms-backend|extbase|fluid|frontend: 13.*.*@dev || 14.*.*@dev
+typo3/testing-framework 8.3.3 requires:
+  phpunit/phpunit: ^10.1 || ^11.0
+  typo3/cms-backend|core|extbase|fluid|frontend: 12.*.*@dev || 13.*.*@dev
 ```
 
 `seeder:import` runs in real installations. Moving that package into `require`
@@ -66,7 +71,7 @@ Everything that is not listed here is unchanged.
 | `?int $workspaceId` became `int $workspaceId` on two private methods                             | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
 | The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. Upstream indexes a list of identifiers by an identifier.                                                                                    |
 | `resolveDataMapPageId()` resolves through the record's own table                                 | See below. Upstream hard-codes `pages`, which collapses the declared order of every other table.                                                       |
-| `{action: 'discard'}` emits `version`/`clearWSID` rather than the command `clearWSID`            | See below. `DataHandler::process_cmdmap()` has no case for the latter, in v13 or in v14.                                                               |
+| `{action: 'discard'}` emits `version`/`clearWSID` rather than the command `clearWSID`            | See below. Nothing handles the latter as a *command*, on either supported version.                                                                     |
 | `processEntityValues()` records a declared `id` in `$staticIdsPerEntity`                         | See below. Upstream declares the registry, reads it and never writes it.                                                                               |
 | `processVersionVariantItem()` reads the workspace from the declaration                           | See below. Upstream reads it from the processed values, which a `columnNames` remap empties.                                                           |
 | `DataHandlerWriter::__construct()` gained an optional third parameter                            | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                          |
@@ -79,7 +84,8 @@ dishonest about where they came from.
 
 ## The deliberate divergences
 
-There are nine. One is forced by PHP 8.5, one is additive - it changes nothing
+There are nine. One is a PHP forward compatibility fix, one is additive - it
+changes nothing
 for a caller that does not use it - and the other seven are defects of the
 upstream engine that are fixed here rather than carried.
 
@@ -130,10 +136,13 @@ stay byte-faithful would be the wrong trade.
 
 `EntityConfiguration::assignValueInstructions()` upstream indexes
 `$this->valueInstructions[$name][$value]` directly. PHP coerces a `null` offset
-to the empty string and **deprecates doing so as of PHP 8.5**, which this
-extension supports and whose suite fails on a deprecation. A seed definition
-declaring a null value on a column that has value instructions would emit it,
-so the coercion is spelled out as `$value ?? ''` instead.
+to the empty string and **deprecates doing so as of PHP 8.5**. This branch tops
+out at PHP 8.4, so the deprecation is not reachable by any job of its matrix -
+the spelled out `$value ?? ''` is kept anyway, because it arrives at exactly the
+same key, because the branch supporting PHP 8.5 needs it, and because a
+divergence that is removed and reintroduced is worse than one that is stated
+once. A seed definition declaring a null value on a column that has value
+instructions is what would reach it.
 
 The lookup still hits exactly the key it hit before — this changes no
 behaviour, only how the same key is arrived at. It is listed here because it is
@@ -172,20 +181,31 @@ Upstream writes `clearWSID` into the command map as the **command name**:
 $this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['clearWSID'] = true;
 ```
 
-`DataHandler::process_cmdmap()` switches over the command name and has no
-`clearWSID` case, in v13 or in v14. The command falls through with no branch
-and no log entry, so the action does nothing at all and the import reports
-success. `clearWSID` is an *action* of the `version` command, which is what the
-testing framework's own `ActionService` uses, and that is what the port emits:
+`DataHandler::process_cmdmap()` switches over the command name, and `clearWSID`
+is not one of its cases on either supported version. On 13.4.34 the switch has
+`move`, `copy`, `localize`, `copyToLanguage`, `inlineLocalizeSynchronize`,
+`delete`, `undelete` and `version`, and `clearWSID` appears only *inside* the
+`version` case, as a value of `$value['action']` (`DataHandler.php:3421`). On
+12.4.45 the switch is shorter still - it has no `version` case at all, because
+that command is contributed by `EXT:workspaces` through its `processCmdmap`
+hook, and **that hook returns immediately unless the command is `version`**
+(`DataHandlerHook.php:95`); its own switch is over the *action*, where
+`clearWSID` and `flush` share a case.
+
+So on both versions a command named `clearWSID` falls through with no branch and
+no log entry: the action does nothing at all and the import reports success.
+`clearWSID` is an *action* of the `version` command, which is what the testing
+framework's own `ActionService` uses, and that is what the port emits:
 
 ```php
 $this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['version'] = ['action' => 'clearWSID'];
 ```
 
-TYPO3 v14 added a `discard` command that says what it does, and core carries a
-`@todo` to drop the `clearWSID` action once nothing uses it any more. Switching
-to `discard` needs v13 support to be gone first; the port carries a `@todo`
-naming that condition.
+TYPO3 v14 - which this branch does not support - added a `discard` command that
+says what it does, and core carries a `@todo` to drop the `clearWSID` action once
+nothing uses it any more. Neither 12.4.45 nor 13.4.34 has a `case 'discard':`, so
+switching to it needs **both** supported versions to be gone; the port carries a
+`@todo` naming that condition.
 
 ### A guard that reads a registry nothing writes
 

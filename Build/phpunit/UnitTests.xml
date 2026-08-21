@@ -3,19 +3,28 @@
     PHPUnit configuration of the unit test suite.
 
     Derived from the boilerplate shipped with typo3/testing-framework in
-    "Resources/Core/Build/UnitTests.xml", baselined from version 9.6.1.
-    Re-check it against that file when the testing-framework is updated.
+    "Resources/Core/Build/UnitTests.xml", baselined from version 8.3.3 - the
+    8.x line, which is the one covering TYPO3 v12 and v13. Re-check it against
+    that file when the testing-framework is updated.
 
     Deliberate deviations from the boilerplate:
 
     * The test suite points to this extension's "Tests/Unit/" directory.
     * The schema location points to the locally installed phpunit.xsd instead
       of the one on schema.phpunit.de, so that validation matches the
-      installed PHPUnit version and works without network access.
+      installed PHPUnit version and works without network access. The
+      boilerplate names the 10.1 schema; every attribute set below is part of
+      it, but "failOnPhpunitDeprecation" and
+      "displayDetailsOnPhpunitDeprecations" were added in PHPUnit 10.5.32 and
+      "failOnPhpunitWarning" in 10.5.47, which is what the lower bound of the
+      "phpunit/phpunit" constraint in composer.json is for.
     * Strictness is raised: notices, warnings, deprecations, PHPUnit
       deprecations, PHPUnit warnings, risky tests, incomplete tests, tests
       without assertions, output during tests, changes to global state and an
-      empty test suite all fail the run.
+      empty test suite all fail the run. The boilerplate switches
+      "beStrictAboutTestsThatDoNotTestAnything" off; it is left at its default
+      of "true" here, which is what makes a test without an assertion risky and
+      therefore, with "failOnRisky", a failure.
 
     "failOnSkipped" is disabled on purpose. "Build/Scripts/runTests.sh"
     excludes the group "not-core-<version>", so tests which cannot run on the

@@ -1,0 +1,60 @@
+includes:
+  - phpstan-baseline.neon
+  - ../../../.Build/vendor/saschaegerer/phpstan-typo3/extension.neon
+  - ../../../.Build/vendor/phpstan/phpstan-phpunit/extension.neon
+
+parameters:
+  # Use local .cache dir instead of /tmp
+  tmpDir: ../../../.cache/phpstan
+
+  level: 8
+
+  # Doc types must not be trusted 100%, especially for globals and test
+  # assertions verifying the runtime contract. Mirrors the TYPO3 core setting.
+  treatPhpDocTypesAsCertain: false
+
+  # Only the core version aware sources of this core version are analysed, the
+  # ones of the other core version may use API that does not exist here.
+  paths:
+    - ../../../Classes
+    - ../../../Configuration
+    - ../../../Core12
+    - ../../../Tests
+
+  excludePaths:
+    - ../../../Tests/*/Core13/*
+
+  # Not a defect of this repository, and deliberately not a baseline entry.
+  #
+  # "TYPO3\CMS\Extbase\Persistence\QueryResultInterface" declares two type
+  # parameters on both supported core versions - "TKey" and "TValue of object",
+  # see ".Build/vendor/typo3/cms-extbase/Classes/Persistence/QueryResultInterface.php"
+  # on v12 as well as on v13. The 2.x line of "saschaegerer/phpstan-typo3"
+  # spells it that way too, so the v13 leg of this branch analyses the
+  # annotation as written and is green.
+  #
+  # Only the 1.x line, which is the newest one supporting TYPO3 v12 - 2.0.0 and
+  # up require "typo3/cms-core: ^13.4.3" - ships a stub declaring a single
+  # "ModelType", and that stub wins over the real class docblock. Correcting it
+  # with a stub of our own does not work: its sibling stubs "QueryInterface",
+  # "Repository" and "QueryFactory" name the interface with one argument as
+  # well, PHPStan analyses the vendor stubs rather than replacing them, and each
+  # correction only moves the error into the next file.
+  #
+  # This is scoped to the one file and the two messages, and
+  # "reportUnmatchedIgnoredErrors" is left at its default: the moment the v12
+  # dependency set goes and the 2.x stub is the only one resolvable, this entry
+  # stops matching and PHPStan fails until it is deleted.
+  #
+  # Two messages, one cause: the arity of the annotation itself, and the
+  # concrete "QueryResult" the query returns, which the same 1.x stub set
+  # declares with one type argument as well.
+  #
+  # @todo Remove together with TYPO3 v12 support.
+  ignoreErrors:
+    -
+      message: '#specifies 2 template types, but interface TYPO3\\CMS\\Extbase\\Persistence\\QueryResultInterface supports only 1: ModelType#'
+      path: ../../../Tests/Functional/Fixtures/Extensions/example-fixture/Classes/Domain/Repository/GreetingRepository.php
+    -
+      message: '#should return TYPO3\\CMS\\Extbase\\Persistence\\QueryResultInterface<int, .*> but returns TYPO3\\CMS\\Extbase\\Persistence\\Generic\\QueryResult<.*>\.#'
+      path: ../../../Tests/Functional/Fixtures/Extensions/example-fixture/Classes/Domain/Repository/GreetingRepository.php

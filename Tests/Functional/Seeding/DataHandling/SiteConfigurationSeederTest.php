@@ -5,22 +5,25 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
+use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
 use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
 use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeedResult;
+use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationWriterInterface;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
 use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
 use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Yaml\Yaml;
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
-use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -69,14 +72,18 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
      * It is a private service nothing references yet, so Symfony removes it
      * while compiling the container. Its wiring is proven where it is first
      * injected - the import command - rather than by publishing it for a test.
-     * The four collaborators are fetched, because a container instance is what
-     * the event listeners of `SiteConfiguration` and `SiteFinder` are attached
-     * to and a hand built `SiteFinder` would never see the flush.
+     * All five collaborators are fetched, for two reasons: a container instance
+     * is what the cache invalidation of `SiteConfiguration` and `SiteFinder`
+     * hangs off, and a hand built `SiteFinder` would never see it; and the two
+     * core version aware ones have to be the implementation of the running
+     * version, which only the container knows - see
+     * {@see self::registeredSiteConfigurationWriterMatchesTheRunningCoreVersion()}.
      */
     private function subject(): SiteConfigurationSeeder
     {
         return new SiteConfigurationSeeder(
-            $this->get(SiteWriter::class),
+            $this->get(SiteConfigurationWriterInterface::class),
+            $this->get(SeedYamlFileLoaderInterface::class),
             $this->get(SiteConfiguration::class),
             $this->get(SiteFinder::class),
             $this->get(ConnectionPool::class),
@@ -99,11 +106,20 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
+     * The parser takes the core version aware YAML loader, so it is fetched
+     * from the container here rather than the parser being newed up bare.
+     */
+    private function parser(): SeedDefinitionParser
+    {
+        return new SeedDefinitionParser($this->get(SeedYamlFileLoaderInterface::class));
+    }
+
+    /**
      * @param array<string, mixed> $definition
      */
     private function parse(array $definition): SeedDefinition
     {
-        return (new SeedDefinitionParser())->parse($definition, 'test definition', $this->templateBasePath());
+        return $this->parser()->parse($definition, 'test definition', $this->templateBasePath());
     }
 
     /**
@@ -113,7 +129,10 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     private function seedScenario(SeedDefinition $definition): ScenarioSeedResult
     {
         $scenarioSeeder = new ScenarioSeeder(
-            new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class)),
+            new FileSeeder(
+                GeneralUtility::makeInstance(StorageRepository::class),
+                $this->get(FileImporterInterface::class),
+            ),
             new FileReferenceSeeder(GeneralUtility::makeInstance(ConnectionPool::class)),
         );
 
@@ -197,6 +216,39 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
             )
             ->executeQuery()
             ->fetchOne();
+    }
+
+    /**
+     * The writer the container hands out is the one of the running core
+     * version.
+     *
+     * Both `Core12/` and `Core13/` are autoloaded by composer, and only the
+     * directory of the running version is registered as services - so this
+     * assertion is what catches a `Configuration/Services.php` that stopped
+     * selecting, an `#[AsAlias]` that was dropped, or a class that ended up in
+     * the wrong directory. All three fail at the first `write()` otherwise, with
+     * a message about a missing core class rather than about the wiring.
+     *
+     * The expected class name is **computed** from `Typo3Version` rather than
+     * written out, so this stays one test instead of two and carries no PHPUnit
+     * group.
+     */
+    #[Test]
+    public function registeredSiteConfigurationWriterMatchesTheRunningCoreVersion(): void
+    {
+        $writer = $this->get(SiteConfigurationWriterInterface::class);
+
+        $this->assertInstanceOf(SiteConfigurationWriterInterface::class, $writer);
+        $this->assertSame(
+            sprintf(
+                'SBUERK\\Seeder\\Core%d\\Seeding\\DataHandling\\SiteConfigurationWriter',
+                (new Typo3Version())->getMajorVersion(),
+            ),
+            $writer::class,
+            'The container registered the site configuration writer of a different core version than the one '
+            . 'running. Only the "Core<major>/" directory of the running version is loaded, see '
+            . '"Configuration/Services.php".',
+        );
     }
 
     /**
@@ -343,8 +395,8 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     }
 
     /**
-     * A configuration written through `SiteWriter` is visible to `SiteFinder`
-     * in the same PHP process, with no cache handling of our own.
+     * A configuration written through {@see SiteConfigurationWriterInterface}
+     * is visible to `SiteFinder` in the same PHP process.
      *
      * `getAllSites()` is called **before** seeding on purpose. It fills the
      * runtime cache of `SiteConfiguration` and the root-page-id mapping of
@@ -352,6 +404,13 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
      * finder that never heard about the new file would still answer from that.
      * Without the warm-up this test would pass on a cold finder and prove
      * nothing.
+     *
+     * It is also what pins the one behaviour the two core version aware writers
+     * have to produce by different means: TYPO3 v13 dispatches a
+     * `SiteConfigurationChangedEvent` the finder listens to, TYPO3 v12 has no
+     * such event and a `SiteFinder` that fills its site list in the constructor,
+     * so the v12 implementation refreshes it itself. Remove that and this test
+     * fails on v12 and passes on v13.
      */
     #[Test]
     public function aWrittenConfigurationIsFoundBySiteFinderInTheSameProcess(): void
@@ -430,12 +489,17 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
      * A template that carries `dependencies:` is written unchanged and read
      * back into the site entity on both core versions.
      *
-     * `dependencies` is often taken for a v14 key. It is not: `Site::__construct()`
-     * reads `$configuration['dependencies'] ?? []` into its set list on 13.4
-     * and 14.3 alike, and the versions differ only in the fourth argument
-     * v14.3 adds to `SiteWriter::createNewBasicSite()`, which this seeder does
-     * not call. This is what keeps that true - a core version that starts
-     * rejecting or renaming the key fails here rather than in an installation.
+     * The **writing** half is version independent: the seeder hands the
+     * template's array to the writer and the writer dumps it, so a key a core
+     * version has no concept of still arrives in the file unchanged.
+     *
+     * The read-back is asserted on `Site::getConfiguration()` rather than on
+     * `Site::getSets()`, which is what the key finally becomes on TYPO3 v13.
+     * `getSets()` does not exist on v12 - site sets are a v13 concept - and what
+     * this seeder is responsible for is that the key survives the round trip
+     * into the site entity, which is true on both versions. A version that
+     * starts rejecting or renaming the key on the way in fails here rather than
+     * in an installation.
      */
     #[Test]
     public function aTemplateCarryingSiteSetDependenciesIsWrittenOnBothCoreVersions(): void
@@ -452,7 +516,7 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
         );
         $this->assertSame(
             ['tests/a-site-set-that-does-not-exist'],
-            $this->get(SiteFinder::class)->getSiteByIdentifier('dependencies')->getSets(),
+            $this->get(SiteFinder::class)->getSiteByIdentifier('dependencies')->getConfiguration()['dependencies'],
         );
     }
 
@@ -517,7 +581,7 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
      * An identifier the installation already uses is refused rather than
      * merged into.
      *
-     * `SiteWriter::write()` diffs an incoming configuration against the
+     * The core writer's `write()` diffs an incoming configuration against the
      * existing file and applies only the changed keys, so writing a template
      * over an existing site produces a hybrid of the two. Seeding the same set
      * twice is the case a user runs into, and it has to say so.
@@ -564,7 +628,7 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     #[Test]
     public function aSetShippedByAnExtensionIsSeededFromItsOwnDirectory(): void
     {
-        $definition = (new SeedDefinitionParser())->parseFile($this->templateBasePath() . '/config.yml');
+        $definition = $this->parser()->parseFile($this->templateBasePath() . '/config.yml');
 
         [$seedResult, $result] = $this->seed($definition);
 

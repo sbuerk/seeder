@@ -37,7 +37,7 @@ is selecting the core version aware directory to register — see
 
   ```php
   #[Autoconfigure(public: true)]
-  final readonly class PublicApiEntryPoint
+  final class PublicApiEntryPoint
   {
   }
   ```

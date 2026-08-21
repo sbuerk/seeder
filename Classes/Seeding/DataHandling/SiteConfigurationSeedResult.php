@@ -26,7 +26,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class SiteConfigurationSeedResult
+final class SiteConfigurationSeedResult
 {
     /**
      * @param list<string> $writtenSites The identifiers of the site
@@ -39,7 +39,7 @@ final readonly class SiteConfigurationSeedResult
      *        no symbolic identifier: what it declares is the uid itself.
      */
     public function __construct(
-        public array $writtenSites = [],
-        public array $uncoveredSiteRoots = [],
+        public readonly array $writtenSites = [],
+        public readonly array $uncoveredSiteRoots = [],
     ) {}
 }

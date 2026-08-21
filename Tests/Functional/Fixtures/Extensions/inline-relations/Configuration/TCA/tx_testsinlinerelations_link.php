@@ -14,8 +14,11 @@ declare(strict_types=1);
  * "tt_content", so a test can tell the two levels apart instead of trusting
  * that a nested child was written at all.
  *
- * As for the item table, there is no "ext_tables.sql" — every column is
- * derived from this TCA.
+ * As for the item table, TYPO3 v13 derives every column from this TCA while
+ * v12 needs the table and its non-"ctrl" columns spelled out — see
+ * "ext_tables.sql" of this fixture.
+ *
+ * @todo Drop the "ext_tables.sql" once TYPO3 v12 support is dropped.
  */
 return [
     'ctrl' => [
@@ -70,8 +73,8 @@ return [
         // RelationHandler ever writes it: DefaultTcaSchema derives the
         // "foreign_field" and the "foreign_table_field" of an inline relation
         // by itself, but never the "foreign_sortby" — a passthrough column is
-        // not derived at all, and the relation would be numbered into a column
-        // that does not exist. Declared as core declares
+        // not derived at all, and on TYPO3 v13 the relation would be numbered
+        // into a column that does not exist. Declared as core declares
         // "sys_file_reference.sorting_foreign", for the same reason.
         'sorting_foreign' => [
             'label' => 'Sorting',

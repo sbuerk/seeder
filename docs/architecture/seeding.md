@@ -8,10 +8,12 @@ the scenario format has
 in [Seed sets and the CLI](../development/seed-sets.md). This page is about the
 mechanism between them.
 
-Everything here was established by reading the core on disk, on TYPO3 v13.4 and
-v14.3, and every claim names the file it came from so the next reader can check
-it instead of trusting it. The class docblocks carry the same citations with
-line numbers; line numbers move, the cited method names do not.
+Everything here was established by reading the core on disk, on **TYPO3 12.4.45
+and 13.4** - the two versions this branch supports - and every claim names the
+file it came from so the next reader can check it instead of trusting it. The
+class docblocks carry the same citations with line numbers; line numbers move,
+the cited method names do not. Where the two versions genuinely differ, both
+are named; where a claim was checked on one of them only, it says so.
 
 ## The pipeline
 
@@ -129,26 +131,34 @@ from the declared values, in that order.
 Two consequences reach an integrator, and both are stated on
 [Seed definitions](../development/seed-definitions.md#hidden-is-not-defaulted-for-you):
 
-- `EXT:core/Configuration/TCA/Overrides/pages.php` sets
-  `$GLOBALS['TCA']['pages']['columns']['hidden']['config']['default'] = 1`, so a
-  scenario that does not carry `defaultValues: {hidden: 0}` seeds a **hidden**
-  page tree. Every TYPO3 Core scenario carries it, which is why nobody notices
-  when copying one.
+- A new page is **hidden by default** on both supported versions, so a scenario
+  that does not carry `defaultValues: {hidden: 0}` seeds a hidden page tree.
+  Every TYPO3 Core scenario carries it, which is why nobody notices when copying
+  one. Where the default comes from differs and does not matter: 12.4 declares
+  `columns.hidden.config.default = 1` in the shipped
+  `EXT:core/Configuration/TCA/pages.php` itself, 13.4 has no `hidden` column in
+  that file and sets the same value from
+  `EXT:core/Configuration/TCA/Overrides/pages.php` instead.
 - `doktype`, `l10n_parent` and `sys_language_uid` come from the TCA of the
-  installation. The first two have a default there - the shipped `pages` TCA and
-  `TcaEnrichment::enrichTransOrigPointerField()` - and the third does not, which
-  DataHandler covers with `addDefaultPermittedLanguageIfNotSet()`.
+  installation. `l10n_parent` has a default of `0` on both, again from different
+  places - declared in the shipped `pages` TCA on 12.4, supplied by
+  `Core\Configuration\Tca\TcaEnrichment::enrichTransOrigPointerField()` on
+  13.4, a class 12.4 does not have. `sys_language_uid` has no TCA default on
+  either, which DataHandler covers with `addDefaultPermittedLanguageIfNotSet()`
+  (12.4: `DataHandler.php:8385`; 13.4: `DataHandler.php:8256`).
 
 The one place where relying on the TCA is not merely a matter of taste is
 `Core\Hooks\CreateSiteConfiguration`. Its early return reads
 `(int)$fieldValues['l10n_parent']` **before** it reaches
 `|| $dataHandler->isImporting`, so the read happens for every seeded page even
-though the hook does nothing afterwards. It is unguarded on v13.4 and `?? 0` on
-v14.3. On v13.4, exactly one TCA override removing the enrichment default
-therefore separates a seeded page from an `Undefined array key` warning - which
-this test suite turns into a failure. A scenario that declares `l10n_parent: 0`
-in its `'*'` defaults is immune; this extension does not declare it on the
-scenario's behalf.
+though the hook does nothing afterwards - and it is unguarded on **both**
+versions: `processDatamap_afterDatabaseOperations()` is byte identical on
+12.4.45 and 13.4.34 down to the line, the two files differing only in which
+writer `generateSiteConfigurationForRootPage()` reaches for. Exactly one TCA
+override removing that default therefore separates a seeded page from an
+`Undefined array key` warning - which this test suite turns into a failure. A
+scenario that declares `l10n_parent: 0` in its `'*'` defaults is immune; this
+extension does not declare it on the scenario's behalf.
 
 ## Suggested uids need both halves
 
@@ -177,13 +187,21 @@ colliding table, and there is no moment between "the writer was constructed" and
 A suggestion is not a demand in the other direction either. Leaving it in for a
 uid another row already holds does not write the record elsewhere; it makes the
 `INSERT` fail on the primary key, because DataHandler forces the uid into the
-field array. What that looks like was established by removing the collision
-check and watching it: on v13.4 the failed insert returns `null`, the `pages`
-branch of `process_datamap()` hands that `null` to
-`addDefaultPermittedLanguageIfNotSet()` and a `TypeError` comes out - not even
-the logged SQL error one would expect. Hence `UidCollisionDetector`, and hence
-`--force` dropping suggestions instead of overriding the refusal; see
+field array. What happens then is a **silent** half-import on both supported
+versions: `insertDB()` logs the failure as a `SYSTEM_ERROR` *"SQL error"* entry
+and returns `null` (12.4: `DataHandler.php:7794`; 13.4: `DataHandler.php:7791`),
+and every call site discards that return value (12.4: `DataHandler.php:1148`
+and `:1152`; 13.4: `DataHandler.php:854` and `:858`). Nothing throws, nothing
+stops, and the run continues with a record that was never written.
+
+That is exactly the failure mode this extension refuses to inherit, which is why
+there is a `UidCollisionDetector` at all - the collision is found **before**
+anything is written rather than reconstructed from an error log afterwards - and
+why `--force` drops the suggestions of the colliding table instead of overriding
+the refusal; see
 [Seed sets and the CLI](../development/seed-sets.md#uid-collisions-and---force).
+The error log is the second net: `ScenarioSeeder` raises it rather than
+returning it, see [below](#errors-are-not-logged-they-are-raised).
 
 ### Reading back what was written
 
@@ -323,31 +341,38 @@ written down before the run.
 is the flag that suppresses the `autogenerated-<uid>` site configuration TYPO3
 writes for every new page on the page tree root or carrying `is_siteroot` -
 `Core\Hooks\CreateSiteConfiguration`, whose early return ends in
-`|| $dataHandler->isImporting`. It is the same flag `EXT:impexp` sets for the
-same reason, in six places, and the core has a functional test named
-`importDoesNotCreateSiteConfigurationWhenDisabled()` for it. It is not
-deprecated: searching the changelogs of 13.4 and 14.3 for `isImporting`,
-`CreateSiteConfiguration` and `processDatamapClass` returns nothing.
+`|| $dataHandler->isImporting` on 12.4.45 and 13.4.34 alike (both at
+`CreateSiteConfiguration.php:75`). It is the same flag `EXT:impexp` sets for the
+same reason, six times in its `Import.php` on both branches. It is not
+deprecated: searching the changelog sets shipped with `typo3/cms-core` 12.4 and
+13.4 for `isImporting`, `CreateSiteConfiguration` and `processDatamapClass`
+returns nothing at all.
 
-It is a **public flag with nine consumers**, so adopting it blind is not
-acceptable. Enumerated on both versions - the lists are identical - the
-consumers outside `impexp` are:
+It is a **public flag with a handful of other consumers**, so adopting it blind
+is not acceptable. Enumerated on both versions - and here the lists are *not*
+identical, which is the one thing about this flag that changed between them:
 
-| Consumer                                               | Effect                                                                             | Verdict        |
-|--------------------------------------------------------|------------------------------------------------------------------------------------|----------------|
-| `Core\Hooks\CreateSiteConfiguration`                   | no automatic site configuration                                                    | the point      |
-| `Backend\Hooks\DataHandlerAuthenticationContext`       | skips sudo mode and authentication context evaluation                              | neutral        |
-| `Core\Resource\Security\FilePermissionAspect`          | lets `sys_file` be written through DataHandler at all                              | neutral        |
-| `Core\Resource\Security\FilePermissionAspect`          | skips `usesDisallowedFileMount()` for `sys_file_reference` and `sys_file_metadata` | **beneficial** |
-| `Core\Resource\Security\FileMetadataPermissionsAspect` | allows a `sys_file_metadata` record with an empty `file`                           | neutral        |
-| `Core\Hooks\UpdateFileIndexEntry`                      | skips re-indexing after a new `sys_file_metadata` record                           | neutral        |
-| `Core\Hooks\BackendUserPasswordCheck`                  | no generated password and `autogenerated-<md5>` username for a `be_users` record   | **caveat**     |
-| `DataHandler`                                          | the flag is handed on to the copy handler                                          | neutral        |
+| Consumer                                               | Effect                                                                             | 12.4 | 13.4 | Verdict        |
+|--------------------------------------------------------|------------------------------------------------------------------------------------|------|------|----------------|
+| `Core\Hooks\CreateSiteConfiguration`                   | no automatic site configuration                                                    | yes  | yes  | the point      |
+| `Backend\Hooks\DataHandlerAuthenticationContext`       | skips sudo mode and authentication context evaluation                              | yes  | yes  | neutral        |
+| `Core\Resource\Security\FilePermissionAspect`          | lets `sys_file` be written through DataHandler at all                              | yes  | yes  | neutral        |
+| `Core\Resource\Security\FilePermissionAspect`          | skips `usesDisallowedFileMount()` for `sys_file_reference` and `sys_file_metadata` | yes  | yes  | **beneficial** |
+| `Core\Resource\Security\FileMetadataPermissionsAspect` | allows a `sys_file_metadata` record with an empty `file`                           | yes  | yes  | neutral        |
+| `Core\Hooks\UpdateFileIndexEntry`                      | skips re-indexing after a new `sys_file_metadata` record                           | -    | yes  | neutral        |
+| `Core\Hooks\BackendUserPasswordCheck`                  | no generated password and `autogenerated-<md5>` username for a `be_users` record   | yes  | yes  | **caveat**     |
+| `DataHandler`                                          | the flag is handed on to the copy handler                                          | yes  | yes  | neutral        |
 
-The neutral ones are neutral for a reason each: the authentication context hook
-returns immediately without a backend request and seeding runs on the CLI; files
-are seeded through the storage API rather than through DataHandler; no
-`sys_file_metadata` record is written; nothing is copied.
+`Core\Hooks\UpdateFileIndexEntry` does not exist in `typo3/cms-core` 12.4.45 at
+all - `Classes/Hooks/` there holds eight files and that is not one of them - so
+the v12 leg has one consumer fewer. It makes no difference here for the same
+reason the row is neutral on v13: no `sys_file_metadata` record is written by a
+seed.
+
+The other neutral ones are neutral for a reason each: the authentication context
+hook returns immediately without a backend request and seeding runs on the CLI;
+files are seeded through the storage API rather than through DataHandler; nothing
+is copied.
 
 The **beneficial** one is why `FileReferenceSeeder` sets the same flag on its own
 DataHandler. Without it, `FilePermissionAspect::processDatamap_preProcessFieldArray()`
@@ -385,11 +410,26 @@ read the way it was meant.
 
 The same reasoning applies one level up, in the parser:
 `YamlFileLoader::processImports()` catches its exceptions per import and reports
-them to a logger. For a site configuration that is a reasonable trade - the site
-still loads, minus an optional include. For a seed descriptor it is data loss,
-so `ThrowOnErrorLogger` raises the report back into an exception. Only error
-level and above, so a future core version logging something informational from
-the loader does not turn a working definition into a failure.
+them to a logger on both supported versions (12.4:
+`YamlFileLoader.php:171`; 13.4: `YamlFileLoader.php:180`, the same
+`$this->logger->error(...)` call inside the same `catch`). For a site
+configuration that is a reasonable trade - the site still loads, minus an
+optional include. For a seed descriptor it is data loss, so `ThrowOnErrorLogger`
+raises the report back into an exception. Only error level and above, so a future
+core version logging something informational from the loader does not turn a
+working definition into a failure.
+
+**Getting that logger into the loader is core version aware**, and it is one of
+the three `Core12/` / `Core13/` seams of this extension. On 13.4 `YamlFileLoader`
+is a `readonly class` taking `LoggerInterface` as its only constructor argument;
+on 12.4 it is a plain class implementing `LoggerAwareInterface` via
+`LoggerAwareTrait`, with no constructor at all - so the logger arrives through
+`setLogger()`. Passing it to the constructor there does not raise anything: PHP
+discards arguments to a class without a constructor, `$this->logger` stays unset,
+and the first report that was meant to become a `SeedingException` becomes a
+fatal error instead. `load()` itself and the `PROCESS_IMPORTS` flag are spelled
+identically on both versions, so only the construction is split.
+See [Core version aware code](core-version-aware-code.md).
 
 ## The layout of `Classes/Seeding/`
 

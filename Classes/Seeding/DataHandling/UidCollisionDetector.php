@@ -36,10 +36,10 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class UidCollisionDetector
+final class UidCollisionDetector
 {
     public function __construct(
-        private ConnectionPool $connectionPool,
+        private readonly ConnectionPool $connectionPool,
     ) {}
 
     /**

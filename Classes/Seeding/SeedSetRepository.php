@@ -63,7 +63,7 @@ use TYPO3\CMS\Core\Package\PackageManager;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class SeedSetRepository
+final class SeedSetRepository
 {
     /**
      * Relative to the package path. Not configurable: a set is found where the
@@ -83,7 +83,7 @@ final readonly class SeedSetRepository
     private const DESCRIPTION = 'description';
 
     public function __construct(
-        private PackageManager $packageManager,
+        private readonly PackageManager $packageManager,
     ) {}
 
     /**

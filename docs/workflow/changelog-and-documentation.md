@@ -69,8 +69,8 @@ shipped with the installed core:
 
 Because it ships with the dependency, what is on disk depends on what is
 installed — and it reaches only as far as the installed version. A package does
-carry the changelogs of all **earlier** versions, so with TYPO3 v14 installed
-both `13.*` and `14.*` are there, while a v13 installation has no `14.0/` at
+carry the changelogs of all **earlier** versions, so with TYPO3 v13 installed
+both `12.*` and `13.*` are there, while a v12 installation has no `13.0/` at
 all.
 
 Installing the **highest** supported version therefore gives the complete set in

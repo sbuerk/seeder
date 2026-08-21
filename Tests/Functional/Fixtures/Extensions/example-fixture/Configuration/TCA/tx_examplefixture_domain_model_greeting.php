@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use TYPO3\CMS\Core\Information\Typo3Version;
-
 /**
  * TCA of the greeting table of the fixture extension.
  *
@@ -19,8 +17,10 @@ use TYPO3\CMS\Core\Information\Typo3Version;
  * retrieval, and "versioningWS", so workspace overlays apply as well.
  *
  * TCA is configuration, not code, so a core version difference cannot be
- * resolved by the "Core13/" and "Core14/" split used for classes. It is applied
- * to the array before returning it instead, see the bottom of this file.
+ * resolved by the "Core12/" and "Core13/" split used for classes. It would be
+ * applied to the array before returning it instead, at the bottom of this file
+ * - there is no such difference between the two versions this branch supports,
+ * and the note at the bottom says what the 2.x line does instead.
  */
 $tcaConfiguration = [
     'ctrl' => [
@@ -88,15 +88,13 @@ $tcaConfiguration = [
     ],
 ];
 
-// The 'searchFields' ctrl option was removed in TYPO3 v14 (Breaking #106972).
-// There, all fields of suitable types are searchable by default and the option
-// is migrated away at runtime with a deprecation; per-field opt-out is the new
-// 'searchable' field configuration. TYPO3 v13 still evaluates 'searchFields'
-// and searches nothing without it, so the explicit list is kept there and only
-// there.
-// @todo Remove once TYPO3 v13 support is dropped.
-if ((new Typo3Version())->getMajorVersion() < 14) {
-    $tcaConfiguration['ctrl']['searchFields'] = 'title,message';
-}
+// Both supported core versions evaluate 'searchFields' and search nothing
+// without it, so it is declared unconditionally. TYPO3 v14 removed the option
+// (Breaking #106972) - there all fields of a suitable type are searchable by
+// default and the option is migrated away at runtime with a deprecation - which
+// is why the 2.x line of this extension guards this assignment and this branch
+// does not. A guard here would be a condition that is true on every version the
+// branch supports, which reads as a version difference and is none.
+$tcaConfiguration['ctrl']['searchFields'] = 'title,message';
 
 return $tcaConfiguration;

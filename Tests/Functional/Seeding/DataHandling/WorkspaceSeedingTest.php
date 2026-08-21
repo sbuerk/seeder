@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
+use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
 use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
 use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
@@ -176,7 +177,10 @@ final class WorkspaceSeedingTest extends AbstractFunctionalTestCase
             scenarios: ['WorkspaceScenario.yaml'],
         );
         $seeder = new ScenarioSeeder(
-            new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class)),
+            new FileSeeder(
+                GeneralUtility::makeInstance(StorageRepository::class),
+                $this->get(FileImporterInterface::class),
+            ),
             new FileReferenceSeeder(GeneralUtility::makeInstance(ConnectionPool::class)),
         );
 

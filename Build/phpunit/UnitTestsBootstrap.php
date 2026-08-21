@@ -30,13 +30,31 @@ use TYPO3\TestingFramework\Core\Testbase;
  * phpunit before instantiating the test suites.
  *
  * Derived from the boilerplate shipped with typo3/testing-framework in
- * "Resources/Core/Build/UnitTestsBootstrap.php", baselined from version 9.6.1.
- * Re-check it against that file when the testing-framework is updated.
+ * "Resources/Core/Build/UnitTestsBootstrap.php", baselined from version 8.3.3 —
+ * the 8.x line, which is the one covering TYPO3 v12 and v13. That file is byte
+ * identical to the 9.6.1 one. Re-check it against the boilerplate when the
+ * testing-framework is updated.
  *
- * Deliberate deviations from the boilerplate: fully qualified class names are
- * replaced by imports and the closure is typed, both to satisfy the coding
- * guidelines of this repository, and the branch for TYPO3 v12 is dropped
- * because this extension does not support that version.
+ * Deliberate deviations from the boilerplate:
+ *
+ * * Fully qualified class names are replaced by imports and the closure is
+ *   typed, both to satisfy the coding guidelines of this repository.
+ * * The request type is passed unconditionally. The boilerplate branches on
+ *   "class_exists(CoreHttpApplication::class)" and passes
+ *   "REQUESTTYPE_BE|REQUESTTYPE_CLI" where that class is absent, which is meant
+ *   to be TYPO3 v12 — \TYPO3\CMS\Core\Http\Application does not exist there.
+ *   The branch is not reproduced, for two reasons that were verified rather
+ *   than assumed. The boilerplate declares no namespace and no import for
+ *   "CoreHttpApplication", so the name resolves to the global
+ *   "\CoreHttpApplication", "class_exists()" is false on every core version,
+ *   and upstream in fact always takes its else branch — the guard distinguishes
+ *   nothing. And on v12 the two request types are indistinguishable in effect:
+ *   \TYPO3\CMS\Core\Core\SystemEnvironmentBuilder::run() hands $requestType to
+ *   calculateScriptPath(), calculateRootPath() and initializeEnvironment()
+ *   only, and each of the three consumes it exclusively through
+ *   isCliRequestType(), which tests "($requestType & REQUESTTYPE_CLI)" and is
+ *   true for both values. v12 no longer defines a TYPO3_REQUESTTYPE constant,
+ *   so nothing else can observe the difference either.
  *
  * The recommended way to execute the suite is "Build/Scripts/runTests.sh".
  */

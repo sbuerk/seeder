@@ -532,17 +532,21 @@ final class DataHandlerFactory
             } elseif ($action === 'discard' && $workspaceId > 0) {
                 // Deliberate divergence from `typo3/testing-framework` 9.6.1,
                 // which emits `clearWSID` as the *command name*.
-                // `DataHandler::process_cmdmap()` has no case for it, in v13 or
-                // in v14, so the command is dropped with no branch and no log
-                // entry and the action does nothing at all. `clearWSID` is an
-                // action of the `version` command, which is how
+                // Nothing consumes it as a command name on either supported
+                // core version, so the command is dropped with no branch and no
+                // log entry and the action does nothing at all. `clearWSID` is
+                // an *action* of the `version` command, handled by
+                // `EXT:workspaces` (`DataHandlerHook::processCmdmap()`), which
+                // is how both
                 // `TYPO3\TestingFramework\Core\Functional\Framework\DataHandling\ActionService`
-                // itself discards a record.
+                // and `WorkspaceService::flushWorkspaceRecords()` discard a
+                // record.
                 //
-                // @todo v14 added a `discard` command that says what it does.
-                //       Emit that one instead once TYPO3 v13 support is
-                //       dropped - core carries a `@todo` of its own to remove
-                //       the `clearWSID` action once nothing uses it any more.
+                // @todo TYPO3 v14 added a `discard` command that says what it
+                //       does. It exists on neither version this branch
+                //       supports, so the switch belongs to the 2.x line -
+                //       core carries a `@todo` of its own to remove the
+                //       `clearWSID` action once nothing uses it any more.
                 $this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['version'] = ['action' => 'clearWSID'];
             }
         }

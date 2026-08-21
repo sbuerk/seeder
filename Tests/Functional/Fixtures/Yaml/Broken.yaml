@@ -1,0 +1,3 @@
+# Deliberately unparseable: the quoted scalar below is never terminated.
+title: 'Unterminated
+key: value

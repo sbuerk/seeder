@@ -72,10 +72,13 @@ be testing an installation nobody has.
 ```
 
 **An inline child of a workspace aware table has to be workspace aware itself.**
-On **TYPO3 v14 only**, a child that is not gets migrated by the TCA migration —
-with a deprecation, which this suite turns into a failure. `tt_content` is
-workspace aware, so the item table below it needs `'versioningWS' => true`, and
-the link table below *that* needs it in turn.
+`tt_content` is workspace aware, so the item table below it needs
+`'versioningWS' => true`, and the link table below *that* needs it in turn.
+Neither supported version helps here: `TcaMigration` mentions `versioningWS` in
+neither 12.4.45 nor 13.4, so a mismatch is migrated by nothing and warned about
+by nothing — it simply produces workspace behaviour that stops at the parent.
+(The automatic migration, with a deprecation, arrived only in TYPO3 v14, which
+this branch does not support.)
 
 Neither is a rule about seeding. Both are rules about TCA that a fixture author
 meets for the first time here, because a fixture table is usually the first table
@@ -222,13 +225,18 @@ rest lower cased. The extension key `tests_example_fixture` does not appear in
 it.
 
 `ext_tables.sql` declares the own fields only. TYPO3 derives `uid`, `pid`,
-`deleted`, the language fields and the workspace fields from the TCA, so
-declaring them by hand is redundant and drifts.
+`deleted`, the language fields and the workspace fields from the TCA on both
+supported versions, so declaring *those* by hand is redundant and drifts.
 
-The TCA also carries the one core version switch of the fixture — `searchFields`
-exists on v13 and was removed on v14. Configuration cannot use the `Core13/` and
-`Core14/` split, so it is applied to the array before returning it; see
-[Core version aware code](../architecture/core-version-aware-code.md#configuration-is-the-exception).
+The own fields are a different matter, and the file exists because of it:
+TYPO3 v13 derives a column from every TCA `columns` entry, **v12 does not** —
+`DefaultTcaSchema` on 12.4 covers the management columns, `category`,
+`datetime`, `slug`, `json`, `uuid` and MM tables and nothing else. Without the
+explicit `title` and `message` definitions the table is incomplete on v12 and
+complete on v13, and only the v12 leg fails. One unconditional file serves both,
+because an explicit definition takes precedence over the derived one (Feature
+#101553). See
+[Configuration is the exception](../architecture/core-version-aware-code.md#configuration-is-the-exception).
 A fixture extension is held to the same rules as the extension itself here.
 
 The [`composer.json`](../../Tests/Functional/Fixtures/Extensions/example-fixture/composer.json)
@@ -266,11 +274,15 @@ implementation pattern as the extension:
 
 ```php
 #[AsAlias(id: DummyServiceInterface::class, public: true)]
-final readonly class DummyService implements DummyServiceInterface
+final class DummyService implements DummyServiceInterface
 ```
 
-A fixture extension is **not** core version aware. There is no `Core13/` and
-`Core14/` split — if a fixture needs to behave differently per core version,
+`final`, not `final readonly` — the
+[PHP 8.1 rule](../architecture/class-design.md#the-php-81-rule-readonly-sits-on-the-properties)
+applies to fixture code as well.
+
+A fixture extension is **not** core version aware. There is no `Core12/` and
+`Core13/` split — if a fixture needs to behave differently per core version,
 that belongs in the test, not in the fixture.
 
 ## What the test proves

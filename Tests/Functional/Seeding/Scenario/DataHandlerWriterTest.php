@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SBUERK\Seeder\Tests\Functional\Seeding\Scenario;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
 use SBUERK\Seeder\Seeding\Scenario\DataHandlerWriter;
@@ -409,15 +410,21 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
     }
 
     /**
-     * The one failure the writer does not turn into an entry of `getErrors()`.
+     * The one failure the writer does not turn into an entry of `getErrors()`,
+     * and the one place where the two supported core versions disagree about
+     * what a broken command map does.
      *
      * A command map key that no round resolved stays the `NEW` identifier it
-     * was, and `DataHandler::start()` rejects a command map key that is not an
-     * integer (`1708586979`, added in v13). The exception passes through
-     * `invokeFactory()`, so a caller that only looks at `getErrors()` sees
-     * nothing - which is worth knowing before this writer is used behind a
+     * was. TYPO3 v13 rejects a command map key that is not an integer
+     * (`1708586979`, `DataHandler::start()`), and the exception passes through
+     * `invokeFactory()` - so a caller that only looks at `getErrors()` sees
+     * nothing, which is worth knowing before this writer is used behind a
      * console command.
+     *
+     * TYPO3 v12.4 has no such check, which is why this is grouped rather than
+     * written once: the companion below pins what happens there instead.
      */
+    #[Group('not-core-12')]
     #[Test]
     public function anUnresolvedCommandMapKeyEscapesAsAnExceptionRatherThanAnError(): void
     {
@@ -429,6 +436,33 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
         $this->expectExceptionCode(1708586979);
 
         $writer->invokeFactory($this->factory('ActionsScenario.yaml'));
+    }
+
+    /**
+     * The same run on TYPO3 v12.4, where `DataHandler::start()` accepts the
+     * unresolved key without complaint.
+     *
+     * This is the worse of the two behaviours and the reason the v13 guard was
+     * added: nothing is raised, nothing reaches `getErrors()`, and the commands
+     * of the set are simply not carried out. A caller cannot tell that run from
+     * a successful one, which is exactly what `ScenarioSeeder` guards against
+     * by refusing a non administrator before it starts.
+     *
+     * @todo Fold back into the test above once TYPO3 v12 support is dropped.
+     */
+    #[Group('not-core-13')]
+    #[Test]
+    public function anUnresolvedCommandMapKeyIsAcceptedWithoutComplaint(): void
+    {
+        $writer = DataHandlerWriter::withBackendUser($this->backendUser(2));
+
+        $writer->invokeFactory($this->factory('ActionsScenario.yaml'));
+
+        // The non admin wrote nothing, so there is nothing for the commands to
+        // act on either - and the writer reports the refusals of the data map
+        // round only.
+        $this->assertSame([], $this->rows('pages', ['uid']));
+        $this->assertNotSame([], $writer->getErrors());
     }
 
     /**
@@ -648,7 +682,14 @@ final class RecordingDataHandlerHook
     public static array $rounds = [];
 
     /**
-     * @var list<array<string, array<string|int, mixed>>>
+     * The outer key is `int|string` rather than `string`, because that is how
+     * TYPO3 v12.4 annotates `DataHandler::$datamap` - `array<int|string,
+     * array<int|string, array>>`. Only a table name is ever written into it,
+     * here and in core, so the wider key is an artefact of the annotation and
+     * not of the data. Declaring `string` makes the assignment below an error
+     * on the v12 leg and passes on the v13 one, which is the worst of both.
+     *
+     * @var list<array<int|string, array<string|int, mixed>>>
      */
     public static array $dataMaps = [];
 

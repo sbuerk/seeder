@@ -29,7 +29,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class SeedFileReference
+final class SeedFileReference
 {
     /**
      * @param string $file Identifier of a file declared under `files`.
@@ -45,10 +45,10 @@ final readonly class SeedFileReference
      *        from the record it declares it on.
      */
     public function __construct(
-        public string $file,
-        public string $table,
-        public int $uid,
-        public string $field,
-        public array $values = [],
+        public readonly string $file,
+        public readonly string $table,
+        public readonly int $uid,
+        public readonly string $field,
+        public readonly array $values = [],
     ) {}
 }

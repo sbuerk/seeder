@@ -31,7 +31,7 @@
 #                                branching and forced minor/major bumps
 #
 # Options:
-#   --source-branch=<name>   git branch the branch-alias is keyed to (default: main)
+#   --source-branch=<name>   git branch the branch-alias is keyed to (default: 1)
 #   --dry-run                print every change without touching a file
 #   -h, --help               show this help
 #
@@ -65,7 +65,7 @@ usage() {
 # ---------------------------------------------------------------------------
 PASSED_VERSION=""
 TYPE=""
-SOURCE_BRANCH="main"
+SOURCE_BRANCH="1"
 
 while [ $# -gt 0 ]; do
     case "$1" in

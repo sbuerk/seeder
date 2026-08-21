@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
+use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
 use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedFile;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
 use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
 use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -70,10 +72,18 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
      * The subject, constructed rather than fetched from the container: the
      * service is private and its wiring is proven where it is injected, not by
      * publishing it for a test.
+     *
+     * The file importer is the one dependency that *is* taken from the
+     * container, because it is core version aware - constructing it would pin
+     * this test to one of the two implementations and make it a fatal error on
+     * the other core version. See {@see FileImporterInterface}.
      */
     private function subject(): FileSeeder
     {
-        return new FileSeeder(GeneralUtility::makeInstance(StorageRepository::class));
+        return new FileSeeder(
+            GeneralUtility::makeInstance(StorageRepository::class),
+            $this->get(FileImporterInterface::class),
+        );
     }
 
     /**
@@ -147,7 +157,7 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
      */
     private function seedFileSet(): array
     {
-        return $this->subject()->seed((new SeedDefinitionParser())->parseFile(self::SEED));
+        return $this->subject()->seed($this->parser()->parseFile(self::SEED));
     }
 
     /**
@@ -430,5 +440,14 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
         }
 
         $this->assertSame([], $this->queryTable('sys_file', ['uid'], 'uid'));
+    }
+
+    /**
+     * The parser takes the core version aware YAML loader, so it is fetched
+     * from the container rather than the parser being newed up bare.
+     */
+    private function parser(): SeedDefinitionParser
+    {
+        return new SeedDefinitionParser($this->get(SeedYamlFileLoaderInterface::class));
     }
 }

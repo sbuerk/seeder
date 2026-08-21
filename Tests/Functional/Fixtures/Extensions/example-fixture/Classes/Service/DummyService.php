@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsAlias;
  * the container with `$this->get()`.
  */
 #[AsAlias(id: DummyServiceInterface::class, public: true)]
-final readonly class DummyService implements DummyServiceInterface
+final class DummyService implements DummyServiceInterface
 {
     public function getExtensionKey(): string
     {

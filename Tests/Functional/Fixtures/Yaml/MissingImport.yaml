@@ -1,0 +1,5 @@
+# Imports a resource that is not there. The loader reports that to its
+# logger instead of raising it, which is what makes the logger load bearing.
+imports:
+  - resource: DoesNotExist.yaml
+title: 'Still here'

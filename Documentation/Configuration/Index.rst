@@ -970,7 +970,9 @@ Three rules apply to the result:
 *   **A minimal template needs almost nothing.** ``base`` and ``languages`` are
     worth declaring, because their defaults are a site on ``/`` in
     "Default / en_US.UTF-8". ``dependencies`` - the site sets a site pulls in -
-    is written unchanged and works on TYPO3 v13 and v14 alike.
+    is written unchanged, and is a TYPO3 v13 key: TYPO3 v12 has no site sets, so
+    a template declaring it seeds a configuration whose ``dependencies`` v12
+    simply ignores.
 
 Placeholders such as ``%env(...)%`` inside a template are **not** resolved while
 seeding. They are written as they stand, so the installation resolves them every

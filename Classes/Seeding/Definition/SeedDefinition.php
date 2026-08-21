@@ -22,7 +22,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class SeedDefinition
+final class SeedDefinition
 {
     /**
      * @param string $identifier Globally unique across all packages. It is
@@ -55,13 +55,13 @@ final readonly class SeedDefinition
      *        after the records, when their root page has a uid.
      */
     public function __construct(
-        public string $identifier,
-        public string $title,
-        public string $description = '',
-        public string $basePath = '',
-        public array $scenarios = [],
-        public array $files = [],
-        public array $references = [],
-        public array $sites = [],
+        public readonly string $identifier,
+        public readonly string $title,
+        public readonly string $description = '',
+        public readonly string $basePath = '',
+        public readonly array $scenarios = [],
+        public readonly array $files = [],
+        public readonly array $references = [],
+        public readonly array $sites = [],
     ) {}
 }

@@ -7,13 +7,13 @@
                project-home="https://github.com/sbuerk/seeder"
                project-repository="https://github.com/sbuerk/seeder"
                project-issues="https://github.com/sbuerk/seeder/issues"
-               edit-on-github-branch="main"
+               edit-on-github-branch="1"
                edit-on-github="sbuerk/seeder"
                typo3-core-preferred="stable"
     />
     <project title="Seeder"
-             release="main (development)"
-             version="main (development)"
+             release="1 (development)"
+             version="1 (development)"
              copyright="sbuerk &amp; Contributors"
     />
 </guides>

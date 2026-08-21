@@ -25,21 +25,21 @@
         }
     ],
     "require": {
-        "php": "^8.2 || ^8.3 || ^8.4 || ^8.5",
-        "typo3/cms-core": "^13.4 || ^14.3"
+        "php": "^8.1 || ^8.2 || ^8.3 || ^8.4",
+        "typo3/cms-core": "^12.4.22 || ^13.4"
     },
     "require-dev": {
-        "fgtclb/environment-state-manager": "^2.0.1",
+        "fgtclb/environment-state-manager": "^1.0.0",
         "friendsofphp/php-cs-fixer": "^3.95.15",
-        "nikic/php-parser": "^5.4.0",
-        "phpstan/phpstan": "^2.2.5",
-        "phpstan/phpstan-phpunit": "^2.0.18",
-        "phpunit/phpunit": "^11.5.56",
-        "saschaegerer/phpstan-typo3": "^2.1.1 || ^3.0.1",
+        "nikic/php-parser": "^4.15.4 || ^5.4.0",
+        "phpstan/phpstan": "^1.12.34 || ^2.2.5",
+        "phpstan/phpstan-phpunit": "^1.4.2 || ^2.0.18",
+        "phpunit/phpunit": "^10.5.64",
+        "saschaegerer/phpstan-typo3": "^1.10.2 || ^2.1.1",
         "sbuerk/fixture-packages": "^1.1.3",
-        "sbuerk/typo3-site-based-test-trait": "^2.0.1 || ^3.0.0",
-        "typo3/cms-workspaces": "^13.4 || ^14.3",
-        "typo3/testing-framework": "^9.6.1"
+        "sbuerk/typo3-site-based-test-trait": "^1.0.2 || ^2.0.1",
+        "typo3/cms-workspaces": "^12.4.22 || ^13.4",
+        "typo3/testing-framework": "^8.3.3"
     },
     "config": {
         "allow-plugins": {
@@ -59,8 +59,8 @@
     "autoload": {
         "psr-4": {
             "SBUERK\\Seeder\\": "Classes/",
-            "SBUERK\\Seeder\\Core13\\": "Core13/",
-            "SBUERK\\Seeder\\Core14\\": "Core14/"
+            "SBUERK\\Seeder\\Core12\\": "Core12/",
+            "SBUERK\\Seeder\\Core13\\": "Core13/"
         }
     },
     "autoload-dev": {
@@ -78,7 +78,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "1.x-dev": "1.0.x-dev"
         },
         "sbuerk/fixture-packages": {
             "paths": {

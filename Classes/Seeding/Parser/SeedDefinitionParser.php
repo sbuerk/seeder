@@ -12,7 +12,6 @@ use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlFileLoadingException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlParseException;
-use TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -54,7 +53,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class SeedDefinitionParser
+final class SeedDefinitionParser
 {
     private const IDENTIFIER = 'identifier';
     private const TITLE = 'title';
@@ -81,7 +80,7 @@ final readonly class SeedDefinitionParser
      * The keys a set descriptor may carry.
      *
      * `imports` is listed although the parser never sees it in practice -
-     * `YamlFileLoader` merges and removes it - so that {@see self::parse()} can
+     * the YAML loader merges and removes it - so that {@see self::parse()} can
      * be called with a raw array carrying one, and rejects the *unknown* rather
      * than the *consumed*.
      */
@@ -145,6 +144,17 @@ final readonly class SeedDefinitionParser
     private const SITE_IDENTIFIER_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9_-]*$/';
 
     /**
+     * {@see self::parse()} needs nothing injected - it works on an array and is
+     * the whole validation surface. The loader is here for
+     * {@see self::parseFile()} alone, and it is a constructor argument rather
+     * than something this class constructs because which loader is correct
+     * depends on the running core version.
+     */
+    public function __construct(
+        private readonly SeedYamlFileLoaderInterface $yamlFileLoader,
+    ) {}
+
+    /**
      * Reads the entry file of a seed set, following its `imports`.
      *
      * `imports` is handled by `TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader`,
@@ -154,15 +164,15 @@ final readonly class SeedDefinitionParser
      * which is what a descriptor split over several files needs, and it means
      * this extension requires nothing beyond `typo3/cms-core`.
      *
-     * Two deliberate deviations from how the core calls it:
-     *
-     * - **Placeholders are switched off** (`PROCESS_IMPORTS` without
-     *   `PROCESS_PLACEHOLDERS`). A `%…%` fragment that happens to name a key of
-     *   the descriptor would be substituted with that key's value, and a title
-     *   or a description is content that has to arrive as it was written.
-     * - **A failing import raises** rather than being logged, through
-     *   {@see ThrowOnErrorLogger}, which the loader's own error handling makes
-     *   necessary.
+     * It is reached through {@see SeedYamlFileLoaderInterface} rather than
+     * constructed here, because the loader's constructor and its flag set differ
+     * between the supported core versions - the interface says how, and the
+     * difference is not one this class could see. The two deliberate deviations
+     * from how the core calls the loader are fixed properties of that seam:
+     * **placeholders are switched off**, so a `%…%` fragment naming a key of the
+     * descriptor is not substituted with that key's value, and **a failing import
+     * raises** through {@see ThrowOnErrorLogger} rather than being logged and
+     * skipped.
      *
      * @throws SeedDefinitionNotFoundException
      * @throws InvalidSeedDefinitionException
@@ -183,9 +193,10 @@ final readonly class SeedDefinitionParser
             );
         }
 
-        $loader = new YamlFileLoader(new ThrowOnErrorLogger($fileName));
         try {
-            $content = $loader->load($absoluteFileName, YamlFileLoader::PROCESS_IMPORTS);
+            // An empty "config.yml" is not an empty set but a descriptor that
+            // declares nothing, so it is rejected rather than allowed through.
+            $content = $this->yamlFileLoader->load($absoluteFileName, new ThrowOnErrorLogger($fileName), false);
         } catch (YamlFileLoadingException|YamlParseException $exception) {
             throw new InvalidSeedDefinitionException(
                 sprintf('The seed definition "%s" is not readable YAML: %s', $fileName, $exception->getMessage()),

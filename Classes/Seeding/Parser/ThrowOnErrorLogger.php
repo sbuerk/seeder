@@ -16,7 +16,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * `YamlFileLoader::processImports()` catches `ParseException`,
  * `YamlParseException` and `YamlFileLoadingException` around every single
  * import and reports them to its logger instead of letting them out
- * (unchanged in TYPO3 v13.4 and v14.3). For a site configuration that is a
+ * (unchanged in TYPO3 v12.4 and v13.4). For a site configuration that is a
  * reasonable trade - the site still loads, minus an optional include. For a
  * seed definition it is data loss: a typo in an `imports` resource means the
  * pages of that file are silently not seeded, and the import reports success.
