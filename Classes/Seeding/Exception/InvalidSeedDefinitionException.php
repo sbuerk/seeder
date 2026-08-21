@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Exception;
+namespace SBUERK\DataFactory\Seeding\Exception;
 
 /**
  * Thrown when a seed definition was read but cannot be understood: it is not a

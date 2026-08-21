@@ -52,8 +52,8 @@ see [Dual core setup](../development/dual-core-setup.md).
   ```php
   public static function expectedLoadedExtensionIdentifiers(): \Generator
   {
-      yield 'composer package name: sbuerk/seeder' => ['identifier' => 'sbuerk/seeder'];
-      yield 'extension key: seeder' => ['identifier' => 'seeder'];
+      yield 'composer package name: sbuerk/data-factory' => ['identifier' => 'sbuerk/data-factory'];
+      yield 'extension key: data_factory' => ['identifier' => 'data_factory'];
   }
   ```
 

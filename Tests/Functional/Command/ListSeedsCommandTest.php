@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Command;
+namespace SBUERK\DataFactory\Tests\Functional\Command;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Command\ListSeedsCommand;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Command\ListSeedsCommand;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Console\CommandRegistry;
 
 /**
- * What `seeder:list` prints for an installation whose seed sets are in order.
+ * What `data-factory:list` prints for an installation whose seed sets are in order.
  *
  * The command is taken from the container rather than constructed, because the
  * registration is half of what is under test: `#[AsCommand]` has to reach the
@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Console\CommandRegistry;
 final class ListSeedsCommandTest extends AbstractFunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/example-fixture',
         'tests/seeds-demo',
     ];
@@ -31,7 +31,7 @@ final class ListSeedsCommandTest extends AbstractFunctionalTestCase
     #[Test]
     public function theCommandIsRegisteredUnderItsName(): void
     {
-        $this->assertTrue($this->get(CommandRegistry::class)->has('seeder:list'));
+        $this->assertTrue($this->get(CommandRegistry::class)->has('data-factory:list'));
     }
 
     #[Test]
@@ -68,13 +68,13 @@ final class ListSeedsCommandTest extends AbstractFunctionalTestCase
     public function raisedVerbosityAddsTheBasePathOfEverySet(): void
     {
         $this->assertStringNotContainsString('Base path', $this->execute()->getDisplay());
-        $this->assertStringNotContainsString('Configuration/Seeder/basic', $this->execute()->getDisplay());
+        $this->assertStringNotContainsString('Configuration/DataFactory/basic', $this->execute()->getDisplay());
 
         $verboseDisplay = $this->execute(OutputInterface::VERBOSITY_VERBOSE)->getDisplay();
 
         $this->assertStringContainsString('Base path', $verboseDisplay);
-        $this->assertStringContainsString('Configuration/Seeder/basic', $verboseDisplay);
-        $this->assertStringContainsString('Configuration/Seeder/extended', $verboseDisplay);
+        $this->assertStringContainsString('Configuration/DataFactory/basic', $verboseDisplay);
+        $this->assertStringContainsString('Configuration/DataFactory/extended', $verboseDisplay);
     }
 
     private function execute(int $verbosity = OutputInterface::VERBOSITY_NORMAL): CommandTester

@@ -23,7 +23,7 @@ return static function (
 
     // Core version independent classes.
     $services->load(
-        'SBUERK\\Seeder\\',
+        'SBUERK\\DataFactory\\',
         __DIR__ . '/../Classes/*',
     );
 
@@ -39,7 +39,7 @@ return static function (
     $coreAwareDirectory = sprintf('%s/../Core%d', __DIR__, $coreMajorVersion);
     if (is_dir($coreAwareDirectory)) {
         $services->load(
-            sprintf('SBUERK\\Seeder\\Core%d\\', $coreMajorVersion),
+            sprintf('SBUERK\\DataFactory\\Core%d\\', $coreMajorVersion),
             $coreAwareDirectory . '/*',
         );
     }

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerWriter;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerWriter;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;

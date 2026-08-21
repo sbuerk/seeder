@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Command;
+namespace SBUERK\DataFactory\Tests\Functional\Command;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Command\ImportSeedCommand;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Command\ImportSeedCommand;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -17,7 +17,7 @@ use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
- * What `seeder:import` writes, and what it refuses to write.
+ * What `data-factory:import` writes, and what it refuses to write.
  *
  * The command is taken from the container rather than constructed: half of what
  * is under test is the wiring - `#[AsCommand]` reaching the `console.command`
@@ -33,7 +33,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 final class ImportSeedCommandTest extends AbstractFunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/seeds-demo',
         'tests/seeds-import',
         'tests/file-fields',
@@ -59,7 +59,7 @@ final class ImportSeedCommandTest extends AbstractFunctionalTestCase
     #[Test]
     public function theCommandIsRegisteredUnderItsName(): void
     {
-        $this->assertTrue($this->get(CommandRegistry::class)->has('seeder:import'));
+        $this->assertTrue($this->get(CommandRegistry::class)->has('data-factory:import'));
     }
 
     #[Test]

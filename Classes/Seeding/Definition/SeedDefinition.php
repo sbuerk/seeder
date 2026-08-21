@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Definition;
+namespace SBUERK\DataFactory\Seeding\Definition;
 
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -13,7 +13,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  *
  * The records themselves are **not** in here. They live in the scenario files
  * this names, in the YAML scenario format of `typo3/testing-framework`, and are
- * read by {@see \SBUERK\Seeder\Seeding\Scenario\ScenarioComposer} rather than
+ * read by {@see \SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer} rather than
  * by the parser that produced this object. `config.yml` describes the set; a
  * scenario file describes the data.
  *
@@ -29,7 +29,7 @@ final readonly class SeedDefinition
      *        declared, never derived from the directory holding the set: a
      *        derived identifier turns a collision between two packages into a
      *        silent one.
-     * @param string $title Shown by `seeder:list`.
+     * @param string $title Shown by `data-factory:list`.
      * @param string $description Optional long text, empty when the definition
      *        declares none.
      * @param string $basePath Absolute path of the directory holding the entry

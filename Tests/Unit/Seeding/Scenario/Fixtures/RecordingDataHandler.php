@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Scenario\Fixtures;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Scenario\Fixtures;
 
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 

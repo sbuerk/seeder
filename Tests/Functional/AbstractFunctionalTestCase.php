@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional;
+namespace SBUERK\DataFactory\Tests\Functional;
 
 use SBUERK\TYPO3\Testing\TestCase\FunctionalTestCase;
 
@@ -21,6 +21,6 @@ use SBUERK\TYPO3\Testing\TestCase\FunctionalTestCase;
 abstract class AbstractFunctionalTestCase extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
     ];
 }

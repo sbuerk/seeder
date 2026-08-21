@@ -13,7 +13,7 @@ A seed set writes the site configurations its page tree needs, from a template
 shipped next to the set:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     sites:
       - identifier: main

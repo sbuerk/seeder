@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Exception;
+namespace SBUERK\DataFactory\Seeding\Exception;
 
 /**
  * Thrown when the file a seed definition was asked for cannot be reached at

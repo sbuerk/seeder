@@ -125,7 +125,7 @@ use SBUERK\TYPO3\Testing\TestCase\FunctionalTestCase;
 abstract class AbstractFunctionalTestCase extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
     ];
 }
 ```
@@ -142,7 +142,7 @@ itself has to be repeated:
 
 ```php
 protected array $testExtensionsToLoad = [
-    'sbuerk/seeder',
+    'sbuerk/data-factory',
     'tests/example-fixture',
 ];
 ```
@@ -203,7 +203,7 @@ final class SeedWriterTest extends AbstractFunctionalTestCase
     public function implementationOfTheOtherCoreVersionIsNotRegistered(): void
     {
         $this->assertFalse($this->getContainer()->has(
-            'SBUERK\\Seeder\\Core14\\Seed\\SeedWriter',
+            'SBUERK\\DataFactory\\Core14\\Seed\\SeedWriter',
         ));
     }
 }

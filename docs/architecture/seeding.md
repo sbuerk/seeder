@@ -287,7 +287,7 @@ reference outside the tree.
 ### What it refuses
 
 A reference naming a record the run did not write is an error, not a lookup.
-`seeder:import` checks the whole list against the suggested ids of the composed
+`data-factory:import` checks the whole list against the suggested ids of the composed
 scenario **before** anything is written, so a mistyped uid does not surface after
 the page tree, the content and the files are in the database.
 
@@ -418,7 +418,7 @@ Three properties of that layout are worth naming because they are easy to erode:
   finished settings array to an unmodified factory.
 - **Discovery does not parse.** `SeedSetRepository` reads three keys with
   `Yaml::parseFile()` and stops. Parsing every set in full to show a title would
-  make `seeder:list` as fragile as the least well maintained set in the
+  make `data-factory:list` as fragile as the least well maintained set in the
   installation; see
   [Seed sets and the CLI](../development/seed-sets.md#discovery-reads-metadata).
 

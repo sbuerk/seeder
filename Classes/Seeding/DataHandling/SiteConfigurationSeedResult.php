@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Seeding\DataHandling;
 
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 

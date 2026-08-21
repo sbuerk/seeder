@@ -37,7 +37,7 @@ typo3/testing-framework requires:
   typo3/cms-backend|extbase|fluid|frontend: 13.*.*@dev || 14.*.*@dev
 ```
 
-`seeder:import` runs in real installations. Moving that package into `require`
+`data-factory:import` runs in real installations. Moving that package into `require`
 would install PHPUnit on every site that seeds anything, and would pull four
 sysexts in as hard runtime requirements. The classes themselves have no such
 problem — `DataHandlerFactory` imports **only** `Symfony\Component\Yaml\Yaml`,
@@ -47,7 +47,7 @@ and `DataHandlerWriter` only `DataHandler`, `BackendUserAuthentication` and
 
 So the three classes — `DataHandlerFactory`, `DataHandlerWriter` and
 `EntityConfiguration`, 779 lines together — are ported into
-`SBUERK\Seeder\Seeding\Scenario`, and `typo3/testing-framework` stays in
+`SBUERK\DataFactory\Seeding\Scenario`, and `typo3/testing-framework` stays in
 `require-dev`.
 
 The cost of that decision is drift: upstream can change and we would not
@@ -59,7 +59,7 @@ Everything that is not listed here is unchanged.
 
 | Change                                                                                           | Why                                                                                                                                                    |
 |--------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Namespace `SBUERK\Seeder\Seeding\Scenario`                                                       | It is our code now.                                                                                                                                    |
+| Namespace `SBUERK\DataFactory\Seeding\Scenario`                                                  | It is our code now.                                                                                                                                    |
 | `final class`, `new self()` instead of `new static()`                                            | Repository rule; the classes were never subclassed upstream either.                                                                                    |
 | `#[Exclude]` on all three                                                                        | They are a builder, a writer and a value object — data, not services. Without it, directory based registration would pick them up.                     |
 | PHPStan level 8 array shapes throughout                                                          | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |

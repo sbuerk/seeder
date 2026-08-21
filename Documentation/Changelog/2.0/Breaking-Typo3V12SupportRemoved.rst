@@ -26,7 +26,7 @@ An installation on TYPO3 v12.4 stays on the 1.x line:
 
 ..  code-block:: bash
 
-    composer require --dev "sbuerk/seeder:^1.0"
+    composer require --dev "sbuerk/data-factory:^1.0"
 
 Nothing breaks silently: :file:`composer.json` requires ``typo3/cms-core``
 ``^13.4 || ^14.3`` and :file:`ext_emconf.php` constrains the extension to

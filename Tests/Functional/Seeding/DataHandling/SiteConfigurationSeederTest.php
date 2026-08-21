@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
-use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeedResult;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileReferenceSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeedResult;
+use SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeedResult;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Yaml\Yaml;
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -52,7 +52,7 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
     private const ROOT_PAGE = 700;
 
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/seeds-demo',
     ];
 
@@ -90,7 +90,7 @@ final class SiteConfigurationSeederTest extends AbstractFunctionalTestCase
      */
     private function templateBasePath(): string
     {
-        return rtrim(ExtensionManagementUtility::extPath('tests_seeds_demo'), '/') . '/Configuration/Seeder/basic';
+        return rtrim(ExtensionManagementUtility::extPath('tests_seeds_demo'), '/') . '/Configuration/DataFactory/basic';
     }
 
     private function scenarioPath(string $scenario): string

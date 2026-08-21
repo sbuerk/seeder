@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;

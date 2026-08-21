@@ -1,17 +1,18 @@
 {
-    "name": "sbuerk/seeder",
+    "name": "sbuerk/data-factory",
     "description": "Seeds pages, records, files and site configurations into a TYPO3 installation from YAML definitions shipped by extensions.",
     "type": "typo3-cms-extension",
-    "homepage": "https://github.com/sbuerk/seeder",
+    "homepage": "https://github.com/sbuerk/data-factory",
     "support": {
-        "issues": "https://github.com/sbuerk/seeder/issues",
-        "source": "https://github.com/sbuerk/seeder"
+        "issues": "https://github.com/sbuerk/data-factory/issues",
+        "source": "https://github.com/sbuerk/data-factory"
     },
     "license": "GPL-2.0-or-later",
     "keywords": [
         "typo3",
         "typo3-cms-extension",
-        "seeder",
+        "data-factory",
+        "data_factory",
         "seeding",
         "fixtures",
         "demo-data",
@@ -58,14 +59,14 @@
     },
     "autoload": {
         "psr-4": {
-            "SBUERK\\Seeder\\": "Classes/",
-            "SBUERK\\Seeder\\Core13\\": "Core13/",
-            "SBUERK\\Seeder\\Core14\\": "Core14/"
+            "SBUERK\\DataFactory\\": "Classes/",
+            "SBUERK\\DataFactory\\Core13\\": "Core13/",
+            "SBUERK\\DataFactory\\Core14\\": "Core14/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "SBUERK\\Seeder\\Tests\\": "Tests/"
+            "SBUERK\\DataFactory\\Tests\\": "Tests/"
         }
     },
     "scripts": {
@@ -88,7 +89,7 @@
             }
         },
         "typo3/cms": {
-            "extension-key": "seeder",
+            "extension-key": "data_factory",
             "web-dir": ".Build/Web",
             "version": "2.0.0-dev",
             "Package": {
