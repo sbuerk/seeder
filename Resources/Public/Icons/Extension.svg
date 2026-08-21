@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!--
+    A sprout growing out of a data drum: what this extension does, in one shape.
+
+    Drawn as filled paths in a single colour rather than as strokes in two, so
+    the glyph keeps its silhouette on a light backend, on a dark one and in a
+    greyscale listing - a second colour would only be legible against one of
+    them. The rim of the drum is a knocked-out crescent for the same reason: it
+    gives the 3D read at 64px and disappears into the antialiasing at 16px,
+    where a stroke would have turned into a smear instead.
+  -->
+  <g fill="#ff8700">
+    <path fill-rule="evenodd" d="M15,42 v11 a17,5 0 0 0 34,0 V42 a17,5 0 0 0 -34,0 z M15,42 A17,5 0 0 0 49,42 A17,2.5 0 0 1 15,42 Z"/>
+    <path d="M29,48 v-38 a3,3 0 0 1 6,0 v38 z"/>
+    <path d="M34,25 C35,15 44,8 53,8 C53,18 45,27 34,25 Z"/>
+    <path d="M30,30 C29,22 21,16 11,16 C11,25 19,32 30,30 Z"/>
+  </g>
+</svg>

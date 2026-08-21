@@ -3,9 +3,9 @@
 1. Create a topic branch off the branch the change belongs on — for example
    `feature/example-service` or `bugfix/empty-response`. **This branch line is
    `main`**, which carries TYPO3 v13.4 + v14.3; `1` carries the 1.x line for
-   TYPO3 v12.4 + v13.4. Both release scripts default `--source-branch` to
-   `main`, see
-   [Releasing](releasing.md#--source-branch-and-the-key-the-alias-is-stored-under).
+   TYPO3 v12.4 + v13.4. Both release scripts default `--source-branch` to the
+   branch they sit on, and are run from a checkout of it, see
+   [Releasing](releasing.md#the-two-lines-and-where-the-scripts-run).
 
    Neither branch is merged into the other, so a fix that affects both lines
    needs a pull request on each — written against the core versions that branch

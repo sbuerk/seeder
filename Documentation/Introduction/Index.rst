@@ -136,6 +136,10 @@ What it does not do
     :yaml:`password` themselves, because the import mode that suppresses the
     automatic site configuration also suppresses the generated credentials.
 
+The two boundaries of the *format* - how far a file reference reaches, and why
+it cannot live in a scenario file - are stated again where they are relevant, in
+:ref:`What this version does not do <configuration-limits>`.
+
 ..  _compatibility:
 
 Compatibility
@@ -150,17 +154,17 @@ Compatibility
         -   TYPO3
         -   PHP
     *   -   main
-        -   development
+        -   active
         -   2.x
         -   v13.4 / v14.3
         -   8.2 - 8.5
     *   -   1
-        -   development
+        -   maintained
         -   1.x
         -   v12.4
         -   8.1 - 8.4
     *   -   1
-        -   development
+        -   maintained
         -   1.x
         -   v13.4
         -   8.2 - 8.4
@@ -175,24 +179,29 @@ TYPO3 version, because the PHP ranges differ there - PHP 8.1 is supported for
 dependency set on PHP 8.1 cannot be installed at all. The lowest supported TYPO3
 v12 patch level is **12.4.22**.
 
-Nothing has been released yet, which is why both lines are listed as
-``development`` rather than as being under active support. Once 1.0 is released
-from branch ``1``, that line moves to active support and ``main`` carries on as
-the development line.
+Both lines are released. ``main`` is the active line and receives features and
+fixes; branch ``1`` is maintained for installations still on TYPO3 v12.4 and
+receives fixes. TYPO3 v13.4 is served by both, so an installation on v13.4 can
+move between the lines without changing a seed set.
 
-One code base serves both supported TYPO3 versions. Where an implementation has
-to differ, the classes are split per core version and the dependency injection
-container registers the ones matching the running installation - none of which
-is visible in a seed set.
+One code base serves both supported TYPO3 versions, and on this line it is
+literally one: no part of the implementation differs between TYPO3 v13.4 and
+v14.3. The mechanism for a version difference is in place - classes split per
+core version, with only the directory matching the running installation
+registered in the dependency injection container - and nothing currently needs
+it. None of it is visible in a seed set either way.
 
-..  note::
+..  _stability:
 
-    The extension has not reached a stable release yet. The seed definition
-    format and the public API may still change without a deprecation phase.
+Stability
+=========
 
-Contributing
-============
+The **supported interface** of this extension is the scenario format,
+:file:`config.yml` and the two console commands with their options and exit
+codes. A change to it that is not backwards compatible goes into a new major
+version and carries a :file:`Breaking-*.rst` entry in the
+:ref:`Changelog <changelog>`.
 
-Contributions are welcome. The development setup, the quality gates and the
-commit message rules are described in the :file:`CONTRIBUTING.md` file of the
-`source repository <https://github.com/sbuerk/data-factory>`__.
+Everything below :file:`Classes/` is :php:`@internal`. It is the implementation
+of that interface, it carries no compatibility promise, and it may change in any
+release - a seed set never touches it.

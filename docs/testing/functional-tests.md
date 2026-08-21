@@ -99,6 +99,34 @@ and the run stopped there.
 Remember to run both core versions, each after the matching `composerUpdate` —
 see [Dual core setup](../development/dual-core-setup.md).
 
+### Debugging a failure
+
+- **Narrow it first.** `-- --filter '<Class>::<method>'` runs one method, and
+  `-- --stop-on-failure` stops at the first one instead of printing the rest.
+- **Attach a debugger with `-x`.** The wrapper sets `XDEBUG_MODE=debug` and
+  points xdebug at the host on port **9003**, which is what PhpStorm listens on
+  by default; `-y <port>` moves it. It applies to `functional`, `unit` and
+  `unitRandom` and is silently ignored by every other suite, so `-x -s phpstan`
+  looks like it worked and did nothing.
+
+  ```bash
+  Build/Scripts/runTests.sh -x -s functional -d sqlite -- --filter SomeTest
+  ```
+
+- **Do not reach for `var_dump()`.** `beStrictAboutOutputDuringTests` is on, so
+  output written during a test makes it risky and — with `failOnRisky` — failed.
+  The debug output buries the failure it was meant to explain under a second,
+  unrelated one. Use the debugger, or assert on the value.
+  → [Strictness policy](phpunit-configuration.md#strictness-policy)
+- **The SQLite database does not survive the run.** It lives under
+  `.Build/Web/typo3temp/var/tests/functional-sqlite-dbs/`, which the wrapper
+  removes, recreates and then mounts as a **tmpfs** — so the files exist only
+  inside the container and are gone when it exits. To look at the rows a test
+  wrote, run the same test with `-d mariadb -i 10.6` and inspect the database
+  container while it is still up.
+- **Read the first lines, not the last.** A wall of `Connection refused` is the
+  case above, and its real message is at the top of the output.
+
 ## The test that proves the instance boots
 
 [`Tests/Functional/ExtensionLoadedTest`](../../Tests/Functional/ExtensionLoadedTest.php)
@@ -185,9 +213,12 @@ Additionally:
 
 ## Core version aware functional tests
 
-Mirroring the source layout, they live in `Tests/Functional/Core13/` and
+Mirroring the source layout, they belong in `Tests/Functional/Core13/` and
 `Tests/Functional/Core14/` and carry the group of the core version they must
-**not** run on:
+**not** run on. Neither directory exists yet, and `SeedWriter` below is the same
+fictional example the architecture page uses — this branch has no version aware
+implementation to test, and both `Core13/` and `Core14/` are empty. See
+[The checklist for a real one](../architecture/core-version-aware-code.md#the-checklist-for-a-real-one).
 
 ```php
 #[Group('not-core-14')]

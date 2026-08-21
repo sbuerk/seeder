@@ -1,3 +1,14 @@
+# What "export-ignore" leaves out is what ships. It decides the composer dist
+# Packagist builds *and* — since the publish workflow hands "git archive" output
+# to "tailor create-artefact --path" instead of pointing it at the checkout —
+# the zip attached to the GitHub release and uploaded to the TER. Tailor has its
+# own hardcoded exclusion list and no notion of this file, so keeping the two
+# artefacts in agreement means the export has to be the thing tailor packs.
+#
+# The list is therefore only about *tracked* entries. ".Build", ".cache", "var",
+# ".agent", ".idea", ".envrc" and "composer.lock" are git-ignored and never
+# reach an archive to begin with, which is why none of them appears below.
+
 /.editorconfig export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore

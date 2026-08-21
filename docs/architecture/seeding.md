@@ -393,14 +393,14 @@ the loader does not turn a working definition into a failure.
 
 ## The layout of `Classes/Seeding/`
 
-| Directory       | What lives there                                                                                                                                                  |
-|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Definition/`   | The parsed **set descriptor** and its parts: `SeedDefinition`, `SeedFile`, `SeedFileReference`, `SeedSiteConfiguration`. Data, `#[Exclude]`, no dependencies.     |
-| `Parser/`       | `SeedDefinitionParser` and the `ThrowOnErrorLogger` it hands to `YamlFileLoader`.                                                                                 |
-| `Scenario/`     | The ported engine - `DataHandlerFactory`, `DataHandlerWriter`, `EntityConfiguration` - and `ScenarioComposer`, which is ours and composes the files of a set.     |
-| `DataHandling/` | Everything that writes: `ScenarioSeeder`, `FileSeeder`, `FileReferenceSeeder`, `SiteConfigurationSeeder`, plus `UidCollisionDetector` and the two result objects. |
-| `Exception/`    | `SeedingException` and its five subclasses, so a caller can tell "unknown set" from "invalid definition".                                                         |
-| root            | `SeedSetRepository` and the `SeedSet` it returns - discovery, which is deliberately not parsing.                                                                  |
+| Directory       | What lives there                                                                                                                                                                                |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Definition/`   | The parsed **set descriptor** and its parts: `SeedDefinition`, `SeedFile`, `SeedFileReference`, `SeedSiteConfiguration`. Data, `#[Exclude]`, no dependencies.                                   |
+| `Parser/`       | `SeedDefinitionParser` and the `ThrowOnErrorLogger` it hands to `YamlFileLoader`.                                                                                                               |
+| `Scenario/`     | The ported engine - `DataHandlerFactory`, `DataHandlerWriter`, `EntityConfiguration` - and `ScenarioComposer`, which is ours and composes the files of a set.                                   |
+| `DataHandling/` | Everything that writes: `ScenarioSeeder`, `FileSeeder`, `FileReferenceSeeder`, `SiteConfigurationSeeder`, plus `UidCollisionDetector`, the `OccupiedUid` it reports and the two result objects. |
+| `Exception/`    | `SeedingException` and its five subclasses, so a caller can tell "unknown set" from "invalid definition".                                                                                       |
+| root            | `SeedSetRepository` and the `SeedSet` it returns - discovery, which is deliberately not parsing.                                                                                                |
 
 Three properties of that layout are worth naming because they are easy to erode:
 

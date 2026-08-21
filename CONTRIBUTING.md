@@ -110,6 +110,9 @@ make that work:
 - **Classes are `final readonly`** where a framework constraint does not prevent
   it. Abstract classes never use constructor injection — they use `#[Required]`
   `inject*()` methods, so the constructor stays free for extending classes.
+  On branch `1` this rule reads differently — PHP 8.1 does not parse a
+  `readonly class`, so `readonly` sits on the properties there. Porting a class
+  between the lines is not a copy.
   → [Class design](docs/architecture/class-design.md)
 - **Models, entities, value objects and DTOs are data, not services** and always
   carry `#[Exclude]`, Extbase models included — directory based service
@@ -182,7 +185,9 @@ burying the real change in the diff.
 
 Two scripts drive the release: `Build/Scripts/setVersion.sh` applies a version to
 every file carrying one, `Build/Scripts/release.sh` orchestrates branch, commit,
-pull request, merge and tag. Nothing remote happens without `--execute`.
+pull request, merge and tag. `--dry-run` rehearses without writing anything;
+without `--execute` the remote steps are withheld but every local one still
+runs, so a bare invocation is not a rehearsal.
 
 → [Releasing](docs/workflow/releasing.md)
 

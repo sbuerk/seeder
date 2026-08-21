@@ -54,8 +54,16 @@ User facing changes need a changelog entry below
 | `Deprecation-*.rst` | Functionality marked for removal, with the migration path. |
 | `Important-*.rst`   | Notable changes that are neither of the above.             |
 
-Each version directory has an `Index.rst` listing its entries; add new files
-there as well.
+The entries of a version directory need no registration: its `Index.rst` picks
+them up with `:glob:` patterns — one `toctree` per change type, matching
+`Breaking-*`, `Feature-*`, `Deprecation-*` and `Important-*`.
+
+A **new version directory** does need one.
+`Documentation/Changelog/Index.rst` lists the versions with a plain `toctree`
+and no `:glob:`, so add the directory there when the first entry of a new
+version is written. Leaving it out fails the `documentation` gate rather than
+passing quietly: `renderDocumentation` runs with `--fail-on-error`, and an
+unreferenced document is an error.
 
 ## The TYPO3 core changelogs
 
