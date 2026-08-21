@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class SeedSiteConfiguration
+final class SeedSiteConfiguration
 {
     /**
      * @param string $identifier The site identifier, which becomes the
@@ -40,9 +40,9 @@ final readonly class SeedSiteConfiguration
      *        template's value alone, which is not the same as an empty base.
      */
     public function __construct(
-        public string $identifier,
-        public int $rootPage,
-        public string $template,
-        public ?string $base = null,
+        public readonly string $identifier,
+        public readonly int $rootPage,
+        public readonly string $template,
+        public readonly ?string $base = null,
     ) {}
 }

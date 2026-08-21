@@ -14,21 +14,21 @@ Documentation for people **using** the extension lives in
 | Page                                                  | Contents                                                                     |
 |-------------------------------------------------------|------------------------------------------------------------------------------|
 | [Development environment](development/environment.md) | `runTests.sh`, container runtimes, suites and options.                       |
-| [Dual core setup](development/dual-core-setup.md)     | Running against TYPO3 v13 and v14, and the rule that avoids false positives. |
+| [Dual core setup](development/dual-core-setup.md)     | Running against TYPO3 v12 and v13, and the rule that avoids false positives. |
 | [Quality gates](development/quality-gates.md)         | Every gate and its configuration, PHPStan per core version, CI.              |
 | [Seed definitions](development/seed-definitions.md)   | `config.yml` and the testing-framework scenario format, key by key.          |
 | [Seed sets and the CLI](development/seed-sets.md)     | Discovery, ordering, `imports`, `seeder:list` and `seeder:import`.           |
 
 ## [Architecture](architecture/Index.md)
 
-| Page                                                               | Contents                                                                                            |
-|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| [Core version aware code](architecture/core-version-aware-code.md) | `Classes/` vs `Core13/` vs `Core14/`, and how the right variant is selected.                        |
-| [Dependency injection](architecture/dependency-injection.md)       | Symfony DI attributes, stateless services, the rules that apply.                                    |
-| [Class design](architecture/class-design.md)                       | `final readonly`, method injection in abstract classes, data objects, the accepted PHPStan ignores. |
-| [The scenario engine](architecture/scenario-engine.md)             | The seed format, why its engine is a port of the testing-framework one, and the conformance test.   |
-| [Seeding](architecture/seeding.md)                                 | Why it goes through DataHandler, the four writing passes, and every behaviour a seed works around.  |
-| [Site configurations](architecture/site-configuration.md)          | Writing a site from a template, the refusals, the uncovered-site-roots report.                      |
+| Page                                                               | Contents                                                                                           |
+|--------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| [Core version aware code](architecture/core-version-aware-code.md) | `Classes/` vs `Core12/` vs `Core13/`, and how the right variant is selected.                       |
+| [Dependency injection](architecture/dependency-injection.md)       | Symfony DI attributes, stateless services, the rules that apply.                                   |
+| [Class design](architecture/class-design.md)                       | `final` with `readonly` properties, method injection, data objects, the accepted PHPStan ignores.  |
+| [The scenario engine](architecture/scenario-engine.md)             | The seed format, why its engine is a port of the testing-framework one, and the conformance test.  |
+| [Seeding](architecture/seeding.md)                                 | Why it goes through DataHandler, the four writing passes, and every behaviour a seed works around. |
+| [Site configurations](architecture/site-configuration.md)          | Writing a site from a template, the refusals, the uncovered-site-roots report.                     |
 
 ## [Testing](testing/Index.md)
 

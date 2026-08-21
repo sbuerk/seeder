@@ -1,0 +1,2 @@
+# Nothing but this comment, which is what a template ships when it has no
+# site settings to declare. YAML parses it to null.

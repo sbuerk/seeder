@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class OccupiedUid
+final class OccupiedUid
 {
     /**
      * @param string $table The table the uid is occupied in. A uid collides per
@@ -31,8 +31,8 @@ final readonly class OccupiedUid
      *        are normal and neither of which is worth a placeholder text.
      */
     public function __construct(
-        public string $table,
-        public int $uid,
-        public string $title,
+        public readonly string $table,
+        public readonly int $uid,
+        public readonly string $title,
     ) {}
 }

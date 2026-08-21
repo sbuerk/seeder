@@ -266,8 +266,8 @@ These are stated in the documentation as well. They are repeated here because a
 violation of any of them is a rejected change, not a review comment.
 
 1. **Version differences split classes, they never add conditionals.** Shared
-   code in `Classes/`, one implementation per core version in `Core13/` and
-   `Core14/`, only the matching directory registered in the container.
+   code in `Classes/`, one implementation per core version in `Core12/` and
+   `Core13/`, only the matching directory registered in the container.
    → [Core version aware code](docs/architecture/core-version-aware-code.md)
 
    The exception is **configuration** — TCA, TypoScript, `ext_localconf.php` —
@@ -340,7 +340,7 @@ TYPO3 ships its changelogs **with the core package**:
 .Build/vendor/typo3/cms-core/Documentation/Changelog/
 ```
 
-They are the authoritative record of what changed between v13 and v14, and they
+They are the authoritative record of what changed between v12 and v13, and they
 are on disk — there is no reason to work from memory.
 
 - Before writing version aware code, **search them** for the API in question.
@@ -351,7 +351,7 @@ are on disk — there is no reason to work from memory.
   the option is still required on the older version.
 
 ```bash
-grep -rl "searchFields" .Build/vendor/typo3/cms-core/Documentation/Changelog/14*/
+grep -rl "searchFields" .Build/vendor/typo3/cms-core/Documentation/Changelog/13*/
 ```
 
 The rendered version is at
@@ -360,13 +360,14 @@ The rendered version is at
 
 > [!IMPORTANT]
 > The changelogs on disk reach only as far as the installed core version: with
-> TYPO3 v13 installed the newest directory is `13.4.x`, and there is no `14.0/`
+> TYPO3 v12 installed the newest directory is `12.4.x`, and there is no `13.0/`
 > to read. A package does ship the changelogs of all **earlier** versions, so
-> installing the **highest** supported version — v14 — puts both v13 and v14
-> changelogs on disk at once, and saves switching back and forth to look
-> something up.
+> installing the **highest** supported version — v13 — puts the v12 *and* the
+> v13 changelogs on disk at once, and saves switching back and forth to look
+> something up. There is no `14.x` on this branch at all — that is the `main`
+> branch, which supports v13 and v14.
 >
-> Reading a changelog is not running a gate. Look things up with v14 installed,
+> Reading a changelog is not running a gate. Look things up with v13 installed,
 > then `composerUpdate` back to the version you are working on before running
 > anything — see
 > [the dual core hint](#quality-gates-and-the-dual-core-hint) below.
@@ -379,32 +380,36 @@ installed on the host except **podman** (preferred) or docker.
 
 > [!CAUTION]
 > **`-t` selects the core version but installs nothing.** Only `composerUpdate`
-> installs a dependency set. Running a gate with `-t 13` while the v14 set is
+> installs a dependency set. Running a gate with `-t 12` while the v13 set is
 > installed produces results that look real and are worthless — tests failing on
 > the wrong core version, PHPStan reporting API that does exist, changelogs
 > missing from disk.
 >
 > **Always `composerUpdate` for a core version before running anything for it,
-> and never interleave `-t 13` and `-t 14` commands.** Do one version completely,
+> and never interleave `-t 12` and `-t 13` commands.** Do one version completely,
 > then switch.
+>
+> `-p` picks the PHP version, and **`-p 8.1` is valid for `-t 12` only** —
+> `typo3/cms-core` 13.4 requires PHP `^8.2`, so `composerUpdate` refuses the
+> combination rather than installing something that does not run.
 
 ```bash
-# TYPO3 v13 — install first, then run everything for v13.
-Build/Scripts/runTests.sh -t 13 -s composerUpdate
-Build/Scripts/runTests.sh -t 13 -s cgl -n
-Build/Scripts/runTests.sh -t 13 -s phpstan
-Build/Scripts/runTests.sh -t 13 -s lintPhp
-Build/Scripts/runTests.sh -t 13 -s unit
-Build/Scripts/runTests.sh -t 13 -s unitRandom
-Build/Scripts/runTests.sh -t 13 -s functional -d sqlite
-Build/Scripts/runTests.sh -t 13 -s composerValidate
-Build/Scripts/runTests.sh -t 13 -s checkBom
-Build/Scripts/runTests.sh -t 13 -s checkExceptionCodes
-Build/Scripts/runTests.sh -t 13 -s checkMarkdownTables
-Build/Scripts/runTests.sh -t 13 -s checkTestMethodsPrefix
+# TYPO3 v12 — install first, then run everything for v12.
+Build/Scripts/runTests.sh -t 12 -s composerUpdate
+Build/Scripts/runTests.sh -t 12 -s cgl -n
+Build/Scripts/runTests.sh -t 12 -s phpstan
+Build/Scripts/runTests.sh -t 12 -s lintPhp
+Build/Scripts/runTests.sh -t 12 -s unit
+Build/Scripts/runTests.sh -t 12 -s unitRandom
+Build/Scripts/runTests.sh -t 12 -s functional -d sqlite
+Build/Scripts/runTests.sh -t 12 -s composerValidate
+Build/Scripts/runTests.sh -t 12 -s checkBom
+Build/Scripts/runTests.sh -t 12 -s checkExceptionCodes
+Build/Scripts/runTests.sh -t 12 -s checkMarkdownTables
+Build/Scripts/runTests.sh -t 12 -s checkTestMethodsPrefix
 
-# Then the same for TYPO3 v14, starting with composerUpdate again.
-Build/Scripts/runTests.sh -t 14 -s composerUpdate
+# Then the same for TYPO3 v13, starting with composerUpdate again.
+Build/Scripts/runTests.sh -t 13 -s composerUpdate
 # …
 ```
 

@@ -46,10 +46,10 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class FileReferenceSeeder
+final class FileReferenceSeeder
 {
     public function __construct(
-        private ConnectionPool $connectionPool,
+        private readonly ConnectionPool $connectionPool,
     ) {}
 
     /**

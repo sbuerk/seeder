@@ -21,7 +21,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class ScenarioSeedResult
+final class ScenarioSeedResult
 {
     /**
      * @param array<string, int> $writtenUids `<table>:<declaredUid>` mapped to
@@ -34,10 +34,10 @@ final readonly class ScenarioSeedResult
      *        reference the set declared, in declared order.
      */
     public function __construct(
-        public array $writtenUids = [],
-        public array $recordCounts = [],
-        public array $fileUids = [],
-        public array $referenceUids = [],
+        public readonly array $writtenUids = [],
+        public readonly array $recordCounts = [],
+        public readonly array $fileUids = [],
+        public readonly array $referenceUids = [],
     ) {}
 
     /**

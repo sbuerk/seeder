@@ -1,0 +1,3 @@
+# Not a map: a bare scalar. TYPO3 v13 rejects this even with
+# ALLOW_EMPTY_FILE, so the v12 implementation has to reject it too.
+just a string

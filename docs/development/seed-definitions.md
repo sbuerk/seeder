@@ -464,8 +464,8 @@ dropped without a word - there is no unknown-action error in this format.
 `discard` deletes the workspace version outright rather than soft deleting it,
 and leaves the live record alone. It is one of the places this extension
 diverges from `typo3/testing-framework`, which emits `clearWSID` as the
-*command name* - a spelling `DataHandler::process_cmdmap()` has no case for in
-v13 or in v14, so upstream's `discard` does nothing at all and reports success.
+*command name* - a spelling nothing handles as a command on either supported
+version, so upstream's `discard` does nothing at all and reports success.
 See [An action DataHandler no longer knows](../architecture/scenario-engine.md#an-action-datahandler-no-longer-knows).
 
 `delete` on a record the same scenario just wrote is not pointless: it is how a

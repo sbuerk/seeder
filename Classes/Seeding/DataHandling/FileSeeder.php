@@ -8,7 +8,6 @@ use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedFile;
 use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use TYPO3\CMS\Core\Resource\Enum\DuplicationBehavior;
 use TYPO3\CMS\Core\Resource\Folder;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Resource\StorageRepository;
@@ -28,17 +27,18 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  * and none of them loud about it:
  *
  * - **`ResourceStorage::addFile()` moves by default.** Its `$removeOriginal`
- *   argument defaults to `true` (13.4: ResourceStorage.php:1312, 14.3:
- *   ResourceStorage.php:1218), which would delete the source out of the
+ *   argument defaults to `true` (12.4: ResourceStorage.php:1261, 13.4:
+ *   ResourceStorage.php:1312), which would delete the source out of the
  *   package shipping the seed. It is passed as `false` here, and a functional
  *   test asserts that the source survived.
- * - **The conflict mode is the native enum**
- *   {@see \TYPO3\CMS\Core\Resource\Enum\DuplicationBehavior}. TYPO3 v13 still
- *   carries the older class `\TYPO3\CMS\Core\Resource\DuplicationBehavior` of
- *   the same name, and `addFile()` answers that one with a deprecation
- *   (#101151) which this test suite turns into a failure. The native enum
- *   exists on 13.4 and 14.3 alike - the old class only on 13.4 - so this needs
- *   no version split.
+ * - **The conflict mode is core version aware**, which is why the call itself
+ *   is not in this class. TYPO3 v13 introduced the native enum
+ *   {@see \TYPO3\CMS\Core\Resource\Enum\DuplicationBehavior} (#101151) and
+ *   answers the older class of the same name with a deprecation this test
+ *   suite turns into a failure - while TYPO3 v12 has only that older class and
+ *   does not have the enum at all. `addFile()` is therefore called by
+ *   {@see FileImporterInterface}, implemented once per core version, and this
+ *   class states the *operation* it wants: add the file, replace what is there.
  * - **Permission evaluation is suspended around the copy.** A storage
  *   evaluates the file mounts of the backend user, which is meaningless while
  *   seeding: that runs on the command line, into a folder no user has been
@@ -49,10 +49,11 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class FileSeeder
+final class FileSeeder
 {
     public function __construct(
-        private StorageRepository $storageRepository,
+        private readonly StorageRepository $storageRepository,
+        private readonly FileImporterInterface $fileImporter,
     ) {}
 
     /**
@@ -75,12 +76,11 @@ final readonly class FileSeeder
                 // Inside the suspension as well: creating the target folder
                 // evaluates the same permissions the copy does.
                 $folder = $this->resolveFolder($storage, $file->folder);
-                $addedFile = $storage->addFile(
+                $addedFile = $this->fileImporter->addFileReplacingExisting(
+                    $storage,
                     $source,
                     $folder,
                     $file->name ?? basename($source),
-                    DuplicationBehavior::REPLACE,
-                    false,
                 );
             } finally {
                 $storage->setEvaluatePermissions($evaluatePermissions);

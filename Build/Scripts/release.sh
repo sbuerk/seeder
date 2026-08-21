@@ -35,7 +35,7 @@
 #   <release-version>        MAJOR.MINOR.PATCH, e.g. 1.2.0
 #
 # Options:
-#   --source-branch=<name>   base/source branch (default: main)
+#   --source-branch=<name>   base/source branch (default: 1)
 #   --dry-run                print the whole plan, change nothing
 #   --execute                enable remote/irreversible operations
 #   -h, --help               show this help
@@ -111,7 +111,7 @@ run_set_version() {
 # Argument parsing
 # ---------------------------------------------------------------------------
 PASSED_VERSION=""
-SOURCE_BRANCH="main"
+SOURCE_BRANCH="1"
 
 while [ $# -gt 0 ]; do
     case "$1" in

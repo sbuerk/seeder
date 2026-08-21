@@ -23,11 +23,15 @@ declare(strict_types=1);
  * and nothing proves that a level deeper than the first is handled at all
  * unless there is one.
  *
- * There is no "ext_tables.sql": every column here is derived from the TCA by
+ * On TYPO3 v13 every column here is derived from the TCA by
  * \TYPO3\CMS\Core\Database\Schema\DefaultTcaSchema, the two "passthrough"
  * relation columns included — that class adds the "foreign_field" and the
- * "foreign_table_field" of an inline relation to the child table itself.
- * Declaring them by hand would be redundant and would drift.
+ * "foreign_table_field" of an inline relation to the child table itself. TYPO3
+ * v12 derives the "ctrl" fields only and never creates a table no
+ * "ext_tables.sql" declares, which is why this fixture ships one; see the
+ * comment at the top of that file.
+ *
+ * @todo Drop the "ext_tables.sql" once TYPO3 v12 support is dropped.
  */
 return [
     'ctrl' => [
@@ -82,8 +86,8 @@ return [
         // RelationHandler ever writes it: DefaultTcaSchema derives the
         // "foreign_field" and the "foreign_table_field" of an inline relation
         // by itself, but never the "foreign_sortby" — a passthrough column is
-        // not derived at all, and the relation would be numbered into a column
-        // that does not exist. Declared as core declares
+        // not derived at all, and on TYPO3 v13 the relation would be numbered
+        // into a column that does not exist. Declared as core declares
         // "sys_file_reference.sorting_foreign", for the same reason.
         'sorting_foreign' => [
             'label' => 'Sorting',

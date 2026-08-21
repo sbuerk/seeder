@@ -7,13 +7,12 @@ namespace SBUERK\Seeder\Seeding\DataHandling;
 use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
 use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
 use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
+use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
 use SBUERK\Seeder\Seeding\Parser\ThrowOnErrorLogger;
 use TYPO3\CMS\Core\Configuration\Exception\SiteConfigurationWriteException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlFileLoadingException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlParseException;
-use TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader;
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
-use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
@@ -26,7 +25,7 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  * Writes the site configurations of a seed definition, once its records exist
  * and their uids are known.
  *
- * ## Why this runs after the records, and through `SiteWriter`
+ * ## Why this runs after the records, and through the core's own writer
  *
  * A site cannot be written before its root page exists: `rootPageId` is the uid
  * of a page the same set creates. The set therefore names the page by the `id`
@@ -35,20 +34,16 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  * over whatever the template declares, so a template cannot point the site
  * somewhere else - that is the one value a seed set cannot delegate.
  *
- * `TYPO3\CMS\Core\Configuration\SiteWriter` is the only supported writer and a
- * container service on TYPO3 v13.4 and v14.3 alike (both register it in
- * `Core/Classes/ServiceProvider.php::getSiteWriter()` with the very same three
- * arguments), so it is injected by type and no path handling is needed here.
- * Writing the file with `file_put_contents()` instead would produce the same
- * bytes and a different result: `write()` ends with
- * `$this->eventDispatcher->dispatch(new SiteConfigurationChangedEvent(...))`,
- * and `SiteConfiguration::siteConfigurationChanged()` and
- * `SiteFinder::siteConfigurationChanged()` both listen to it and flush their
- * caches (13.4: SiteConfiguration.php:301, SiteFinder.php:117; 14.3:
- * SiteConfiguration.php:322, SiteFinder.php:117). Going through `SiteWriter`
- * is what makes a freshly written configuration visible to `SiteFinder` in the
- * same PHP process - which the seeding run itself needs, see
- * {@see self::findUncoveredSiteRoots()}.
+ * The core's own writer is the only supported way to produce the file, reached
+ * through {@see SiteConfigurationWriterInterface} because the class holding it
+ * moved: TYPO3 v13 split `SiteWriter` out of `SiteConfiguration`, and on v12.4
+ * the same `write()` and `writeSettings()` are still methods of
+ * `SiteConfiguration` itself. Writing the file with `file_put_contents()`
+ * instead would produce the same bytes and a different result - the writer is
+ * what makes a freshly written configuration visible to `SiteFinder` in the
+ * same PHP process, which the seeding run itself needs, see
+ * {@see self::findUncoveredSiteRoots()}. How each version achieves that differs
+ * as well, and the interface is where both differences are written down.
  *
  * ## What a template is
  *
@@ -63,28 +58,21 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  * `SiteConfiguration::resolveAllExistingSites()` skips a configuration whose
  * `rootPageId` is not greater than zero **without a word**, and
  * `Site::__construct()` substitutes a default `languages` entry and an empty
- * `base` for what is missing. Both are byte identical on 13.4 and 14.3 (the
- * only difference between the two `Site` classes is a `@todo` comment), so a
- * template that works on one version works on the other. A useful template
- * declares `base` and `languages`, because the defaults are a site on `/` in
+ * `base` for what is missing. Both hold on 12.4 and 13.4, so a template that
+ * works on one version works on the other. A useful template declares `base`
+ * and `languages`, because the defaults are a site on `/` in
  * "Default / en_US.UTF-8".
  *
- * `settings.yaml` holds the site settings - the values `SiteSettingsFactory`
- * reads for `Site::getSettings()`, which is where the site-local overrides of
- * site set settings are persisted (`SiteSettingsService` on both versions
- * calls that file "our persistence target"). It is separate from `config.yaml`
- * because the backend writes it separately, and it is copied verbatim when the
- * template ships one.
+ * `settings.yaml` holds the site settings - the values `Site::getSettings()`
+ * answers with, which is where the site-local overrides of a site's settings
+ * are persisted. It is separate from `config.yaml` because the backend writes
+ * it separately, and it is copied verbatim when the template ships one.
  *
- * `dependencies:` - the site sets a site pulls in - is **not** a v14 only key
- * and needs no version handling: `Site::__construct()` reads
- * `$configuration['dependencies'] ?? []` into `$this->sets` on 13.4 and 14.3
- * alike. What v14.3 adds is a fourth `array $dependencies = []` argument to
- * `SiteWriter::createNewBasicSite()`, which this class does not call, and
- * route enhancers resolved from sets in `SiteConfiguration`. A template
- * carrying `dependencies:` is therefore written unchanged on both versions and
- * understood on both - asserted by a functional test rather than assumed, so
- * that a version which starts rejecting the key is found here.
+ * A key a core version does not know is **written anyway**: this class hands
+ * the template's array to the writer and the writer dumps it, so a template
+ * carrying a v13 only key such as `dependencies:` - the site sets a site pulls
+ * in, which v12 has no concept of - produces the same file on both versions.
+ * What differs is only what the version makes of it when reading the site back.
  *
  * There is consequently **no version difference to apply to the finished
  * array**. Where one turns up it belongs right before the `write()` call, with
@@ -93,22 +81,22 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  *
  * ## An identifier that already exists is refused
  *
- * `SiteWriter::write()` **merges**: when `config.yaml` already exists it loads
- * the unprocessed file, diffs the incoming configuration against the processed
- * one and applies only the modified and removed keys with
- * `ArrayUtility::mergeRecursiveWithOverrule()`. It is built for the backend
- * site module, where the file is the source of truth and the form supplies
- * changes. Seeding a set into an instance that already has a site of that
- * identifier would therefore produce neither the template nor the previous
- * configuration but a silent hybrid of both, so this class refuses instead.
- * `SiteWriter::delete()` is not the answer either - it unlinks `config.yaml`
- * and leaves the directory and its `settings.yaml` behind, and deleting an
- * instance's hand-maintained site configuration is not a seeder's decision to
- * make.
+ * The core writer's `write()` **merges**, on both supported versions: when
+ * `config.yaml` already exists it loads the unprocessed file, diffs the
+ * incoming configuration against the processed one and applies only the
+ * modified and removed keys with `ArrayUtility::mergeRecursiveWithOverrule()`.
+ * It is built for the backend site module, where the file is the source of
+ * truth and the form supplies changes. Seeding a set into an instance that
+ * already has a site of that identifier would therefore produce neither the
+ * template nor the previous configuration but a silent hybrid of both, so this
+ * class refuses instead. Deleting first is not the answer either - the core's
+ * `delete()` unlinks `config.yaml` and leaves the directory and its
+ * `settings.yaml` behind, and removing an instance's hand-maintained site
+ * configuration is not a seeder's decision to make.
  *
  * ## Where templates may live
  *
- * `YamlFileLoader` resolves through `GeneralUtility::getFileAbsFileName()`,
+ * The YAML loader resolves through `GeneralUtility::getFileAbsFileName()`,
  * which refuses a path outside `Environment::getProjectPath()` and
  * `Environment::getPublicPath()`. A template therefore has to sit inside the
  * project, which every package of an installation does, and which is the same
@@ -117,14 +105,17 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class SiteConfigurationSeeder
+final class SiteConfigurationSeeder
 {
     /**
      * The file names of a site below `config/sites/<identifier>/`, which are
-     * also the file names of a template directory. Private constants on
-     * `SiteWriter`, repeated here rather than guessed: they are what
-     * `SiteConfiguration::CONFIG_FILE_NAME` and
-     * `SiteWriter::SETTINGS_FILE_NAME` hold on 13.4 and 14.3.
+     * also the file names of a template directory. Repeated here rather than
+     * guessed, and not readable from the core on either version: on 13.4 they
+     * are the private constants `SiteConfiguration::CONFIG_FILE_NAME` and
+     * `SiteWriter::SETTINGS_FILE_NAME` (13.4: SiteConfiguration.php:54,
+     * SiteWriter.php:47), on 12.4 the protected properties
+     * `SiteConfiguration::$configFileName` and `$settingsFileName` (12.4:
+     * SiteConfiguration.php:57 and :64). All four hold these two values.
      */
     private const CONFIG_FILE_NAME = 'config.yaml';
     private const SETTINGS_FILE_NAME = 'settings.yaml';
@@ -136,7 +127,7 @@ final readonly class SiteConfigurationSeeder
      * a seeded sysfolder on the page tree root is not reported as a broken
      * frontend, and no fewer.
      *
-     * Identical on 13.4 and 14.3 (`CreateSiteConfiguration::$allowedPageTypes`).
+     * Identical on 12.4 and 13.4 (`CreateSiteConfiguration::$allowedPageTypes`).
      */
     private const SITE_ROOT_PAGE_TYPES = [
         PageRepository::DOKTYPE_DEFAULT,
@@ -144,11 +135,18 @@ final readonly class SiteConfigurationSeeder
         PageRepository::DOKTYPE_SHORTCUT,
     ];
 
+    /**
+     * `SiteConfiguration` is injected next to the writer rather than replaced by
+     * it: {@see self::writeSite()} reads `getAllSiteConfigurationPaths()` from
+     * it, and that method is on `SiteConfiguration` on both supported core
+     * versions. Only the writing moved, so only the writing is behind a seam.
+     */
     public function __construct(
-        private SiteWriter $siteWriter,
-        private SiteConfiguration $siteConfiguration,
-        private SiteFinder $siteFinder,
-        private ConnectionPool $connectionPool,
+        private readonly SiteConfigurationWriterInterface $siteConfigurationWriter,
+        private readonly SeedYamlFileLoaderInterface $yamlFileLoader,
+        private readonly SiteConfiguration $siteConfiguration,
+        private readonly SiteFinder $siteFinder,
+        private readonly ConnectionPool $connectionPool,
     ) {}
 
     /**
@@ -224,9 +222,9 @@ final readonly class SiteConfigurationSeeder
             throw new SeedingFailedException(
                 sprintf(
                     'The seed set "%s" writes the site configuration "%s", which this installation already has.'
-                    . ' It is not overwritten: SiteWriter merges an incoming configuration into an existing'
-                    . ' "%s" instead of replacing it, so seeding it again would produce neither the template nor'
-                    . ' the existing site. Remove "%s" first if the seed is meant to replace it.',
+                    . ' It is not overwritten: the site writer of TYPO3 merges an incoming configuration into an'
+                    . ' existing "%s" instead of replacing it, so seeding it again would produce neither the'
+                    . ' template nor the existing site. Remove "%s" first if the seed is meant to replace it.',
                     $definition->identifier,
                     $site->identifier,
                     self::CONFIG_FILE_NAME,
@@ -257,7 +255,7 @@ final readonly class SiteConfigurationSeeder
         }
 
         try {
-            $this->siteWriter->write($site->identifier, $configuration);
+            $this->siteConfigurationWriter->write($site->identifier, $configuration);
         } catch (SiteConfigurationWriteException $exception) {
             throw new SeedingFailedException(
                 sprintf(
@@ -278,13 +276,13 @@ final readonly class SiteConfigurationSeeder
      * Copies the `settings.yaml` of the template, when it has one.
      *
      * It is written **after** `write()` and not before, for two reasons that
-     * are both in `SiteWriter`: `writeSettings()` does not create the site
-     * directory - it hands the file name to `GeneralUtility::writeFile()`,
-     * which does not either - and it dispatches no
-     * `SiteConfigurationChangedEvent`, so it cannot be the last thing that
-     * happens before something reads the site back. `write()` creates the
-     * directory and flushes the caches, and the only read that follows in this
-     * run is the uncovered-root check, after every site has been written.
+     * hold on both supported core versions: `writeSettings()` does not create
+     * the site directory - it hands the file name to
+     * `GeneralUtility::writeFile()`, which does not either - and it invalidates
+     * nothing, so it cannot be the last thing that happens before something
+     * reads the site back. `write()` creates the directory and makes the site
+     * visible, and the only read that follows in this run is the
+     * uncovered-root check, after every site has been written.
      *
      * @throws SeedingFailedException
      */
@@ -301,7 +299,7 @@ final readonly class SiteConfigurationSeeder
         }
 
         try {
-            $this->siteWriter->writeSettings($site->identifier, $settings);
+            $this->siteConfigurationWriter->writeSettings($site->identifier, $settings);
         } catch (SiteConfigurationWriteException $exception) {
             throw new SeedingFailedException(
                 sprintf(
@@ -343,18 +341,25 @@ final readonly class SiteConfigurationSeeder
     /**
      * Reads one file of a template directory.
      *
-     * `YamlFileLoader` is used rather than a plain YAML parse because it is
-     * what TYPO3 reads its own site configurations with: it resolves `EXT:`
-     * paths and it follows `imports:`. Following them **inlines** the imported
-     * content into the written file, which is the behaviour a seed needs - an
-     * `imports:` key kept verbatim would point at paths relative to the
-     * template directory and break the moment the file lands in
-     * `config/sites/`.
+     * The core's `YamlFileLoader` is used rather than a plain YAML parse
+     * because it is what TYPO3 reads its own site configurations with: it
+     * resolves `EXT:` paths and it follows `imports:`. Following them
+     * **inlines** the imported content into the written file, which is the
+     * behaviour a seed needs - an `imports:` key kept verbatim would point at
+     * paths relative to the template directory and break the moment the file
+     * lands in `config/sites/`. Placeholders are deliberately **not** processed:
+     * `%env(…)%` in a site configuration is meant to be resolved by the instance
+     * every time it reads the file, so resolving it here would bake this
+     * machine's environment into the seeded site. Both are properties of
+     * {@see SeedYamlFileLoaderInterface}, which is also where the version
+     * differences of that loader are handled.
      *
-     * Placeholders are deliberately **not** processed. `%env(…)%` in a site
-     * configuration is meant to be resolved by the instance every time it reads
-     * the file, so resolving it here would bake this machine's environment into
-     * the seeded site.
+     * A file that parses to nothing is an empty result rather than an error, for
+     * `config.yaml` as much as for `settings.yaml`. It is what the optional
+     * `settings.yaml` needs - a template holding nothing but comments has no
+     * site settings, and {@see self::writeSettings()} skips it - and it is
+     * right for `config.yaml` too, because the one key a site really needs is
+     * `rootPageId` and this class overwrites that key anyway.
      *
      * @param bool $required Whether a missing file is an error. It is for
      *        `config.yaml`, which is what makes a directory a template at all.
@@ -379,10 +384,8 @@ final readonly class SiteConfigurationSeeder
             );
         }
 
-        $loader = new YamlFileLoader(new ThrowOnErrorLogger($file));
         try {
-            /** @var array<string, mixed> $content */
-            $content = $loader->load($file, YamlFileLoader::PROCESS_IMPORTS | YamlFileLoader::ALLOW_EMPTY_FILE);
+            $content = $this->yamlFileLoader->load($file, new ThrowOnErrorLogger($file), true);
         } catch (YamlFileLoadingException|YamlParseException $exception) {
             throw new SeedingFailedException(
                 sprintf(
@@ -415,9 +418,10 @@ final readonly class SiteConfigurationSeeder
      * reachable through that site, and reporting it would be a false alarm.
      *
      * This runs after every declared site has been written, so a site written
-     * in this run counts as coverage - which it does, because `SiteWriter`
-     * flushed the caches of `SiteConfiguration` and `SiteFinder` on its way
-     * out.
+     * in this run counts as coverage - which it does, because
+     * {@see SiteConfigurationWriterInterface::write()} promises exactly that:
+     * the configuration is effective for `SiteConfiguration` and `SiteFinder`
+     * in this process by the time it returns.
      *
      * @return list<int>
      */

@@ -22,4 +22,4 @@ parameters:
     - ../../../Tests
 
   excludePaths:
-    - ../../../Tests/*/Core14/*
+    - ../../../Tests/*/Core12/*

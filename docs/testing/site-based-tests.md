@@ -22,13 +22,13 @@ core version introduced over time behind one API.
 Its majors are pinned to a core version, so the constraint names both:
 
 ```json
-"sbuerk/typo3-site-based-test-trait": "^2.0.1 || ^3.0.0"
+"sbuerk/typo3-site-based-test-trait": "^1.0.2 || ^2.0.1"
 ```
 
 | Package major | TYPO3 |
 |---------------|-------|
+| `1.x`         | v12   |
 | `2.x`         | v13   |
-| `3.x`         | v14   |
 
 `composerUpdate` resolves the major matching the `-t` core version, which is one
 more reason why the installed dependency set must match the version a suite is
@@ -227,20 +227,23 @@ $this->view->assign(
 ```
 
 The request attribute is used rather than the language aspect because it behaves
-identically in TYPO3 v13 and v14 — a fixture extension should not need
+identically in TYPO3 v12 and v13 — a fixture extension should not need
 [core version aware code](../architecture/core-version-aware-code.md).
 
 Two details of the plugin registration are worth knowing, both of them the
 reason it works on both core versions unchanged:
 
 - `ExtensionUtility::configurePlugin()` is called with
-  `PLUGIN_TYPE_CONTENT_ELEMENT` explicitly, and it has to be. TYPO3 v13 still
-  defaults to `list_type` and **triggers a deprecation** for it; v14 removed
-  that plugin content element and throws an `\InvalidArgumentException` for
-  anything but `CType`. Naming `CType` is the one call correct on both. Omitting
-  it would not fail silently either: the deprecation turns the v13 run red,
-  because [the suites fail on deprecations](phpunit-configuration.md#strictness-policy).
-  See the changelog entry `Important-105538-ListTypeAndSubTypes.rst` shipped
+  `PLUGIN_TYPE_CONTENT_ELEMENT` explicitly, and it has to be. Both supported
+  versions default the fifth argument to `PLUGIN_TYPE_PLUGIN`, which is
+  `'list_type'` — on v12 silently, so the fixture would register a *different*
+  content element and nothing would say so, and on v13 with an
+  `E_USER_DEPRECATED` on top (13.4: `ExtensionUtility::configurePlugin()`
+  raises it for `list_type`), which turns the run red because
+  [the suites fail on deprecations](phpunit-configuration.md#strictness-policy).
+  `PLUGIN_TYPE_CONTENT_ELEMENT` is `'CType'` on 12.4 and 13.4 alike, so naming
+  it is the one call correct on both. See the changelog entry
+  `13.4/Deprecation-105076-PluginContentElementAndPluginSubTypes.rst` shipped
   with `typo3/cms-core`.
 - `Configuration/TCA/Overrides/tt_content.php` passes **no** plugin type:
   `ExtensionUtility::registerPlugin()` reads it back from what `configurePlugin()`

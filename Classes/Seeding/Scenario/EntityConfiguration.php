@@ -186,10 +186,11 @@ final class EntityConfiguration
     {
         // Deliberate divergence from `typo3/testing-framework` 9.6.1, which
         // indexes with `$value` directly. PHP coerces a null offset to the
-        // empty string, and deprecates doing so as of PHP 8.5 - which this
-        // extension supports and whose test suite fails on a deprecation. The
-        // coercion is spelled out instead, so the lookup keeps hitting exactly
-        // the key it hit before while nothing is deprecated.
+        // empty string and deprecates doing so as of PHP 8.5, which is beyond
+        // the 8.4 this branch supports - so nothing is deprecated here yet, and
+        // the coercion is spelled out anyway: it is what the expression means,
+        // it costs nothing, and the 2.x line does run on 8.5 with a test suite
+        // that fails on a deprecation.
         $key = $value ?? '';
         if (empty($this->valueInstructions[$name][$key])) {
             return $values;

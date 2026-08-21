@@ -19,8 +19,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * turns into the `console.command` tag while compiling the container - so
  * neither `Configuration/Commands.php` nor a service definition is needed.
  *
- * The class is `final` but not `readonly`: it extends the Symfony `Command`,
- * which is not readonly, and a readonly class cannot extend a non readonly one.
+ * The class is plain `final`. Readonly classes are PHP 8.2 and this branch
+ * supports PHP 8.1 for TYPO3 v12, so immutability is declared per property
+ * throughout - and here it could not be declared on the class in any case,
+ * because it extends the Symfony `Command`, which is not readonly.
  *
  * @internal Part of the seeding implementation, not public API.
  */

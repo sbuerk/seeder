@@ -1,7 +1,7 @@
 # Quality gates
 
-The same gates run locally and in the GitHub Actions workflows for TYPO3 v13
-and v14. Every one of them must pass for both core versions, each after the
+The same gates run locally and in the GitHub Actions workflows for TYPO3 v12
+and v13. Every one of them must pass for both core versions, each after the
 matching `composerUpdate` — see [Dual core setup](dual-core-setup.md).
 
 ## The gates
@@ -38,7 +38,7 @@ Build/Scripts/runTests.sh -s checkTestMethodsPrefix
 | Gate                     | Configuration                                                                                        | Core version dependent |
 |--------------------------|------------------------------------------------------------------------------------------------------|------------------------|
 | `cgl`                    | [`Build/php-cs-fixer/config.php`](../../Build/php-cs-fixer/config.php)                               | no                     |
-| `phpstan`                | `Build/phpstan/Core13/`, `Build/phpstan/Core14/`                                                     | **yes**                |
+| `phpstan`                | `Build/phpstan/Core12/`, `Build/phpstan/Core13/`                                                     | **yes**                |
 | `lintPhp`                | —                                                                                                    | no                     |
 | `composerValidate`       | `composer.json`                                                                                      | no                     |
 | `checkBom`               | [`Build/Scripts/checkUtf8Bom.sh`](../../Build/Scripts/checkUtf8Bom.sh)                               | no                     |
@@ -50,9 +50,17 @@ Build/Scripts/runTests.sh -s checkTestMethodsPrefix
 
 PHPStan runs at **level 8** and is configured **per core version**. Each
 configuration analyses only its own core version aware sources —
-`Build/phpstan/Core13/phpstan.neon` lists `Classes`, `Configuration`, `Core13`
-and `Tests`, and excludes `Tests/*/Core14/*`. Analysing the sources of the other
-core version would report false positives about API that does not exist there.
+`Build/phpstan/Core12/phpstan.neon` lists `Classes`, `Configuration`, `Core12`
+and `Tests`, and excludes `Tests/*/Core13/*`; `Build/phpstan/Core13/phpstan.neon`
+is the mirror image. Analysing the sources of the other core version would report
+false positives about API that does not exist there.
+
+The two configurations also run **different PHPStan majors** — 1.12 on the v12
+leg, 2.x on the v13 leg, because `saschaegerer/phpstan-typo3` has no v12-capable
+release above 1.10.2 and that one requires PHPStan 1.x. A finding fixed for one
+major is therefore not automatically gone on the other, and both baselines are
+separate files for that reason as much as for the API difference. See
+[the dependency sets](dual-core-setup.md#the-dependency-sets-differ-by-more-than-the-core).
 
 Both PHPStan suites pass arguments after `--` through to the tool and do not
 force an output format, so `-- --error-format=json` or `-- --no-progress` is the
@@ -62,16 +70,39 @@ When PHPStan reports pre-existing findings that cannot be fixed right away, the
 baseline can be regenerated per core version — but **prefer fixing the finding**:
 
 ```bash
+Build/Scripts/runTests.sh -t 12 -s phpstanGenerateBaseline
 Build/Scripts/runTests.sh -t 13 -s phpstanGenerateBaseline
-Build/Scripts/runTests.sh -t 14 -s phpstanGenerateBaseline
 ```
 
 A growing baseline is a defect, not a configuration. Regenerating it to make a
-new finding disappear hides the very problem the gate exists for. The two
+new finding disappear hides the very problem the gate exists for. Both baselines
+are currently empty, and that is the state to keep them in. The two
 `@phpstan-ignore` annotations this repository does accept are documented, scoped
 and justified in
 [Class design](../architecture/class-design.md#the-two-phpstan-ignores-on-injected-readonly-properties);
 nothing else may be silenced.
+
+### The one `ignoreErrors` entry, and why it is not in the baseline
+
+`Build/phpstan/Core12/phpstan.neon` carries two `ignoreErrors` entries scoped to
+a single file, and they are **deliberately in the configuration rather than in
+the baseline** — the file states the full reasoning, this is the summary.
+
+`QueryResultInterface` declares two template types on both supported core
+versions. `saschaegerer/phpstan-typo3` 2.x spells it that way as well, so the v13
+leg analyses the annotation as written and is green. Only the 1.x line — the
+newest one supporting TYPO3 v12, because 2.0.0 and up require
+`typo3/cms-core: ^13.4.3` — ships a **stub** declaring a single type parameter,
+and a stub wins over the real class docblock. Correcting it with a stub of our
+own does not work: its sibling stubs name the interface with one argument too,
+PHPStan analyses vendor stubs rather than replacing them, and each correction
+moves the error into the next file.
+
+Keeping it in the configuration rather than the baseline is what makes it
+self-removing: `reportUnmatchedIgnoredErrors` is left at its default, so the
+moment the v12 dependency set goes and the 2.x stub is the only reachable one,
+the entry stops matching and PHPStan fails until it is deleted. A baseline entry
+would simply be regenerated away and nobody would notice.
 
 ## Exception codes
 
@@ -137,13 +168,21 @@ docs ────┘
 
 | Job                 | Matrix                                   | Runs                                        |
 |---------------------|------------------------------------------|---------------------------------------------|
-| `quality`           | lowest PHP, one core version             | The gates that inspect source files         |
-| `phpstan`           | lowest PHP × both core versions          | The one gate configured per core version    |
+| `quality`           | PHP 8.2, TYPO3 v12 only                  | The gates that inspect source files         |
+| `phpstan`           | PHP 8.2 × both core versions             | The one gate configured per core version    |
 | `lint`              | all PHP versions × both core versions    | `lintPhp`                                   |
 | `unit`              | edge PHP versions × both core versions   | `unit`, `unitRandom`                        |
 | `functional-sqlite` | edge PHP versions × both core versions   | `functional -d sqlite`                      |
 | `functional-dbms`   | edge PHP × both cores × 4 DBMS — 16 jobs | `functional` against each database          |
 | `documentation`     | —                                        | `renderDocumentation`, uploads the artifact |
+
+"Edge PHP versions" is **not** the same pair on both legs, because the PHP
+matrix is not square: the lower edge is 8.1 on v12 and 8.2 on v13, the upper
+edge is 8.4 on both. `lint` runs all four PHP versions and excludes the one pair
+that cannot resolve, `(v13, PHP 8.1)` — `typo3/cms-core` 13.4 requires PHP
+`^8.2`. PHP 8.1 is therefore exercised in `lint` and `unit` and nowhere else,
+which is exactly enough to catch a `readonly class` or a constant in a trait.
+→ [The PHP dimension is not square](dual-core-setup.md#the-php-dimension-is-not-square)
 
 Two decisions are worth knowing:
 
@@ -201,9 +240,12 @@ What is deliberately *not* symmetric is who keeps it: `composerUpdate` deletes
 `.cache/` **locally** and keeps it in CI, guarded by the same `IS_CORE_CI` the
 rest of the script uses. The two contexts differ in what the cache can collide
 with. A CI job starts from an empty checkout, installs once and ends; a working
-copy switches between the core versions for months, and that switch changes the
-major version of `typo3/class-alias-loader` — v13 resolves `^1.2`, v14 resolves
-`^2.0.1`.
+copy switches between the core versions for months, and that switch exchanges
+the **major version of four packages at once**: `phpstan/phpstan`,
+`phpstan/phpstan-phpunit`, `saschaegerer/phpstan-typo3` and
+`nikic/php-parser` — with `sbuerk/typo3-site-based-test-trait` as a fifth. The
+table in [Dual core setup](dual-core-setup.md#the-dependency-sets-differ-by-more-than-the-core)
+lists what each `-t` value resolves to.
 
 The local clear is a **precaution rather than a fix for a reproduced defect**.
 Switching back and forth four times does not fail today; what it buys is that an

@@ -42,7 +42,7 @@ use TYPO3\CMS\Core\Utility\PathUtility;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class ScenarioComposer
+final class ScenarioComposer
 {
     private const ENTITY_SETTINGS = 'entitySettings';
     private const ENTITIES = 'entities';

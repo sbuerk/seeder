@@ -16,7 +16,7 @@
 print=0
 # Directories holding the extension sources, including the core version aware
 # ones at the repository root. Non-existing directories are skipped.
-scanPaths=("Classes/" "Core13/" "Core14/")
+scanPaths=("Classes/" "Core12/" "Core13/")
 
 ignoreFiles=()
 

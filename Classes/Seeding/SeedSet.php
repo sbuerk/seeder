@@ -21,7 +21,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
  * @internal Part of the seeding implementation, not public API.
  */
 #[Exclude]
-final readonly class SeedSet
+final class SeedSet
 {
     /**
      * @param string $identifier Declared in `config.yml`, globally unique
@@ -45,12 +45,12 @@ final readonly class SeedSet
      *        which is the entry point a full parse is handed.
      */
     public function __construct(
-        public string $identifier,
-        public string $title,
-        public string $description,
-        public string $packageName,
-        public string $extensionKey,
-        public string $basePath,
-        public string $configFile,
+        public readonly string $identifier,
+        public readonly string $title,
+        public readonly string $description,
+        public readonly string $packageName,
+        public readonly string $extensionKey,
+        public readonly string $basePath,
+        public readonly string $configFile,
     ) {}
 }

@@ -59,25 +59,25 @@ see [Dual core setup](../development/dual-core-setup.md).
 
 ## Core version aware unit tests
 
-Tests for classes below `Core13/` and `Core14/` mirror that layout in
-`Tests/Unit/Core13/` and `Tests/Unit/Core14/`, and carry the group of the core
+Tests for classes below `Core12/` and `Core13/` mirror that layout in
+`Tests/Unit/Core12/` and `Tests/Unit/Core13/`, and carry the group of the core
 version they must **not** run on:
 
 ```php
-#[Group('not-core-14')]
+#[Group('not-core-13')]
 final class SeedWriterTest extends UnitTestCase
 {
 }
 ```
 
-Note the inverted logic: the class above runs on v13 only, and a test without
+Note the inverted logic: the class above runs on v12 only, and a test without
 any group runs everywhere. See
 [Dual core setup](../development/dual-core-setup.md#test-grouping).
 
 The same grouping is what makes
 [`Tests/Unit/VersionCompatTest`](../../Tests/Unit/VersionCompatTest.php) work:
-it asserts that a run with `-t 13` really is v13 and one with `-t 14` really is
-v14, so a stale `.Build/` cannot produce a green suite that proved nothing. That
+it asserts that a run with `-t 12` really is v12 and one with `-t 13` really is
+v13, so a stale `.Build/` cannot produce a green suite that proved nothing. That
 test is **never removed** —
 see [the two tests that must never be dropped](Index.md#the-two-tests-that-must-never-be-dropped).
 

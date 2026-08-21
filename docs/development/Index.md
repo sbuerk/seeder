@@ -14,8 +14,8 @@ versions green.
 ## Quick start
 
 ```bash
-# Install dependencies for TYPO3 v13 on PHP 8.2 (default matrix).
-Build/Scripts/runTests.sh -t 13 -p 8.2 -s composerUpdate
+# Install dependencies for TYPO3 v12 on PHP 8.2 (the defaults).
+Build/Scripts/runTests.sh -t 12 -p 8.2 -s composerUpdate
 
 # Quality gates.
 Build/Scripts/runTests.sh -s cgl -n
@@ -30,7 +30,9 @@ Build/Scripts/runTests.sh -s functional -d sqlite
 Build/Scripts/runTests.sh -h
 ```
 
-Then repeat with `-t 14`, starting again at `composerUpdate` — see
+Then repeat with `-t 13`, starting again at `composerUpdate` — and once more
+with `-t 12 -p 8.1` when a change adds or moves a class, because a dependency
+set carries the PHP version it was installed for. See
 [Dual core setup](dual-core-setup.md).
 
 ## See also

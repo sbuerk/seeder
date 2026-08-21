@@ -49,6 +49,8 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  */
 final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
 {
+    use SeedYamlFileLoaderTestTrait;
+
     protected bool $backupEnvironment = true;
 
     private string $projectPath = '';
@@ -87,7 +89,7 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
     #[Test]
     public function aSetInTheVendorDirectoryOfTheProjectIsRead(): void
     {
-        $definition = (new SeedDefinitionParser())->parseFile(
+        $definition = $this->subject()->parseFile(
             $this->projectPath . '/vendor/acme/demo-content/Configuration/Seeder/demo/config.yml',
         );
 
@@ -102,7 +104,7 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
     #[Test]
     public function aRelativeImportOfSuchASetIsFollowed(): void
     {
-        $definition = (new SeedDefinitionParser())->parseFile(
+        $definition = $this->subject()->parseFile(
             $this->projectPath . '/vendor/acme/demo-content/Configuration/Seeder/demo/config.yml',
         );
 
@@ -123,7 +125,7 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
         $this->expectException(SeedDefinitionNotFoundException::class);
         $this->expectExceptionCode(1787072801);
 
-        (new SeedDefinitionParser())->parseFile(
+        $this->subject()->parseFile(
             $this->outsidePath . '/demo-content/Configuration/Seeder/demo/config.yml',
         );
     }
@@ -142,5 +144,15 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
             "scenarios:\n  - Imported.yaml\n",
             true,
         );
+    }
+
+    /**
+     * Built per call rather than in `setUp()`: every test here replaces
+     * `Environment` first, and the parser is only meaningful against the
+     * environment of the test using it.
+     */
+    private function subject(): SeedDefinitionParser
+    {
+        return new SeedDefinitionParser($this->seedYamlFileLoader());
     }
 }

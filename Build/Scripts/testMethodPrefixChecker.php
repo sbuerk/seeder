@@ -32,7 +32,19 @@ class NodeVisitor extends NodeVisitorAbstract
     }
 }
 
-$parser = (new ParserFactory())->createForVersion(PhpVersion::fromComponents(8, 2));
+// php-parser spans two majors on this branch: "typo3/cms-install" 12.4 requires
+// "^4.15.4", so a TYPO3 v12 dependency set installs php-parser 4, and a v13 one
+// installs 5. This is a build script and not extension code, so a conditional is
+// the right tool here - there is no container to pick an implementation with.
+//
+// "PhpVersion" is the class php-parser 5 added along with "createForVersion()",
+// which makes it the honest thing to test for - "::class" does not autoload, so
+// this asks whether the class exists rather than loading it.
+// @todo Collapse to the "createForVersion()" branch when TYPO3 v12 support is
+//       dropped and php-parser 4 goes with it.
+$parser = class_exists(PhpVersion::class)
+    ? (new ParserFactory())->createForVersion(PhpVersion::fromComponents(8, 2))
+    : (new ParserFactory())->create(ParserFactory::PREFER_PHP7);
 
 $finder = new Finder();
 $finder->files()

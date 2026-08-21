@@ -41,6 +41,8 @@ require_once __DIR__ . '/Fixtures/ShadowedIsReadable.php';
  */
 final class SeedDefinitionParserTest extends UnitTestCase
 {
+    use SeedYamlFileLoaderTestTrait;
+
     /**
      * The one entry file `Fixtures/ShadowedIsReadable.php` answers as
      * unreadable. It is a normal, readable fixture - see that file for why the
@@ -53,7 +55,7 @@ final class SeedDefinitionParserTest extends UnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->subject = new SeedDefinitionParser();
+        $this->subject = new SeedDefinitionParser($this->seedYamlFileLoader());
     }
 
     #[Test]

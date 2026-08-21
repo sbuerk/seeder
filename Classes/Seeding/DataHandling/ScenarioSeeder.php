@@ -42,11 +42,11 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * @internal Part of the seeding implementation, not public API.
  */
-final readonly class ScenarioSeeder
+final class ScenarioSeeder
 {
     public function __construct(
-        private FileSeeder $fileSeeder,
-        private FileReferenceSeeder $fileReferenceSeeder,
+        private readonly FileSeeder $fileSeeder,
+        private readonly FileReferenceSeeder $fileReferenceSeeder,
     ) {}
 
     /**

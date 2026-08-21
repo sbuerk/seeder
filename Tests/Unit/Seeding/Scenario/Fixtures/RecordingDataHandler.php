@@ -21,9 +21,15 @@ use TYPO3\CMS\Core\DataHandling\DataHandler;
  * as nothing but the four members below is touched — a test reaching further
  * fails on an uninitialised property rather than silently working.
  *
- * `start()` takes its parameters after the two maps as a variadic: TYPO3 v14
- * added a `CorrelationId` argument to the signature that v13 does not have, and
- * a variadic is compatible with both.
+ * `start()` declares both maps as `mixed` and takes everything after them as a
+ * variadic, which is the only signature valid on both supported core versions.
+ * TYPO3 v13 declares `start(array $dataMap, array $commandMap,
+ * ?BackendUserAuthentication, ?ReferenceIndexUpdater): void`, while v12.4
+ * declares `start($data, $cmd, $altUserObject = null)` with no types and no
+ * return type at all. Narrowing the two maps to `array` therefore satisfies v13
+ * and breaks v12, where the parent accepts anything - PHP allows a child to
+ * widen a parameter type, never to narrow one. The real types are stated in the
+ * docblock below, which is what the analysis reads.
  */
 final class RecordingDataHandler extends DataHandler
 {
@@ -45,7 +51,7 @@ final class RecordingDataHandler extends DataHandler
      * @param array<string, array<int|string, array<string, mixed>>> $dataMap
      * @param array<string, array<int|string, array<string, mixed>>> $commandMap
      */
-    public function start(array $dataMap, array $commandMap, mixed ...$rest): void
+    public function start(mixed $dataMap, mixed $commandMap, mixed ...$rest): void
     {
         if ($dataMap !== []) {
             $this->recordedDataMaps[] = $dataMap;

@@ -29,7 +29,7 @@ The worked example is
 All three are published as public services, so a test fetches them with
 `$this->get()`. The package resolves the version specific implementation exactly
 the way this repository does it — a shared interface, one implementation per core
-version in a `Core13/` and a `Core14/` directory, and only the matching one
+version in a `Core12/` and a `Core13/` directory, and only the matching one
 registered in the container. See
 [Core version aware code](../architecture/core-version-aware-code.md); the
 package is a second, independent example of the same pattern.

@@ -311,22 +311,28 @@ Options:
             - 17    maintained until 2029-11-08
             - 18    maintained until 2030-11-14
 
-    -t <13|14>
+    -t <12|13>
         Specifies the TYPO3 CORE Version to be used
-            - 13: (default) use TYPO3 v13
-            - 14: use TYPO3 v14
+            - 12: (default) use TYPO3 v12
+            - 13: use TYPO3 v13
+        The default is the lowest supported version, because the gates that do
+        not depend on a core version are run against it.
         Note that the dependencies must be installed for the selected core
         version first, which is done by the composerUpdate suite:
-            ./Build/Scripts/runTests.sh -t 13 -s composerUpdate
+            ./Build/Scripts/runTests.sh -t 12 -s composerUpdate
         Gates executed with a different core version installed than selected
         report false positives.
 
-    -p <8.2|8.3|8.4|8.5>
+    -p <8.1|8.2|8.3|8.4>
         Specifies the PHP minor version to be used
+            - 8.1: use PHP 8.1 - TYPO3 v12 only
             - 8.2: use PHP 8.2 (default)
             - 8.3: use PHP 8.3
             - 8.4: use PHP 8.4
-            - 8.5: use PHP 8.5
+        "-p 8.1" is only meaningful together with "-t 12": "typo3/cms-core"
+        13.4 requires PHP "^8.2", so composerUpdate refuses the combination
+        rather than installing something the version does not support. The
+        default is the lowest version valid for both core versions.
 
     -x
         Only with -s functional|unit|unitRandom
@@ -356,8 +362,8 @@ Options:
         Show this help.
 
 Examples:
-    # Install dependencies for TYPO3 v13 on PHP 8.2 (default matrix)
-    ./Build/Scripts/runTests.sh -t 13 -p 8.2 -s composerUpdate
+    # Install dependencies for TYPO3 v12 on PHP 8.2 (default matrix)
+    ./Build/Scripts/runTests.sh -t 12 -p 8.2 -s composerUpdate
 
     # Run all unit tests using PHP 8.2
     ./Build/Scripts/runTests.sh -s unit
@@ -392,7 +398,7 @@ fi
 
 # Option defaults
 TEST_SUITE="help"
-CORE_VERSION="13"
+CORE_VERSION="12"
 DBMS="sqlite"
 PHP_VERSION="8.2"
 PHP_XDEBUG_ON=0
@@ -433,13 +439,13 @@ while getopts "a:b:s:d:i:p:t:xy:o:nhu" OPT; do
             ;;
         p)
             PHP_VERSION=${OPTARG}
-            if ! [[ ${PHP_VERSION} =~ ^(8.2|8.3|8.4|8.5)$ ]]; then
+            if ! [[ ${PHP_VERSION} =~ ^(8.1|8.2|8.3|8.4)$ ]]; then
                 INVALID_OPTIONS+=("p ${OPTARG}")
             fi
             ;;
         t)
             CORE_VERSION=${OPTARG}
-            if ! [[ ${CORE_VERSION} =~ ^(13|14)$ ]]; then
+            if ! [[ ${CORE_VERSION} =~ ^(12|13)$ ]]; then
                 INVALID_OPTIONS+=("t ${OPTARG}")
             fi
             ;;
@@ -658,9 +664,10 @@ case ${TEST_SUITE} in
         if [[ ${IS_CORE_CI} -eq 0 ]]; then
             # Locally the cache is dropped along with the dependency set, as it was while it still
             # lived below ".Build/". This is a precaution, not a fix for a reproduced defect:
-            # switching between the core versions also switches the major version of
-            # "typo3/class-alias-loader", a working copy accumulates months of such switches, and
-            # an install resolving against a cache from the other major is a class of failure that
+            # switching between the core versions also switches the major version of four packages
+            # - "phpstan/phpstan", "phpstan/phpstan-phpunit", "saschaegerer/phpstan-typo3" and
+            # "nikic/php-parser" - a working copy accumulates months of such switches, and an
+            # install resolving against a cache from the other major is a class of failure that
             # is tedious to recognize. One download of a dependency set that was about to be
             # replaced anyway is the cheaper side of that trade.
             #
@@ -681,7 +688,17 @@ case ${TEST_SUITE} in
         ;;
     functional)
         PHPUNIT_CONFIG_FILE="Build/phpunit/FunctionalTests.xml"
-        COMMAND=(.Build/bin/phpunit -c ${PHPUNIT_CONFIG_FILE} --exclude-group not-${DBMS} --exclude-group not-core-${CORE_VERSION} "$@")
+        # One "--exclude-group" carrying a comma separated list, never two of
+        # them. This branch pins PHPUnit to the 10.5 line, and 10.5 rejects a
+        # repeated option outright: "Option --exclude-group cannot be used more
+        # than once". That arrives as a runner warning, and
+        # "failOnPhpunitWarning" in "Build/phpunit/FunctionalTests.xml" turns it
+        # into a failed run - so the wrong spelling reports FAILURE on a fully
+        # passing suite.
+        # @todo PHPUnit 11 deprecates the comma separated list and PHPUnit 12
+        #       drops it. Switch to the repeated form together with the PHPUnit
+        #       major, not before: there is no spelling both accept.
+        COMMAND=(.Build/bin/phpunit -c ${PHPUNIT_CONFIG_FILE} --exclude-group not-${DBMS},not-core-${CORE_VERSION} "$@")
         case ${DBMS} in
             mariadb)
                 echo "Using driver: ${DATABASE_DRIVER}"

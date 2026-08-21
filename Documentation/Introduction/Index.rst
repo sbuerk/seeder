@@ -136,6 +136,8 @@ What it does not do
     :yaml:`password` themselves, because the import mode that suppresses the
     automatic site configuration also suppresses the generated credentials.
 
+..  _compatibility:
+
 Compatibility
 =============
 
@@ -143,13 +145,39 @@ Compatibility
     :header-rows: 1
 
     *   -   Branch
+        -   State
         -   Extension
         -   TYPO3
         -   PHP
     *   -   main
-        -   1.x
-        -   v13 / v14
+        -   development
+        -   2.x
+        -   v13.4 / v14.3
         -   8.2 - 8.5
+    *   -   1
+        -   development
+        -   1.x
+        -   v12.4
+        -   8.1 - 8.4
+    *   -   1
+        -   development
+        -   1.x
+        -   v13.4
+        -   8.2 - 8.4
+
+Branch ``1`` is the 1.x line and the one this documentation belongs to: TYPO3
+v12.4 and v13.4. It carries one row per TYPO3 version, because the PHP ranges
+differ - PHP 8.1 is supported for **TYPO3 v12 only**, as ``typo3/cms-core``
+13.4 requires PHP ``^8.2`` and a v13 dependency set on PHP 8.1 cannot be
+installed at all. The lowest supported TYPO3 v12 patch level is **12.4.22**.
+
+Branch ``main`` is the 2.x line, on TYPO3 v13.4 and v14.3. One row is enough
+there, because both of its core versions share the same PHP range.
+
+Nothing has been released yet, which is why both lines are listed as
+``development`` rather than as being under active support. Once 1.0 is released
+from branch ``1``, that line moves to active support and ``main`` carries on as
+the development line.
 
 One code base serves both supported TYPO3 versions. Where an implementation has
 to differ, the classes are split per core version and the dependency injection

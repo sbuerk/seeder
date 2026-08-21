@@ -10,17 +10,22 @@ Dependencies are installed into the git-ignored `.Build/` directory. The
 wrapper installs them for a specific TYPO3 core and PHP version:
 
 ```bash
-# Install dependencies for TYPO3 v13 on PHP 8.2 (default matrix).
+# Install dependencies for TYPO3 v12 on PHP 8.2 - both are the defaults.
+Build/Scripts/runTests.sh -t 12 -p 8.2 -s composerUpdate
+
+# Switch the working copy to the TYPO3 v13 dependency set.
 Build/Scripts/runTests.sh -t 13 -p 8.2 -s composerUpdate
 
-# Switch the working copy to the TYPO3 v14 dependency set.
-Build/Scripts/runTests.sh -t 14 -p 8.2 -s composerUpdate
+# The PHP 8.1 leg is a dependency set of its own, not a flag on a gate.
+Build/Scripts/runTests.sh -t 12 -p 8.1 -s composerUpdate
 ```
 
 > [!IMPORTANT]
-> The installed dependency set must match the core version a gate is run for.
-> See [Dual core setup](dual-core-setup.md) — this is the single most common
-> source of false positives in this repository.
+> The installed dependency set must match the core version **and** the PHP
+> version a gate is run for. `-t` and `-p` select; only `composerUpdate`
+> installs, and the install writes the PHP platform requirement into the
+> autoloader. See [Dual core setup](dual-core-setup.md) — this is the single
+> most common source of false positives in this repository.
 
 Run `Build/Scripts/runTests.sh -h` to see all suites and options.
 
@@ -41,8 +46,8 @@ hosted runners, not of this repository.
 | Option         | Meaning                                                                   |
 |----------------|---------------------------------------------------------------------------|
 | `-s <suite>`   | Suite to run (`unit`, `functional`, `cgl`, `phpstan`, …).                 |
-| `-t <13\|14>`  | TYPO3 core major version to run against. Default `13`.                    |
-| `-p <version>` | PHP version (`8.2` … `8.5`). Default `8.2`.                               |
+| `-t <12\|13>`  | TYPO3 core major version to run against. Default `12`, the lowest.        |
+| `-p <version>` | PHP version (`8.1` … `8.4`). Default `8.2`. `8.1` needs `-t 12`.          |
 | `-d <dbms>`    | Database for functional tests (`sqlite`, `mariadb`, `mysql`, `postgres`). |
 | `-i <version>` | Database image version, together with `-d`. `-h` lists the accepted ones. |
 | `-b <bin>`     | Container binary, `podman` or `docker`. Auto-detected, podman preferred.  |

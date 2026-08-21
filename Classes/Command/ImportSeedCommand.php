@@ -45,8 +45,10 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * is also where the whole seeding pipeline is first injected, which is what
  * proves its wiring.
  *
- * The class is `final` but not `readonly`: it extends the Symfony `Command`,
- * which is not readonly, and a readonly class cannot extend a non readonly one.
+ * The class is plain `final`. Readonly classes are PHP 8.2 and this branch
+ * supports PHP 8.1 for TYPO3 v12, so immutability is declared per property
+ * throughout - and here it could not be declared on the class in any case,
+ * because it extends the Symfony `Command`, which is not readonly.
  *
  * ## The order of the run, and why it is that order
  *

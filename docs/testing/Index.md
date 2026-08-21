@@ -41,11 +41,18 @@ class level docblock saying so.
 Both use
 [`ExtensionCoreVersionCompatTestsTrait`](../../Tests/ExtensionCoreVersionCompatTestsTrait.php),
 which asserts that the running major version is supported and — through the
-`not-core-13` and `not-core-14` groups — that `-t 13` really is v13 and `-t 14`
-really is v14. `-t` selects a core version but installs nothing, so without this
+`not-core-12` and `not-core-13` groups — that `-t 12` really is v12 and `-t 13`
+really is v13. `-t` selects a core version but installs nothing, so without this
 a stale `.Build/` produces a green run that proved nothing. Running a suite with
-`-t 14` while the v13 set is installed fails it with
-`Failed asserting that 13 is identical to 14`.
+`-t 13` while the v12 set is installed fails it with
+`Failed asserting that 12 is identical to 13`.
+
+The trait returns those two version numbers from `private function`s rather than
+declaring them as `private const`s: a `const` in a `trait` is PHP 8.2, and this
+branch supports PHP 8.1 for the TYPO3 v12 leg. The group names next to them are
+written out rather than composed from those methods, because an attribute
+argument has to be a constant expression. See
+[Class design](../architecture/class-design.md#constants-in-traits-are-php-82-as-well).
 
 The functional one earns its keep before its assertions run: booting the
 instance compiles the dependency injection container, executes the extension
@@ -68,7 +75,7 @@ same as the backend being able to render a form from it.
 - Functional tests extend `AbstractFunctionalTestCase`, never the testing
   framework `FunctionalTestCase` directly — see
   [Site based tests](site-based-tests.md#no-test-extends-the-framework-test-case-directly).
-- Core version aware tests live in a `Core13/` or `Core14/` subdirectory and
+- Core version aware tests live in a `Core12/` or `Core13/` subdirectory and
   carry `#[Group('not-core-<other version>')]` — see
   [Dual core setup](../development/dual-core-setup.md#test-grouping).
 - Data provider keys are named, so a failing case is identifiable from the

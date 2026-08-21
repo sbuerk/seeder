@@ -49,7 +49,7 @@ Explain what breaks and how to migrate.
 ```
 [FEATURE] Add core version aware example service
 
-[TASK] Raise minimum TYPO3 version to v13.4
+[TASK] Raise minimum TYPO3 version to v12.4
 
 [BUGFIX] Handle empty response payloads
 
@@ -96,12 +96,12 @@ often states that the removed option is still required on the older version.
 
 > [!IMPORTANT]
 > The changelogs reach only as far as the **installed** core version: with
-> TYPO3 v13 installed the newest directory is `13.4.x` and there is no `14.0/`
+> TYPO3 v12 installed the newest directory is `12.4.x` and there is no `13.0/`
 > to read. A package does ship the changelogs of all earlier versions, so
-> installing the highest supported version — v14 — puts both v13 and v14
+> installing the highest supported version — v13 — puts both v12 and v13
 > changelogs on disk at once.
 >
-> Looking something up is not running a gate. Read with v14 installed, then
+> Looking something up is not running a gate. Read with v13 installed, then
 > `composerUpdate` back to the version you are working on before running
 > anything — see [Dual core setup](../development/dual-core-setup.md).
 

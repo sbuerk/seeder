@@ -27,8 +27,8 @@ requirement on the host is a container runtime — **podman** (preferred) or
 **docker**. Neither PHP nor Composer needs to be installed.
 
 ```bash
-# Install dependencies for TYPO3 v13 on PHP 8.2 (default matrix).
-Build/Scripts/runTests.sh -t 13 -p 8.2 -s composerUpdate
+# Install dependencies for TYPO3 v12 on PHP 8.2 (default matrix).
+Build/Scripts/runTests.sh -t 12 -p 8.2 -s composerUpdate
 
 # All available suites and options.
 Build/Scripts/runTests.sh -h
@@ -45,8 +45,8 @@ Build/Scripts/runTests.sh -h
 
 ## Quality gates
 
-The same gates run locally and in the GitHub Actions workflows for TYPO3 v13
-and v14:
+The same gates run locally and in the GitHub Actions workflows for TYPO3 v12
+and v13:
 
 ```bash
 Build/Scripts/runTests.sh -s cgl          # coding guidelines, "-n" to check only
@@ -94,12 +94,12 @@ frontend sub-requests available everywhere.
 
 ## Code rules
 
-The extension supports TYPO3 v13 and v14 from one code base. The rules that make
-that work:
+The extension supports TYPO3 v12.4 and v13.4 from one code base — PHP 8.1 up to
+8.4, with PHP 8.1 valid for TYPO3 v12 only. The rules that make that work:
 
 - **Version differences split classes, they do not add conditionals.**
-  `Classes/` holds everything working on all supported versions; `Core13/` and
-  `Core14/` hold one implementation each, and only the matching directory is
+  `Classes/` holds everything working on all supported versions; `Core12/` and
+  `Core13/` hold one implementation each, and only the matching directory is
   registered in the dependency injection container.
   → [Core version aware code](docs/architecture/core-version-aware-code.md)
 - **Services are stateless and wired with Symfony DI attributes on the class** —
@@ -139,7 +139,7 @@ characters. An issue reference is not required, but must be verified when used.
 Before opening a pull request, run every gate from
 [Quality gates](#quality-gates), both test suites, and `renderDocumentation`
 when anything below `Documentation/` changed — for **both** core versions
-(`-t 13` and `-t 14`, each after the matching `composerUpdate`).
+(`-t 12` and `-t 13`, each after the matching `composerUpdate`).
 
 Add another DBMS (`-d mariadb -i 10.6`, `mysql`, `postgres`) when the change
 touches queries, schema or TCA.
