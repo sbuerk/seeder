@@ -10,13 +10,13 @@ Description
 ===========
 
 A **seed set** describes the content of a TYPO3 installation in YAML. It is a
-directory :file:`Configuration/Seeder/<name>/` inside any active extension, and
+directory :file:`Configuration/DataFactory/<name>/` inside any active extension, and
 it is made of two kinds of file.
 
 :file:`config.yml` describes the **set**:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     identifier: demo
     title: 'Demo page tree'
@@ -51,7 +51,7 @@ The scenario files it names describe the **records**, in the YAML scenario
 format of :php:`typo3/testing-framework`:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/Scenario.yaml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/Scenario.yaml
 
     entitySettings:
       '*':

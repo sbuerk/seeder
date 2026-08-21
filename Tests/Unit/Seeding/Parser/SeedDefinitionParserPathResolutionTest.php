@@ -2,24 +2,24 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Parser;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Parser;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
-use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\DataFactory\Seeding\Exception\SeedDefinitionNotFoundException;
+use SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**
- * Where a seed set may live, which is the one question `seeder:import` cannot
+ * Where a seed set may live, which is the one question `data-factory:import` cannot
  * answer from a functional test.
  *
  * `SeedDefinitionParser::parseFile()` runs the entry file through
  * `GeneralUtility::getFileAbsFileName()`, and resolves its `imports` through
  * `YamlFileLoader`, which does the same for every resource. That function
  * answers an absolute path outside `Environment::getProjectPath()` and
- * `Environment::getPublicPath()` with an empty string - and `seeder:import`
+ * `Environment::getPublicPath()` with an empty string - and `data-factory:import`
  * hands it the absolute `config.yml` that discovery found, which in a Composer
  * installation is below the vendor directory.
  *
@@ -43,7 +43,7 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  *   that plainly exists as missing.
  *
  * Only the entry file is confined this way. A **scenario** path is resolved by
- * {@see \SBUERK\Seeder\Seeding\Scenario\ScenarioComposer}, which deliberately
+ * {@see \SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer}, which deliberately
  * does not send an absolute path through `getFileAbsFileName()` - see the
  * resolution tests there.
  */
@@ -69,8 +69,8 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
 
         $this->projectPath = $root . '/project';
         $this->outsidePath = $root . '/elsewhere';
-        $this->writeSeedSet($this->projectPath . '/vendor/acme/demo-content/Configuration/Seeder/demo');
-        $this->writeSeedSet($this->outsidePath . '/demo-content/Configuration/Seeder/demo');
+        $this->writeSeedSet($this->projectPath . '/vendor/acme/demo-content/Configuration/DataFactory/demo');
+        $this->writeSeedSet($this->outsidePath . '/demo-content/Configuration/DataFactory/demo');
         GeneralUtility::mkdir_deep($this->projectPath . '/public');
 
         Environment::initialize(
@@ -90,7 +90,7 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
     public function aSetInTheVendorDirectoryOfTheProjectIsRead(): void
     {
         $definition = $this->subject()->parseFile(
-            $this->projectPath . '/vendor/acme/demo-content/Configuration/Seeder/demo/config.yml',
+            $this->projectPath . '/vendor/acme/demo-content/Configuration/DataFactory/demo/config.yml',
         );
 
         $this->assertSame('vendor-demo', $definition->identifier);
@@ -105,7 +105,7 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
     public function aRelativeImportOfSuchASetIsFollowed(): void
     {
         $definition = $this->subject()->parseFile(
-            $this->projectPath . '/vendor/acme/demo-content/Configuration/Seeder/demo/config.yml',
+            $this->projectPath . '/vendor/acme/demo-content/Configuration/DataFactory/demo/config.yml',
         );
 
         // The import is resolved against the importing file and then checked
@@ -120,13 +120,13 @@ final class SeedDefinitionParserPathResolutionTest extends UnitTestCase
         // The file is there and readable, so the refusal below is the path
         // check and not a missing file - which is the whole point of it, and
         // the reason the message of the command explains itself.
-        $this->assertFileExists($this->outsidePath . '/demo-content/Configuration/Seeder/demo/config.yml');
+        $this->assertFileExists($this->outsidePath . '/demo-content/Configuration/DataFactory/demo/config.yml');
 
         $this->expectException(SeedDefinitionNotFoundException::class);
         $this->expectExceptionCode(1787072801);
 
         $this->subject()->parseFile(
-            $this->outsidePath . '/demo-content/Configuration/Seeder/demo/config.yml',
+            $this->outsidePath . '/demo-content/Configuration/DataFactory/demo/config.yml',
         );
     }
 

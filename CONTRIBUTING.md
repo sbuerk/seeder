@@ -5,7 +5,7 @@ need to get started and links to the detailed developer documentation in
 [`docs/`](docs/Index.md).
 
 Source code and issue tracker are hosted on GitHub:
-[sbuerk/seeder](https://github.com/sbuerk/seeder).
+[sbuerk/data-factory](https://github.com/sbuerk/data-factory).
 
 ## Table of contents
 

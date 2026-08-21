@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Command;
+namespace SBUERK\DataFactory\Tests\Functional\Command;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Command\ListSeedsCommand;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Command\ListSeedsCommand;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * What `seeder:list` does when two extensions claim the same identifier.
+ * What `data-factory:list` does when two extensions claim the same identifier.
  *
  * A collision is not a display problem, it is a state an import must not run
  * in - so the command reports it and exits non-zero. The two sets are still
@@ -25,7 +25,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class ListSeedsCommandDuplicateTest extends AbstractFunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/seeds-demo',
         'tests/seeds-collision',
     ];
@@ -48,11 +48,11 @@ final class ListSeedsCommandDuplicateTest extends AbstractFunctionalTestCase
         // The absolute path depends on where the checkout lives, the tail of
         // it does not - and the tail is what tells the two providers apart.
         $this->assertMatchesRegularExpression(
-            '#tests_seeds_demo \(\S+/tests_seeds_demo/Configuration/Seeder/basic/config\.yml\)#',
+            '#tests_seeds_demo \(\S+/tests_seeds_demo/Configuration/DataFactory/basic/config\.yml\)#',
             $display,
         );
         $this->assertMatchesRegularExpression(
-            '#tests_seeds_collision \(\S+/tests_seeds_collision/Configuration/Seeder/duplicate/config\.yml\)#',
+            '#tests_seeds_collision \(\S+/tests_seeds_collision/Configuration/DataFactory/duplicate/config\.yml\)#',
             $display,
         );
     }

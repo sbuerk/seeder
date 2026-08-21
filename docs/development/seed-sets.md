@@ -7,12 +7,12 @@ descriptor and the scenario format a set is written in are specified in
 
 ## Discovery
 
-A seed set is a directory `Configuration/Seeder/<name>/` with a `config.yml` in
+A seed set is a directory `Configuration/DataFactory/<name>/` with a `config.yml` in
 it. That `config.yml` names the **scenario files** the records come from, and
 those files sit next to it or anywhere an `EXT:` path reaches:
 
 ```
-Configuration/Seeder/demo/
+Configuration/DataFactory/demo/
 ├── config.yml               identifier, title, "scenarios", "files", "sites"
 ├── Scenario.yaml            the records, in the scenario format
 ├── Files/
@@ -26,9 +26,9 @@ collects those directories:
   activated;
 - there is no configured path list, and nothing outside a package directory is
   ever scanned;
-- an extension without a `Configuration/Seeder/` directory is skipped, which is
+- an extension without a `Configuration/DataFactory/` directory is skipped, which is
   the normal case for all but a handful of packages;
-- a directory below `Configuration/Seeder/` **without** a `config.yml` is not a
+- a directory below `Configuration/DataFactory/` **without** a `config.yml` is not a
   set and is passed over without a word — that is what lets a set keep partials,
   files and site templates next to itself.
 
@@ -42,12 +42,12 @@ A `config.yml` is read here with `Yaml::parseFile()`, and only `identifier`,
 `SeedDefinitionParser`, which would follow the `imports` of the set, read every
 scenario file it names and validate every entity and every file of it.
 
-Parsing in full to show a title would make `seeder:list` as fragile as the least
+Parsing in full to show a title would make `data-factory:list` as fragile as the least
 well maintained set in the installation: one set with a typo in a page record and
 *no* set can be listed any more — including the ones that are fine, and including
 the listing an integrator would use to find out which sets exist at all. Listing
 therefore costs one YAML parse per set, and validating a set is what
-`seeder:import` does, to the set it was asked for.
+`data-factory:import` does, to the set it was asked for.
 
 The consequence for the format is that those three keys have to be declared in
 `config.yml` itself and cannot be pulled in through an `imports`.
@@ -121,7 +121,7 @@ set outside the project path would still fail the moment it grew an `imports:` �
 and it would fail later, in a different place, for a reason the workaround had
 hidden.
 
-Instead, `seeder:import` **detects that case explicitly**: when the file exists
+Instead, `data-factory:import` **detects that case explicitly**: when the file exists
 and `GeneralUtility::getFileAbsFileName()` still answers with an empty string, it
 says so and names the project path, the public path and the file. In a Composer
 installation this cannot normally happen —
@@ -131,11 +131,11 @@ directory outside it, so every package path is below the project path. It happen
 when the project path was moved out from under the packages afterwards, with
 `TYPO3_PATH_APP`.
 
-## `seeder:list`
+## `data-factory:list`
 
 ```bash
-vendor/bin/typo3 seeder:list
-vendor/bin/typo3 seeder:list -v
+vendor/bin/typo3 data-factory:list
+vendor/bin/typo3 data-factory:list -v
 ```
 
 Prints identifier, title and providing extension of every set found, in discovery
@@ -155,12 +155,12 @@ The duplicate report is written as plain lines rather than as a `SymfonyStyle`
 block, because a block is wrapped to the terminal width and an absolute path
 broken over two lines is the one thing this report must not do.
 
-## `seeder:import`
+## `data-factory:import`
 
 ```bash
-vendor/bin/typo3 seeder:import                      # asks, on a terminal
-vendor/bin/typo3 seeder:import demo --dry-run
-vendor/bin/typo3 seeder:import demo --base='https://example.com/'
+vendor/bin/typo3 data-factory:import                      # asks, on a terminal
+vendor/bin/typo3 data-factory:import demo --dry-run
+vendor/bin/typo3 data-factory:import demo --base='https://example.com/'
 ```
 
 ### The order of the run

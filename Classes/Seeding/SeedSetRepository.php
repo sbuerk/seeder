@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding;
+namespace SBUERK\DataFactory\Seeding;
 
-use SBUERK\Seeder\Seeding\Exception\DuplicateSeedSetIdentifierException;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedSetNotFoundException;
+use SBUERK\DataFactory\Seeding\Exception\DuplicateSeedSetIdentifierException;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedSetNotFoundException;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 use TYPO3\CMS\Core\Package\PackageInterface;
@@ -15,27 +15,27 @@ use TYPO3\CMS\Core\Package\PackageManager;
 /**
  * Finds the seed sets the active packages of this installation provide.
  *
- * A seed set is a directory `Configuration/Seeder/<name>/` with a `config.yml`
+ * A seed set is a directory `Configuration/DataFactory/<name>/` with a `config.yml`
  * in it. Discovery walks the **active** packages, so a set is available exactly
  * when the extension shipping it is installed *and* activated - there is no
  * configured path list, and nothing outside a package directory is ever
- * scanned. An extension without a `Configuration/Seeder/` directory is skipped,
+ * scanned. An extension without a `Configuration/DataFactory/` directory is skipped,
  * which is the normal case for all but a handful of packages.
  *
  * ## Discovery reads metadata, it does not parse the set
  *
  * A set is read here with {@see Yaml::parseFile()} and only its `identifier`,
  * `title` and `description` are looked at. It is deliberately *not* handed to
- * {@see \SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser}, which would follow
+ * {@see \SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser}, which would follow
  * the `imports` of the set, walk its page tree and validate every record and
  * every file of it.
  *
- * Parsing in full to show a title would make `seeder:list` as fragile as the
+ * Parsing in full to show a title would make `data-factory:list` as fragile as the
  * least well maintained set in the installation: one set with a typo in a page
  * record, and *no* set can be listed any more - including the ones that are
  * fine, and including the listing an integrator would use to find out which
  * sets exist at all. Listing therefore costs one `yaml_parse` per set and
- * validating a set is what `seeder:import` does, to the set it was asked for.
+ * validating a set is what `data-factory:import` does, to the set it was asked for.
  *
  * The three keys have to be declared in the `config.yml` of the set itself and
  * not pulled in through an `imports`, which is what makes reading them without
@@ -69,7 +69,7 @@ final class SeedSetRepository
      * Relative to the package path. Not configurable: a set is found where the
      * format says it is, or the format has no meaning.
      */
-    private const SET_DIRECTORY = 'Configuration/Seeder';
+    private const SET_DIRECTORY = 'Configuration/DataFactory';
 
     /**
      * The entry point of a set. A directory below {@see self::SET_DIRECTORY}
@@ -204,7 +204,7 @@ final class SeedSetRepository
     }
 
     /**
-     * The `config.yml` files below the `Configuration/Seeder/` of one package,
+     * The `config.yml` files below the `Configuration/DataFactory/` of one package,
      * sorted by path.
      *
      * `glob()` sorts by itself, but the sort is explicit here because the order

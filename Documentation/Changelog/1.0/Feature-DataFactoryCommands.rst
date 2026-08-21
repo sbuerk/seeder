@@ -1,10 +1,10 @@
 ..  include:: /Includes.rst.txt
 
-..  _feature-seeder-commands:
+..  _feature-data-factory-commands:
 
-=========================================================
-Feature: The "seeder:list" and "seeder:import" commands
-=========================================================
+===================================================================
+Feature: The "data-factory:list" and "data-factory:import" commands
+===================================================================
 
 Description
 ===========
@@ -14,19 +14,19 @@ one of them.
 
 ..  code-block:: bash
 
-    vendor/bin/typo3 seeder:list
-    vendor/bin/typo3 seeder:import demo --dry-run
-    vendor/bin/typo3 seeder:import demo --base='https://example.com/'
+    vendor/bin/typo3 data-factory:list
+    vendor/bin/typo3 data-factory:import demo --dry-run
+    vendor/bin/typo3 data-factory:import demo --base='https://example.com/'
 
-:bash:`seeder:list` prints identifier, title and providing extension of every
-seed set found in :file:`Configuration/Seeder/*/config.yml` of an active
+:bash:`data-factory:list` prints identifier, title and providing extension of every
+seed set found in :file:`Configuration/DataFactory/*/config.yml` of an active
 extension, in the order the installation loads its extensions in. :bash:`-v`
 adds the directory of each set. An identifier provided by more than one
 extension is reported with all of its providers and makes the command exit
 non-zero: the sets cannot be told apart, so neither listing nor importing may
 pick one of them.
 
-:bash:`seeder:import` writes one set. Without an identifier it asks which one;
+:bash:`data-factory:import` writes one set. Without an identifier it asks which one;
 without a terminal to ask on it lists the available sets and exits non-zero
 rather than guessing. The options are:
 

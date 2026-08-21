@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Exception;
+namespace SBUERK\DataFactory\Seeding\Exception;
 
 /**
  * Thrown when no active package provides a seed set with the requested

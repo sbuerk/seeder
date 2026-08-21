@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Core12\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Core12\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationWriterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationWriterInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use TYPO3\CMS\Core\Configuration\SiteConfiguration;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -39,7 +39,7 @@ use TYPO3\CMS\Core\Site\SiteFinder;
  * one, built before the first site of the run was written, so
  * `getSiteByPageId()` would answer `SiteNotFoundException` for a root page this
  * run has just covered - and
- * {@see \SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder::findUncoveredSiteRoots()}
+ * {@see \SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeeder::findUncoveredSiteRoots()}
  * would report a site it wrote itself as uncovered.
  *
  * `getAllSites(false)` is the only public way in: it is what re-runs

@@ -24,9 +24,9 @@ core version as the third namespace part — one entry per supported core versio
 ```json
 "autoload": {
     "psr-4": {
-        "SBUERK\\Seeder\\": "Classes/",
-        "SBUERK\\Seeder\\Core12\\": "Core12/",
-        "SBUERK\\Seeder\\Core13\\": "Core13/"
+        "SBUERK\\DataFactory\\": "Classes/",
+        "SBUERK\\DataFactory\\Core12\\": "Core12/",
+        "SBUERK\\DataFactory\\Core13\\": "Core13/"
     }
 }
 ```
@@ -45,7 +45,7 @@ $coreMajorVersion = (new Typo3Version())->getMajorVersion();
 $coreAwareDirectory = sprintf('%s/../Core%d', __DIR__, $coreMajorVersion);
 if (is_dir($coreAwareDirectory)) {
     $services->load(
-        sprintf('SBUERK\\Seeder\\Core%d\\', $coreMajorVersion),
+        sprintf('SBUERK\\DataFactory\\Core%d\\', $coreMajorVersion),
         $coreAwareDirectory . '/*',
     );
 }
@@ -86,7 +86,7 @@ The three files of that pattern, sketched with a fictional subject — there is 
 
 ```php
 // Classes/Seed/SeedWriterInterface.php
-namespace SBUERK\Seeder\Seed;
+namespace SBUERK\DataFactory\Seed;
 
 interface SeedWriterInterface
 {
@@ -96,7 +96,7 @@ interface SeedWriterInterface
 
 ```php
 // Classes/Seed/AbstractSeedWriter.php
-namespace SBUERK\Seeder\Seed;
+namespace SBUERK\DataFactory\Seed;
 
 abstract class AbstractSeedWriter implements SeedWriterInterface
 {
@@ -106,10 +106,10 @@ abstract class AbstractSeedWriter implements SeedWriterInterface
 
 ```php
 // Core12/Seed/SeedWriter.php — Core13/Seed/SeedWriter.php is its counterpart
-namespace SBUERK\Seeder\Core12\Seed;
+namespace SBUERK\DataFactory\Core12\Seed;
 
-use SBUERK\Seeder\Seed\AbstractSeedWriter;
-use SBUERK\Seeder\Seed\SeedWriterInterface;
+use SBUERK\DataFactory\Seed\AbstractSeedWriter;
+use SBUERK\DataFactory\Seed\SeedWriterInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 
 #[AsAlias(id: SeedWriterInterface::class, public: true)]

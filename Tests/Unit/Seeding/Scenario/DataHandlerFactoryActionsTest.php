@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Scenario;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Scenario;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**

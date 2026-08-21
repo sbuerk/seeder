@@ -2,15 +2,15 @@
 
 ..  _start:
 
-======
-Seeder
-======
+============
+Data Factory
+============
 
 :Extension key:
-    seeder
+    data_factory
 
 :Package name:
-    sbuerk/seeder
+    sbuerk/data-factory
 
 :Version:
     |release|

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional;
+namespace SBUERK\DataFactory\Tests\Functional;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Tests\ExtensionCoreVersionCompatTestsTrait;
+use SBUERK\DataFactory\Tests\ExtensionCoreVersionCompatTestsTrait;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 
 /**
@@ -56,8 +56,8 @@ final class ExtensionLoadedTest extends AbstractFunctionalTestCase
      */
     public static function expectedLoadedExtensionIdentifiers(): \Generator
     {
-        yield 'composer package name: sbuerk/seeder' => ['identifier' => 'sbuerk/seeder'];
-        yield 'extension key: seeder' => ['identifier' => 'seeder'];
+        yield 'composer package name: sbuerk/data-factory' => ['identifier' => 'sbuerk/data-factory'];
+        yield 'extension key: data_factory' => ['identifier' => 'data_factory'];
     }
 
     #[DataProvider('expectedLoadedExtensionIdentifiers')]

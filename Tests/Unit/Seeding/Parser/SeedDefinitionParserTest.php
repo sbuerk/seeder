@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Parser;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Parser;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
-use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
-use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\DataFactory\Seeding\Definition\SeedFile;
+use SBUERK\DataFactory\Seeding\Definition\SeedFileReference;
+use SBUERK\DataFactory\Seeding\Definition\SeedSiteConfiguration;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedDefinitionNotFoundException;
+use SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 require_once __DIR__ . '/Fixtures/ShadowedIsReadable.php';
@@ -265,7 +265,7 @@ final class SeedDefinitionParserTest extends UnitTestCase
             'scenarios' => [
                 'Zulu.yaml',
                 'Alpha.yaml',
-                'EXT:demo/Configuration/Seeder/demo/Pages.yaml',
+                'EXT:demo/Configuration/DataFactory/demo/Pages.yaml',
                 '/absolute/Content.yaml',
                 'Nested/../Content.yaml',
             ],
@@ -275,7 +275,7 @@ final class SeedDefinitionParserTest extends UnitTestCase
             [
                 'Zulu.yaml',
                 'Alpha.yaml',
-                'EXT:demo/Configuration/Seeder/demo/Pages.yaml',
+                'EXT:demo/Configuration/DataFactory/demo/Pages.yaml',
                 '/absolute/Content.yaml',
                 'Nested/../Content.yaml',
             ],

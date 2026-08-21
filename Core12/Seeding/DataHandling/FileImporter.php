@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Core12\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Core12\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\FileImporterInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use TYPO3\CMS\Core\Resource\DuplicationBehavior;
 use TYPO3\CMS\Core\Resource\File;

@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Scenario;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Scenario;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
 use TYPO3\TestingFramework\Core\Functional\Framework\DataHandling\Scenario\DataHandlerFactory as UpstreamDataHandlerFactory;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**
  * Drift alarm for the port of the `typo3/testing-framework` scenario importer.
  *
- * `SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory` is a copy of
+ * `SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory` is a copy of
  * `TYPO3\TestingFramework\Core\Functional\Framework\DataHandling\Scenario\DataHandlerFactory`
  * (9.6.1). A copy silently rots, so this test runs the same definition through
  * both classes and compares every observable of the parse run — the data map
@@ -621,7 +621,7 @@ final class UpstreamConformanceTest extends UnitTestCase
         return str_replace(
             [
                 'TYPO3\\TestingFramework\\Core\\Functional\\Framework\\DataHandling\\Scenario\\',
-                'SBUERK\\Seeder\\Seeding\\Scenario\\',
+                'SBUERK\\DataFactory\\Seeding\\Scenario\\',
             ],
             '',
             $message

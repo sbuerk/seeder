@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Scenario;
+namespace SBUERK\DataFactory\Seeding\Scenario;
 
-use SBUERK\Seeder\Tests\Unit\Seeding\Scenario\ScenarioComposerTest;
+use SBUERK\DataFactory\Tests\Unit\Seeding\Scenario\ScenarioComposerTest;
 
 /**
  * Shadows `is_readable()` for {@see ScenarioComposer} - and for one path only,

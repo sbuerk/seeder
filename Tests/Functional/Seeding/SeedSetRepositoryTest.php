@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Exception\DuplicateSeedSetIdentifierException;
-use SBUERK\Seeder\Seeding\SeedSet;
-use SBUERK\Seeder\Seeding\SeedSetRepository;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\Exception\DuplicateSeedSetIdentifierException;
+use SBUERK\DataFactory\Seeding\SeedSet;
+use SBUERK\DataFactory\Seeding\SeedSetRepository;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 
 /**
@@ -24,12 +24,12 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 final class SeedSetRepositoryTest extends AbstractFunctionalTestCase
 {
     /**
-     * "tests/example-fixture" has no "Configuration/Seeder/" at all and is
+     * "tests/example-fixture" has no "Configuration/DataFactory/" at all and is
      * loaded on purpose: it is the case every other extension of an
      * installation is in.
      */
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/example-fixture',
         'tests/seeds-demo',
         'tests/seeds-collision',
@@ -69,7 +69,7 @@ final class SeedSetRepositoryTest extends AbstractFunctionalTestCase
     }
 
     #[Test]
-    public function anExtensionWithoutASeederDirectoryContributesNothing(): void
+    public function anExtensionWithoutADataFactoryDirectoryContributesNothing(): void
     {
         $this->assertTrue(ExtensionManagementUtility::isLoaded('tests_example_fixture'));
 
@@ -90,7 +90,7 @@ final class SeedSetRepositoryTest extends AbstractFunctionalTestCase
         $this->assertSame('The page tree of "demo-pages" with content elements on it.', $seedSet->description);
         $this->assertSame('tests/seeds-demo', $seedSet->packageName);
         $this->assertSame('tests_seeds_demo', $seedSet->extensionKey);
-        $this->assertStringEndsWith('/Configuration/Seeder/extended', $seedSet->basePath);
+        $this->assertStringEndsWith('/Configuration/DataFactory/extended', $seedSet->basePath);
         $this->assertSame($seedSet->basePath . '/config.yml', $seedSet->configFile);
         $this->assertFileExists($seedSet->configFile);
     }

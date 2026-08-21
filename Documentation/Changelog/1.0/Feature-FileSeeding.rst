@@ -13,7 +13,7 @@ A seed set brings the files its content needs, and copies them into a file
 storage before the first record is written:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     files:
       - identifier: placeholder
@@ -44,7 +44,7 @@ A seeded file is attached to a seeded record through :yaml:`references`, the
 second key of :file:`config.yml` this feature adds:
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     references:
       - file: placeholder

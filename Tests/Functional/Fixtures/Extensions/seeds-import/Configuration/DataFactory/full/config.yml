@@ -1,5 +1,5 @@
 #
-# The set "seeder:import" is driven with: a page tree with declared uids, a
+# The set "data-factory:import" is driven with: a page tree with declared uids, a
 # content element, a file, a site configuration - and an "imports" of a file
 # next to this one, so the resolution of a relative resource is exercised for a
 # set that was discovered rather than handed over by a test.

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileImporterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Definition\SeedFile;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Resource\StorageRepository;
@@ -42,8 +42,8 @@ final class FileImporterTest extends AbstractFunctionalTestCase
      * Two sources with different contents, so "the second run replaced the
      * first" can be asserted on the bytes rather than only on the row.
      */
-    private const SOURCE_LANDSCAPE = 'EXT:seeder/Tests/Functional/Fixtures/Seeds/Files/placeholder.svg';
-    private const SOURCE_PORTRAIT = 'EXT:seeder/Tests/Functional/Fixtures/Seeds/Files/placeholder-portrait.svg';
+    private const SOURCE_LANDSCAPE = 'EXT:data_factory/Tests/Functional/Fixtures/Seeds/Files/placeholder.svg';
+    private const SOURCE_PORTRAIT = 'EXT:data_factory/Tests/Functional/Fixtures/Seeds/Files/placeholder-portrait.svg';
 
     private const TARGET_FOLDER = 'importer-test';
     private const TARGET_NAME = 'placeholder.svg';
@@ -77,7 +77,7 @@ final class FileImporterTest extends AbstractFunctionalTestCase
         $this->assertInstanceOf(FileImporterInterface::class, $importer);
         $this->assertSame(
             sprintf(
-                'SBUERK\\Seeder\\Core%d\\Seeding\\DataHandling\\FileImporter',
+                'SBUERK\\DataFactory\\Core%d\\Seeding\\DataHandling\\FileImporter',
                 (new Typo3Version())->getMajorVersion(),
             ),
             $importer::class,

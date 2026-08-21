@@ -12,15 +12,15 @@ handful of things that are easy to get wrong and expensive to discover later.
 
 ## What this extension is
 
-`seeder` seeds a TYPO3 installation from YAML definitions that ship inside the
+`data_factory` seeds a TYPO3 installation from YAML definitions that ship inside
 extensions themselves. Its entire surface is two console commands:
 
-| Command                      | Does                                                                                    |
-|------------------------------|-----------------------------------------------------------------------------------------|
-| `seeder:list`                | List every discovered seed set: identifier, title, providing extension.                 |
-| `seeder:import <identifier>` | Import one seed set: pages, records of any table, files, file references, site configs. |
+| Command                            | Does                                                                                    |
+|------------------------------------|-----------------------------------------------------------------------------------------|
+| `data-factory:list`                | List every discovered seed set: identifier, title, providing extension.                 |
+| `data-factory:import <identifier>` | Import one seed set: pages, records of any table, files, file references, site configs. |
 
-A **seed set** is a directory `Configuration/Seeder/<name>/` in any active
+A **seed set** is a directory `Configuration/DataFactory/<name>/` in any active
 package, with `config.yml` as its entry point. `config.yml` describes the set
 and names the **scenario files** the records come from; those are written in the
 YAML scenario format of `typo3/testing-framework`, the one TYPO3 Core's own
@@ -117,7 +117,7 @@ installation, in package order — never from a configured path list, and never
 by scanning the file system outside the package directories.
 
 - `identifier` is declared in `config.yml`, is required and is globally unique.
-  A duplicate is reported by `seeder:list` and refused by `seeder:import`,
+  A duplicate is reported by `data-factory:list` and refused by `data-factory:import`,
   naming both providing extensions. Deriving it from the directory name would
   make that collision silent.
 - The result is ordered and stable: the same installation returns the same sets

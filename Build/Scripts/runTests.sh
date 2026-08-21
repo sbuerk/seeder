@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ----------------------------------------------------------------------------------------------------------------------
-# sbuerk/seeder test runner based on docker/podman.
+# sbuerk/data-factory test runner based on docker/podman.
 # Adopted from TYPO3 Core Development and extension based additions.
 # ----------------------------------------------------------------------------------------------------------------------
 if [ "${CI}" != "true" ]; then
@@ -216,7 +216,7 @@ cleanRenderedDocumentationFiles() {
 loadHelp() {
     # Load help text into $HELP
     read -r -d '' HELP <<EOF
-sbuerk/seeder test runner. Execute unit, functional and other test suites
+sbuerk/data-factory test runner. Execute unit, functional and other test suites
 in a container based test environment. Handles execution of single test files,
 sending xdebug information to a local IDE and more.
 
@@ -555,7 +555,7 @@ fi
 shift $((OPTIND - 1))
 
 SUFFIX=$(echo $RANDOM)
-NETWORK="seeder-${SUFFIX}"
+NETWORK="data-factory-${SUFFIX}"
 ${CONTAINER_BIN} network create ${NETWORK} >/dev/null
 
 if [ "${CONTAINER_BIN}" == "docker" ]; then

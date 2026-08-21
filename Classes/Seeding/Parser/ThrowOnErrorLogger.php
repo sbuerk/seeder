@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Parser;
+namespace SBUERK\DataFactory\Seeding\Parser;
 
 use Psr\Log\AbstractLogger;
 use Psr\Log\LogLevel;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**

@@ -22,11 +22,11 @@ than a dependency, is on
 
 ## Where a set lives
 
-A seed set is a directory `Configuration/Seeder/<name>/` in any active package,
+A seed set is a directory `Configuration/DataFactory/<name>/` in any active package,
 with `config.yml` as its entry file:
 
 ```
-Configuration/Seeder/demo/
+Configuration/DataFactory/demo/
 ├── config.yml               entry file, and the only mandatory one
 ├── Scenario.yaml            the records, named under "scenarios"
 ├── Files.yaml               optional, pulled in through "imports"
@@ -73,7 +73,7 @@ sites: []
 | Key           | Required | Type   | Default | Meaning                                                                                                                                      |
 |---------------|----------|--------|---------|----------------------------------------------------------------------------------------------------------------------------------------------|
 | `identifier`  | yes      | string | -       | Globally unique across all active packages. Declared, never derived from the directory name - a derived identifier makes a collision silent. |
-| `title`       | yes      | string | -       | Shown by `seeder:list`.                                                                                                                      |
+| `title`       | yes      | string | -       | Shown by `data-factory:list`.                                                                                                                |
 | `description` | no       | string | `''`    | Long text. Carried on the set and the definition; no command prints it today.                                                                |
 | `imports`     | no       | list   | `[]`    | Further YAML files merged into **this descriptor**. Consumed by `YamlFileLoader` before the parser sees it.                                  |
 | `scenarios`   | **yes**  | list   | -       | The scenario files the records come from, in the order they are applied. Non-empty.                                                          |
@@ -507,7 +507,7 @@ them is registered as a **suggested uid**.
 Two consequences are worth stating.
 
 **A scenario without a single declared `id` still suggests uids**, from 10000
-upwards, and `seeder:import` checks those against the installation exactly like
+upwards, and `data-factory:import` checks those against the installation exactly like
 declared ones. There is no "let the database decide" mode.
 
 **The counter is per entity name, the suggestion is per table.** Two entities
@@ -574,7 +574,7 @@ are not the same operation and only one of them has
 
 ## `--root-page`
 
-`seeder:import --root-page=<uid>` writes the set below an existing page instead
+`data-factory:import --root-page=<uid>` writes the set below an existing page instead
 of at the page tree root. The transformation is applied to the **merged
 settings**, before the factory is built, and it touches exactly this:
 
@@ -686,7 +686,7 @@ as the string `Array`.
 reference names a file the set does not declare is a mistake the parser can name
 before anything happens, so it does. That `table`/`uid` names a record is
 deliberately *not* checked there: the records live in the scenario files, which
-the parser never reads. `seeder:import` checks it against the composed scenario
+the parser never reads. `data-factory:import` checks it against the composed scenario
 before the first row is written - and `FileReferenceSeeder` checks it again
 against what the run actually wrote, because that is the number the reference is
 written with. It is the same rule [`rootPage`](#site-configurations) follows, and
@@ -706,7 +706,7 @@ along with them, is on
 [Seeding](../architecture/seeding.md#the-file-reference-pass).
 
 A reference to a record no scenario of the set declares is an error, not a
-lookup: `seeder:import` refuses the set with `EXIT_INVALID_DEFINITION`. Seeding
+lookup: `data-factory:import` refuses the set with `EXIT_INVALID_DEFINITION`. Seeding
 into an existing tree is not what this key is for.
 
 ## Inline relations need no support
@@ -837,7 +837,7 @@ What the template directory is and what happens to it is on
 ```yaml
 imports:
   - { resource: Files.yaml }
-  - { resource: 'EXT:my_extension/Configuration/Seeder/shared/Sites.yaml' }
+  - { resource: 'EXT:my_extension/Configuration/DataFactory/shared/Sites.yaml' }
 ```
 
 `imports` is handled by `TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader`,
@@ -884,7 +884,7 @@ importing loader; see
 `Documentation/Configuration/Index.rst` prints one complete set — a page tree
 with content, a translation of both, a file, a file reference and a site. That
 example is not written in prose: it is the fixture set
-`Tests/Functional/Fixtures/Extensions/seeds-import/Configuration/Seeder/documented/`,
+`Tests/Functional/Fixtures/Extensions/seeds-import/Configuration/DataFactory/documented/`,
 and `DocumentedSeedSetTest` both imports it and compares every captioned code
 block of that section against the file it names. Change either side alone and a
 test goes red.

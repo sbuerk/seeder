@@ -17,5 +17,5 @@ files:
     folder: 'seed-files'
   # The other accepted form, resolved by the core rather than against the set.
   - identifier: portrait
-    source: 'EXT:seeder/Tests/Functional/Fixtures/Seeds/Files/placeholder-portrait.svg'
+    source: 'EXT:data_factory/Tests/Functional/Fixtures/Seeds/Files/placeholder-portrait.svg'
     folder: 'seed-files'

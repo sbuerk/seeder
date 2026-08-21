@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Core13\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Core13\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\FileImporterInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use TYPO3\CMS\Core\Resource\Enum\DuplicationBehavior;
 use TYPO3\CMS\Core\Resource\File;
@@ -37,7 +37,7 @@ use TYPO3\CMS\Core\Resource\ResourceStorage;
  *
  * @todo Remove together with {@see FileImporterInterface} when TYPO3 v12
  *       support is dropped, and inline the call back into
- *       {@see \SBUERK\Seeder\Seeding\DataHandling\FileSeeder}.
+ *       {@see \SBUERK\DataFactory\Seeding\DataHandling\FileSeeder}.
  *
  * @internal Part of the seeding implementation, not public API.
  */
