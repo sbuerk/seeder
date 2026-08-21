@@ -41,7 +41,7 @@ A set can describe:
 - **pages**, nested to any depth, with **records of any table** on them,
 - **translations** of a record, through `languageVariants`,
 - **workspace records**, through `versionVariants`,
-- **`DataHandler` commands** - move and delete - through `actions`,
+- **`DataHandler` commands** - move, delete and discard - through `actions`,
 - **files**, copied into a storage,
 - **file references**, attaching a seeded file to a field of a seeded record,
 - **site configurations**, written from a template with a seeded page as root.

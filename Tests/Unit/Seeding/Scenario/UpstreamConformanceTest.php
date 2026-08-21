@@ -51,23 +51,33 @@ use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
  *
  * ## How total the conformance assertion is
  *
- * One divergence is deliberate, and it is the `elseif ($currentIndex > 0)`
- * branch of `setInDataMap()`: upstream reads
- * `$identifiers[$identifiers[$currentIndex - 1]]`, indexing a list of
- * identifiers by an identifier instead of by an index. The port reads
- * `$identifiers[$currentIndex - 1]`.
+ * Five divergences from upstream are deliberate in the class this test
+ * compares - `DataHandlerWriter` has three more of its own, and they are covered
+ * by `DataHandlerWriterSubstitutionTest` and by the functional tests. Every one
+ * of the five is a defect of the upstream engine that this extension fixes,
+ * every one has a test of its own below that runs both classes and states the
+ * difference, and none of them loosens the comparison for anything else:
  *
- * That branch **is** reachable from the public API, but only under a
- * construction no scenario in TYPO3 Core uses, and
- * {@see self::theOneDeliberateDivergenceIsTheDoubleIndexedIdentifierList()}
- * both spells it out and pins both behaviours. Everywhere else the assertion is
- * total: all four observables are compared in full, with `assertSame()`, for
- * every definition fed in.
+ * | Divergence                                                        | How this test stays total                     |
+ * |-------------------------------------------------------------------|-----------------------------------------------|
+ * | `setInDataMap()` indexes the identifier list by an identifier     | unreachable by the definitions fed in below   |
+ * | a `-NEW…` back reference is resolved through `pages` only         | modelled onto the upstream side, see below    |
+ * | `discard` emits `clearWSID` as a command name                     | modelled onto the upstream side, see below    |
+ * | the guard on a duplicate `id:` reads a registry nothing writes    | reached only by a refused definition          |
+ * | a version variant takes its workspace from the processed values   | reached only by a remapped `workspace` column |
  *
- * The core scenarios below are proof that the branch stays out of the way in
- * practice. Upstream raises an "Undefined array key" warning when it is hit,
- * and the suite fails on a warning, so a fixture that reached it could not pass
- * this test quietly.
+ * Two of them change the maps that ordinary definitions produce, so leaving
+ * them out of the assertion would take the core scenarios with them — eight of
+ * the eleven differ in the sibling chain alone. Instead
+ * {@see self::observablesOfUpstream()} applies both of them **to upstream's own
+ * output** before the comparison, so all four observables stay under one
+ * `assertSame()` for every definition fed in and any *other* drift still fails.
+ *
+ * That the two models are written against upstream's output rather than sharing
+ * code with the fix is what keeps them honest: they cannot reproduce a mistake
+ * in the fix, because they do not run it. Each is additionally pinned by a test
+ * that compares port and upstream directly, on a definition small enough to
+ * write the expected values down.
  *
  * ## The fixtures
  *
@@ -547,15 +557,6 @@ final class UpstreamConformanceTest extends UnitTestCase
             ],
         ]];
 
-        yield 'the same id declared twice' => [[
-            'entities' => [
-                'pages' => [
-                    ['self' => ['id' => 4711, 'title' => 'First']],
-                    ['self' => ['id' => 4711, 'title' => 'Second']],
-                ],
-            ],
-        ]];
-
         yield 'a value instruction that is not an array' => [[
             'entitySettings' => [
                 'page' => [
@@ -628,8 +629,6 @@ final class UpstreamConformanceTest extends UnitTestCase
     }
 
     /**
-     * The one place where port and upstream disagree on purpose.
-     *
      * `setInDataMap()` rewrites the `pid` of a record so records end up in
      * declaration order instead of all on top of their page. Its second branch,
      * `elseif ($currentIndex > 0)`, is taken when the identifier being written
@@ -646,11 +645,13 @@ final class UpstreamConformanceTest extends UnitTestCase
      * Reaching the branch takes all of the following at once, which is why no
      * scenario in TYPO3 Core does:
      *
-     * 1. the table has to be `pages` — `resolveDataMapPageId()` follows a
-     *    `-NEW…` back reference through `dataMapPerWorkspace[ws]['pages']` and
-     *    nowhere else, so on any other table a record whose `pid` was already
-     *    rewritten drops out of the filter and the filtered list never grows
-     *    past one entry;
+     * 1. two records of the table have to sit on the page already, which
+     *    upstream reaches on `pages` only — its `resolveDataMapPageId()`
+     *    follows a `-NEW…` back reference through
+     *    `dataMapPerWorkspace[ws]['pages']` whatever table it is resolving,
+     *    so on any other table the filtered list never grows past one entry.
+     *    The port resolves through the record's own table, which is the
+     *    second divergence below, so for it the table may be any;
      * 2. the entity must not be a node, so that the version variant inherits the
      *    node id of its parent (here: none) instead of pointing at itself;
      * 3. the item and its version variant have to declare the same non-zero
@@ -665,7 +666,7 @@ final class UpstreamConformanceTest extends UnitTestCase
      * handler is restored in a `finally`.
      */
     #[Test]
-    public function theOneDeliberateDivergenceIsTheDoubleIndexedIdentifierList(): void
+    public function theIdentifierListIsIndexedByAnIndexRatherThanByAnIdentifier(): void
     {
         $definition = [
             'entitySettings' => [
@@ -720,6 +721,231 @@ final class UpstreamConformanceTest extends UnitTestCase
     }
 
     /**
+     * The second deliberate divergence, on the definition the model in
+     * {@see self::withSequentialSiblingChains()} is derived from.
+     *
+     * `setInDataMap()` gives every record after the first on a page a `pid` of
+     * `-<identifier of the record before it>`, which is how the declared order
+     * of a scenario survives into `sorting`. Reaching the record before it
+     * means resolving the back reference the *previous* record already carries,
+     * and upstream resolves every back reference through
+     * `dataMapPerWorkspace[ws]['pages']` whatever table it is looking at. On
+     * `tt_content` that lookup misses, the second record drops out of the
+     * filtered list, and the third is chained behind the first — so from the
+     * third record onwards the declared order is reversed in the backend.
+     *
+     * The port resolves through the table the record belongs to. `pages` is
+     * unaffected: there the two expressions are the same expression.
+     */
+    #[Test]
+    public function aBackReferenceIsResolvedThroughTheTableItWasWrittenIn(): void
+    {
+        $definition = [
+            'entitySettings' => [
+                'page' => ['isNode' => true, 'tableName' => 'pages', 'defaultValues' => ['pid' => 0]],
+                'content' => ['tableName' => 'tt_content', 'nodeColumnName' => 'pid'],
+            ],
+            'entities' => [
+                'page' => [
+                    [
+                        'self' => ['id' => 1000, 'title' => 'Root'],
+                        'entities' => [
+                            'content' => [
+                                ['self' => ['id' => 300, 'title' => 'First']],
+                                ['self' => ['id' => 301, 'title' => 'Second']],
+                                ['self' => ['id' => 302, 'title' => 'Third']],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $upstream = (new UpstreamDataHandlerFactory($definition))->getDataMapPerWorkspace()[0]['tt_content'];
+        $ported = (new DataHandlerFactory($definition))->getDataMapPerWorkspace()[0]['tt_content'];
+
+        $upstreamIdentifiers = array_keys($upstream);
+        $portedIdentifiers = array_keys($ported);
+        $this->assertCount(3, $portedIdentifiers);
+
+        // The first record of the page carries the page pointer on both sides,
+        // and the second is chained behind it on both sides.
+        $this->assertSame(
+            '-' . $upstreamIdentifiers[0],
+            $upstream[$upstreamIdentifiers[1]]['pid']
+        );
+        $this->assertSame(
+            '-' . $portedIdentifiers[0],
+            $ported[$portedIdentifiers[1]]['pid']
+        );
+
+        // The third is where they part.
+        $this->assertSame(
+            '-' . $upstreamIdentifiers[0],
+            $upstream[$upstreamIdentifiers[2]]['pid'],
+            'Upstream is expected to chain the third record behind the first.'
+        );
+        $this->assertSame(
+            '-' . $portedIdentifiers[1],
+            $ported[$portedIdentifiers[2]]['pid'],
+            'The port is expected to chain the third record behind the second.'
+        );
+    }
+
+    /**
+     * The third deliberate divergence.
+     *
+     * `{action: 'discard'}` is meant to throw a workspace version away again.
+     * Upstream writes `clearWSID` into the command map as the *command name*,
+     * and `DataHandler::process_cmdmap()` has no case for it in v13 or in v14 —
+     * it runs the hooks, matches nothing, and moves on, so the action does
+     * nothing at all and says nothing about it. `clearWSID` is an *action* of
+     * the `version` command, which is how the testing framework's own
+     * `ActionService` discards a record.
+     */
+    #[Test]
+    public function theDiscardActionEmitsACommandDataHandlerStillKnows(): void
+    {
+        $definition = [
+            'entitySettings' => [
+                'page' => ['isNode' => true, 'tableName' => 'pages', 'defaultValues' => ['pid' => 0]],
+            ],
+            'entities' => [
+                'page' => [
+                    [
+                        'self' => ['id' => 1000, 'title' => 'Root'],
+                        'versionVariants' => [
+                            [
+                                'version' => ['workspace' => 1, 'title' => 'In workspace 1'],
+                                'actions' => [['action' => 'discard']],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $upstream = (new UpstreamDataHandlerFactory($definition))->getCommandMapPerWorkspace()[1]['pages'];
+        $ported = (new DataHandlerFactory($definition))->getCommandMapPerWorkspace()[1]['pages'];
+
+        $this->assertSame([['clearWSID' => true]], array_values($upstream));
+        $this->assertSame([['version' => ['action' => 'clearWSID']]], array_values($ported));
+    }
+
+    /**
+     * The fourth deliberate divergence.
+     *
+     * `hasStaticId()` reads `$staticIdsPerEntity`, which upstream declares and
+     * never writes, so the guard is always false and its exception 1533734370
+     * cannot be raised. A duplicate `id:` is caught one step later by
+     * `addSuggestedId()`, which reports the table and the uid it resolved to
+     * rather than the entity and the id that was written down. Both refuse the
+     * definition, so nothing is imported that should not be — this is about
+     * which of the two messages a set author gets.
+     */
+    #[Test]
+    public function aDuplicateStaticIdIsRefusedByTheGuardMeantToRefuseIt(): void
+    {
+        $definition = [
+            'entitySettings' => [
+                'page' => ['isNode' => true, 'tableName' => 'pages'],
+            ],
+            'entities' => [
+                'page' => [
+                    ['self' => ['id' => 4711, 'title' => 'First']],
+                    ['self' => ['id' => 4711, 'title' => 'Second']],
+                ],
+            ],
+        ];
+
+        $upstreamFailure = $this->captureFailure(
+            static fn(): object => new UpstreamDataHandlerFactory($definition)
+        );
+        $portedFailure = $this->captureFailure(
+            static fn(): object => new DataHandlerFactory($definition)
+        );
+
+        $this->assertInstanceOf(\LogicException::class, $upstreamFailure);
+        $this->assertSame(1568146788, $upstreamFailure->getCode());
+        $this->assertSame('Cannot redeclare identifier "pages:4711" with "4711"', $upstreamFailure->getMessage());
+
+        $this->assertInstanceOf(\LogicException::class, $portedFailure);
+        $this->assertSame(1533734370, $portedFailure->getCode());
+        $this->assertSame('Cannot assign ID "4711" multiple times', $portedFailure->getMessage());
+    }
+
+    /**
+     * The fifth deliberate divergence.
+     *
+     * `processVersionVariantItem()` decides which workspace the variant belongs
+     * to. Upstream reads that from the *processed* values, after `columnNames`
+     * has been applied, so an entity that maps `workspace` onto another column
+     * leaves no `workspace` key for it to read: the expression warns about an
+     * undefined key, evaluates to workspace 0, and the version variant is
+     * written into the live workspace — over the very record it was declared to
+     * version. The port reads the declared value, as every other call site of
+     * `setInDataMap()` does.
+     *
+     * Upstream is invoked through an error handler of this test's own because
+     * the suite fails on a warning and the warning is part of what is pinned.
+     * Nothing is suppressed: the warning is asserted, and the handler is
+     * restored in a `finally`.
+     */
+    #[Test]
+    public function aRemappedWorkspaceColumnStillRoutesTheVersionIntoItsWorkspace(): void
+    {
+        $definition = [
+            'entitySettings' => [
+                'page' => [
+                    'isNode' => true,
+                    'tableName' => 'pages',
+                    'columnNames' => ['workspace' => 't3ver_wsid'],
+                    'defaultValues' => ['pid' => 0],
+                ],
+            ],
+            'entities' => [
+                'page' => [
+                    [
+                        'self' => ['id' => 1000, 'title' => 'Root'],
+                        'versionVariants' => [
+                            ['version' => ['workspace' => 1, 'title' => 'In workspace 1']],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $warnings = [];
+        set_error_handler(
+            static function (int $number, string $message) use (&$warnings): bool {
+                $warnings[] = $message;
+                return true;
+            }
+        );
+        try {
+            $upstream = (new UpstreamDataHandlerFactory($definition))->getDataMapPerWorkspace();
+        } finally {
+            restore_error_handler();
+        }
+        $ported = (new DataHandlerFactory($definition))->getDataMapPerWorkspace();
+
+        $this->assertSame(['Undefined array key "workspace"'], $warnings);
+        // Upstream: no workspace 1 at all, and the live record replaced by the
+        // values of the version that should have gone next to it.
+        $this->assertSame([0], array_keys($upstream));
+        $this->assertSame(
+            ['In workspace 1'],
+            array_column($upstream[0]['pages'], 'title')
+        );
+
+        // Ported: the live record is left alone and the version is in the
+        // workspace it declares.
+        $this->assertSame([0, 1], array_keys($ported));
+        $this->assertSame(['Root'], array_column($ported[0]['pages'], 'title'));
+        $this->assertSame(['In workspace 1'], array_column($ported[1]['pages'], 'title'));
+    }
+
+    /**
      * The normaliser is the part of this test that could make everything pass
      * for the wrong reason, so it is tested itself: two structures that differ
      * only in *which* identifier a pointer names have to stay different after
@@ -763,16 +989,107 @@ final class UpstreamConformanceTest extends UnitTestCase
     }
 
     /**
+     * Upstream's four observables, with the two deliberate divergences that
+     * ordinary definitions reach applied to them. See the class docblock for
+     * why they are modelled here instead of being excluded from the assertion.
+     *
      * @return array{dataMapPerWorkspace: array<mixed>, commandMapPerWorkspace: array<mixed>, dataMapTableNames: array<mixed>, suggestedIds: array<mixed>}
      */
     private function observablesOfUpstream(UpstreamDataHandlerFactory $factory): array
     {
         return $this->normalizeObservables(
-            $factory->getDataMapPerWorkspace(),
-            $factory->getCommandMapPerWorkspace(),
+            $this->withSequentialSiblingChains($factory->getDataMapPerWorkspace()),
+            $this->withDiscardEmittedAsAVersionCommand($factory->getCommandMapPerWorkspace()),
             $factory->getDataMapTableNames(),
             $factory->getSuggestedIds()
         );
+    }
+
+    /**
+     * Models the first divergence: a `-NEW…` back reference is resolved through
+     * the data map of the record's own table rather than through `pages`.
+     *
+     * The table the lookup is hard coded to is what bounds this: on `pages`
+     * upstream and the port run the identical expression, so the two cannot
+     * differ there and the model must not touch it. `pages` is also the only
+     * table on which a `-NEW…` pointer is ever *handed to* a record rather than
+     * computed for it — `processEntityItem()` passes `'-' . $newId` as the node
+     * id of a language variant of a node — and those pointers are shared by
+     * every variant of one record on both sides.
+     *
+     * On every other table upstream's filtered list never grows past its first
+     * entry, so each record after the first points at the *first* record of the
+     * page instead of at the one declared before it. Undoing that needs no
+     * knowledge of how the fix works, only of what a chain looks like: the
+     * records of one table of one workspace that point at the same record are
+     * the ones upstream failed to chain, and in the order they were written
+     * each of them points at the one before it.
+     *
+     * @param array<int, array<string, array<string, array<string, mixed>>>> $dataMapPerWorkspace
+     * @return array<int, array<string, array<string, array<string, mixed>>>>
+     */
+    private function withSequentialSiblingChains(array $dataMapPerWorkspace): array
+    {
+        foreach ($dataMapPerWorkspace as $workspaceId => $tableDataMaps) {
+            foreach ($tableDataMaps as $tableName => $tableDataMap) {
+                if ($tableName === 'pages') {
+                    continue;
+                }
+                $lastOfChain = [];
+                foreach ($tableDataMap as $identifier => $values) {
+                    $pageId = $values['pid'] ?? null;
+                    if (!is_string($pageId) || !str_starts_with($pageId, '-')) {
+                        continue;
+                    }
+                    $referenced = substr($pageId, 1);
+                    // Not a record of this table: upstream's own defective
+                    // branch writes a bare "-", and that one is pinned by a
+                    // test of its own rather than modelled away here.
+                    if (!isset($tableDataMap[$referenced])) {
+                        continue;
+                    }
+                    $dataMapPerWorkspace[$workspaceId][$tableName][$identifier]['pid']
+                        = '-' . ($lastOfChain[$referenced] ?? $referenced);
+                    $lastOfChain[$referenced] = $identifier;
+                }
+            }
+        }
+        return $dataMapPerWorkspace;
+    }
+
+    /**
+     * Models the second divergence: `{action: 'discard'}` emits the `version`
+     * command with the `clearWSID` action rather than a command literally
+     * called `clearWSID`, which `DataHandler::process_cmdmap()` has no case
+     * for.
+     *
+     * The rename keeps the position of the entry, because a record may declare
+     * `discard` and `delete` and the command map is processed in order.
+     *
+     * @param array<int, array<string, array<string, array<string, mixed>>>> $commandMapPerWorkspace
+     * @return array<int, array<string, array<string, array<string, mixed>>>>
+     */
+    private function withDiscardEmittedAsAVersionCommand(array $commandMapPerWorkspace): array
+    {
+        foreach ($commandMapPerWorkspace as $workspaceId => $tableCommandMaps) {
+            foreach ($tableCommandMaps as $tableName => $tableCommandMap) {
+                foreach ($tableCommandMap as $identifier => $commands) {
+                    if (!array_key_exists('clearWSID', $commands)) {
+                        continue;
+                    }
+                    $renamed = [];
+                    foreach ($commands as $command => $value) {
+                        if ($command === 'clearWSID') {
+                            $renamed['version'] = ['action' => 'clearWSID'];
+                            continue;
+                        }
+                        $renamed[$command] = $value;
+                    }
+                    $commandMapPerWorkspace[$workspaceId][$tableName][$identifier] = $renamed;
+                }
+            }
+        }
+        return $commandMapPerWorkspace;
     }
 
     /**

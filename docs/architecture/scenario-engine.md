@@ -64,9 +64,14 @@ Everything that is not listed here is unchanged.
 | `#[Exclude]` on all three                                                                        | They are a builder, a writer and a value object — data, not services. Without it, directory based registration would pick them up.                     |
 | PHPStan level 8 array shapes throughout                                                          | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |
 | `?int $workspaceId` became `int $workspaceId` on two private methods                             | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
-| The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. This is the one deliberate behavioural divergence.                                                                                          |
+| The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. Upstream indexes a list of identifiers by an identifier.                                                                                    |
+| `resolveDataMapPageId()` resolves through the record's own table                                 | See below. Upstream hard-codes `pages`, which collapses the declared order of every other table.                                                       |
+| `{action: 'discard'}` emits `version`/`clearWSID` rather than the command `clearWSID`            | See below. `DataHandler::process_cmdmap()` has no case for the latter, in v13 or in v14.                                                               |
+| `processEntityValues()` records a declared `id` in `$staticIdsPerEntity`                         | See below. Upstream declares the registry, reads it and never writes it.                                                                               |
+| `processVersionVariantItem()` reads the workspace from the declaration                           | See below. Upstream reads it from the processed values, which a `columnNames` remap empties.                                                           |
 | `DataHandlerWriter::__construct()` gained an optional third parameter                            | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                          |
 | `DataHandlerWriter::invokeFactory()` resets `DataHandler::$autoVersionIdMap` per workspace round | See below. Only observable for a scenario declaring more than one workspace.                                                                           |
+| `updateDataMap()` and `updateCommandMap()` keep the minus of a substituted `-NEW…`               | See below. Upstream returns the uid without the sign, turning a position into a page pointer.                                                          |
 
 The original TYPO3 file headers are kept. The code is GPL-2.0-or-later and so is
 this repository; dropping the header to make the files look native would be
@@ -74,9 +79,14 @@ dishonest about where they came from.
 
 ## The deliberate divergences
 
-There are four. Two are forced, one is additive - it changes nothing for a
-caller that does not use it - and one fixes silent data loss that only a
-scenario with two workspaces can reach.
+There are nine. One is forced by PHP 8.5, one is additive - it changes nothing
+for a caller that does not use it - and the other seven are defects of the
+upstream engine that are fixed here rather than carried.
+
+Every one of them is stated by a test in
+`Tests/Unit/Seeding/Scenario/UpstreamConformanceTest.php` that runs the same
+definition through both classes and asserts what each of them produces, so the
+list below is not the only place the difference is written down.
 
 ### The double-indexed identifier list
 
@@ -108,8 +118,9 @@ also the one table whose `-NEW` back references resolve, so the record survives
 its own page filter. That is the route in, it needs no reflection, and it is
 pinned by a test.
 
-Because it is reachable, this is a real behavioural divergence and the
-conformance test has to exclude exactly this case rather than assert over it.
+Because it is reachable, this is a real behavioural divergence, and the
+conformance test states it on a definition of its own rather than asserting
+over it.
 
 It was fixed rather than carried because PHPStan proves the defect, and a
 growing baseline is a defect in this repository. Suppressing a proven bug to
@@ -127,6 +138,114 @@ so the coercion is spelled out as `$value ?? ''` instead.
 The lookup still hits exactly the key it hit before — this changes no
 behaviour, only how the same key is arrived at. It is listed here because it is
 a diff against upstream, not because anything observable moved.
+
+### A back reference resolved through the wrong table
+
+`setInDataMap()` chains siblings by rewriting `pid` to `-<previous identifier>`
+so DataHandler appends rather than prepends, and it finds that previous record
+by filtering the data map for records on the same page. Following the back
+reference a previous record already carries is `resolveDataMapPageId()`, and
+upstream looks it up in one place whatever table it is resolving for:
+
+```php
+$resolvedPageId = $this->dataMapPerWorkspace[$workspaceId]['pages'][$regularPageId]['pid'] ?? null;
+```
+
+On any table but `pages` that lookup misses, the record resolves to `null`,
+drops out of the filter, and the filtered list never grows past its first
+entry - so from the **third** record of a page onwards every one of them is
+chained behind the *first*. Three content elements declared 300, 301, 302 reach
+the backend as 300, 302, 301, and the declared order of a seed set is silently
+reversed. Two records are not enough to see it, which is why nothing noticed:
+TYPO3 Core's own scenario fixtures put at most two elements on a page.
+
+The port passes the table name down and resolves through the record's own data
+map. On `pages` the two are the same expression, which is what bounds the
+divergence - and what lets the conformance test model it, see below.
+
+### An action DataHandler no longer knows
+
+`{action: 'discard'}` is meant to throw a workspace version away again.
+Upstream writes `clearWSID` into the command map as the **command name**:
+
+```php
+$this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['clearWSID'] = true;
+```
+
+`DataHandler::process_cmdmap()` switches over the command name and has no
+`clearWSID` case, in v13 or in v14. The command falls through with no branch
+and no log entry, so the action does nothing at all and the import reports
+success. `clearWSID` is an *action* of the `version` command, which is what the
+testing framework's own `ActionService` uses, and that is what the port emits:
+
+```php
+$this->commandMapPerWorkspace[$workspaceId][$tableName][$identifier]['version'] = ['action' => 'clearWSID'];
+```
+
+TYPO3 v14 added a `discard` command that says what it does, and core carries a
+`@todo` to drop the `clearWSID` action once nothing uses it any more. Switching
+to `discard` needs v13 support to be gone first; the port carries a `@todo`
+naming that condition.
+
+### A guard that reads a registry nothing writes
+
+`DataHandlerFactory` declares `$staticIdsPerEntity`, reads it in
+`hasStaticId()` and never writes it. The guard is therefore always false and
+its exception `1533734370` is unreachable: a duplicate `id:` is caught one step
+later by `addSuggestedId()` as `1568146788`.
+
+Nothing is imported that should not be - both refuse the definition. What
+differs is the message. `addSuggestedId()` knows the table and the uid the
+declaration resolved to and reports `Cannot redeclare identifier "pages:100"
+with "100"`; the guard that was meant to fire knows the entity and the number
+the set author wrote and reports `Cannot assign ID "100" multiple times`. The
+port registers the id, so the second one speaks.
+
+The two guards are not redundant. The registry is keyed by entity name, so two
+entities that share a table each declaring the same id still collide on the
+table and are refused by `addSuggestedId()` - as is a declared id the dynamic
+counter later walks into, which nobody declared twice at all.
+
+### A workspace read from the values instead of the declaration
+
+`processVersionVariantItem()` decides which workspace map the variant goes
+into. Upstream reads that from the **processed** values, after `columnNames`
+has been applied:
+
+```php
+$this->setInDataMap($tableName, $ancestorId, $values, (int)$values['workspace']);
+```
+
+An entity that maps `workspace` onto another column therefore leaves no
+`workspace` key behind. The expression warns about an undefined key, evaluates
+to workspace `0`, and the version variant is written under the key of the live
+record - **overwriting the record it was declared to version**, with an empty
+error log. The port reads `$itemSettings['version']['workspace']`, which is
+what the two other call sites of `setInDataMap()` already do.
+
+`columnNames` decides what is written, not where.
+
+### A position that loses its sign
+
+`DataHandlerWriter` substitutes the identifiers of earlier rounds before each
+round. Two forms occur: `NEW…` points *at* a record, `-NEW…` points **behind**
+one - a `pid` of `-42` means "on the page record 42 is on, sorted after it", a
+`move` command of `-42` means "move behind record 42". Upstream strips the
+minus to look the identifier up and does not put it back:
+
+```php
+return $this->dataHandler->substNEWwithIDs[substr($value, 1)] ?? $value;
+```
+
+`-NEW…` therefore becomes `42`: a page pointer instead of a position, so the
+record is created *inside* the record it was meant to follow, and a move lands
+on a page instead of behind a record. The port returns `'-' . $substitutedId`.
+
+The command map half is the reachable one. A language variant of a node
+inherits `-<identifier of its original>` as its node pointer, so
+`{action: 'move', type: 'toTop'}` on a page translation is a command value of
+`-NEW…` - and the command map rounds run after every data map round, so the
+identifier is always substituted by then.
 
 ### A withheld set of suggested uids
 
@@ -257,26 +376,29 @@ structures.
 When upstream changes something, that test goes red and the change becomes a
 decision instead of a surprise.
 
-## Sibling ordering only really works for pages
+Seven deliberate divergences are a problem for a test like that: excluding the
+definitions that reach them would take most of the assertion with them - eight
+of the eleven core scenarios differ in the sibling chain alone. Two of the
+seven are therefore **modelled onto upstream's own output** before the
+comparison, so all four observables stay under one `assertSame()`:
 
-`setInDataMap()` chains siblings by rewriting `pid` to `-<previous identifier>`
-so DataHandler appends rather than prepends. Resolving those back references is
-`resolveDataMapPageId()`, and it hard-codes the table name `'pages'`.
+- the sibling chain, which is undone by pointing each record that upstream
+  chained behind the first at the one written before it instead - on `pages`
+  only, where the two implementations run the identical expression, this is
+  skipped, and that restriction is a proof rather than a heuristic;
+- the `discard` command, which is renamed in place.
 
-The consequence is easy to miss and worth stating plainly: for any **other**
-table, a record that has already been chained to `-<sibling>` resolves to
-`null`, drops out of the page filter, and every later record on that page is
-appended after the **first** record rather than after its predecessor. Three
-content elements on one page produce pids of `<page>`, `-<c1>`, `-<c1>`, and
-DataHandler yields the order c1, c3, c2.
+The other five are unreachable by the definitions the test feeds in - two of
+them are refusals, one needs a remapped `workspace` column, one needs the
+`$currentIndex > 0` construction, and one is in `DataHandlerWriter`, which this
+test does not run.
 
-This is upstream behaviour, it is carried unchanged, and it is pinned twice so
-that nobody discovers it from a seeded site instead: by
-`DataHandlerFactorySortingTest` on the data map, and by
-`ScenarioSeederTest::theThirdRecordOfAnyOtherTableIsSortedBehindTheFirstRatherThanTheSecond()`
-on the rows the seed produces. Repairing it means changing the ported
-`DataHandlerFactory`, which the conformance test holds to the letter, so it
-belongs with the step that narrows that test.
+The models are written against upstream's output and share no code with the
+fixes, so they cannot reproduce a mistake in one. What they cannot catch is a
+*regression* of a fix - a port that stopped chaining would model to the same
+structure - and that is what the dedicated divergence tests and
+`ScenarioSeederTest::threeRecordsOfAnyOtherTableKeepTheOrderTheyWereDeclaredIn()`
+are for.
 
 ## What upstream does not do, and the pipeline must
 
@@ -318,35 +440,13 @@ resolution and the CSV `DataSet`. The format is only ever exercised indirectly,
 by Core tests asserting rendered output.
 
 That gap is filled here, in `Tests/Unit/Seeding/Scenario/`, from a written
-inventory of every untested behaviour of the three classes. Three of the tests
-pin behaviour that is arguably wrong and is left alone deliberately:
+inventory of every untested behaviour of the three classes. Five of those tests
+found defects that are now fixed - they are the divergences listed above, and
+each of them was shown to fail against the unfixed code before the fix went in.
 
-- `hasStaticId()` reads a property that is **never written**, so its
-  "Cannot assign ID multiple times" guard (`1533734370`) is unreachable and
-  duplicates are caught later by `addSuggestedId()` (`1568146788`) with a
-  different message.
-- A version variant reads its workspace from the **processed** values. A
-  `columnNames` remap of `workspace` does not raise — `(int)null` is `0`, so the
-  variant silently lands in workspace 0 under the ancestor's key and
-  **overwrites the live record**.
-- `DataHandlerWriter::updateDataMap()` resolves a `-NEW…` value through
-  `substNEWwithIDs[substr($value, 1)]`, which looks the identifier up without
-  its leading minus and returns the uid without it as well. The "insert after"
-  marker is lost, and the record is created *inside* the record it was meant to
-  follow. It only bites from the second workspace round on.
+Two behaviours are pinned rather than fixed, because neither is engine
+behaviour:
 
-All three are pinned as they behave today, and all three say so in their
-docblock, so that a later reader changes them on purpose or not at all.
-
-Two more are pinned by the functional tests rather than by the unit tests,
-because they are only visible once a real `DataHandler` has run:
-
-- **`{action: 'discard'}` does nothing.** It produces the command map entry
-  `['clearWSID' => true]`, and `DataHandler::process_cmdmap()` switches over the
-  command name and has no `clearWSID` case - the spelling it still understands
-  is `['version' => ['action' => 'clearWSID']]`, forwarded to `discard()` under
-  a `@todo` naming the testing framework as its last caller. An unknown command
-  falls through with no branch and no log entry.
 - **A translation of a translation loses its source.** The factory builds
   `l10n_source` correctly, and `DataHandler::processRemapStack()` overwrites it:
   `$newValue` is declared once outside the loop and never reset, so a remap
@@ -355,9 +455,16 @@ because they are only visible once a real `DataHandler` has run:
   translation that is always the `l10n_parent` resolved immediately before it.
   TYPO3 Core carries the same observation as a `@todo` on the nested
   `languageVariants` of its own `CommonScenario.yaml`.
+- **A translated page follows its original only if the entity declares a node
+  column.** `processLanguageVariantItem()` is called without a parent id, so
+  `parentColumnName` never positions a variant; a node entity without
+  `nodeColumnName` produces a translation whose `pid` falls back to
+  `defaultValues`. Every TYPO3 Core scenario declares `nodeColumnName: 'pid'`
+  on its wildcard entity, which is why this is a footnote rather than a bug.
 
-Both are TYPO3 Core behaviour rather than engine behaviour, and both are worth
-reporting.
+The first of the two is a TYPO3 Core defect and is worth reporting; the second
+is a property of the format that seed authors need to know about, and it is
+documented for them in `Documentation/Configuration`.
 
 ## See also
 

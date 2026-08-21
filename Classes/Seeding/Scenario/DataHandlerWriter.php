@@ -31,12 +31,14 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * `TYPO3\TestingFramework\Core\Functional\Framework\DataHandling\Scenario\DataHandlerWriter`,
  * for the reason given on `DataHandlerFactory`.
  *
- * Two deliberate divergences from upstream: the optional
- * `$withoutSuggestedUids` documented on the constructor, and the reset of
+ * Three deliberate divergences from upstream: the optional
+ * `$withoutSuggestedUids` documented on the constructor, the reset of
  * `DataHandler::$autoVersionIdMap` between two workspace rounds documented in
- * `invokeFactory()`. Both are additive - the first is inert when it is not
- * passed, the second only matters for a scenario declaring more than one
- * workspace, which upstream has no test and TYPO3 Core no fixture for.
+ * `invokeFactory()`, and the minus that `updateDataMap()` and
+ * `updateCommandMap()` keep on a substituted `-NEW…` value. The first two are
+ * additive - one is inert when it is not passed, the other only matters for a
+ * scenario declaring more than one workspace, which upstream has no test and
+ * TYPO3 Core no fixture for.
  *
  * Note what this class does **not** do, because the seeding pipeline has to add
  * it: it never sets `DataHandler::$isImporting`, it never checks that the
@@ -164,7 +166,14 @@ final class DataHandlerWriter
                             return $this->dataHandler->substNEWwithIDs[$value] ?? $value;
                         }
                         if (str_starts_with($value, '-NEW')) {
-                            return $this->dataHandler->substNEWwithIDs[substr($value, 1)] ?? $value;
+                            // Deliberate divergence from
+                            // `typo3/testing-framework` 9.6.1, which returns
+                            // the substituted uid without the minus it just
+                            // stripped. `-42` means "put this record behind
+                            // record 42"; `42` means "put it on page 42". The
+                            // minus is the whole meaning of the value.
+                            $substitutedId = $this->dataHandler->substNEWwithIDs[substr($value, 1)] ?? null;
+                            return $substitutedId === null ? $value : '-' . $substitutedId;
                         }
                         return $value;
                     },
@@ -214,7 +223,14 @@ final class DataHandlerWriter
                             return $this->dataHandler->substNEWwithIDs[$value] ?? $value;
                         }
                         if (str_starts_with($value, '-NEW')) {
-                            return $this->dataHandler->substNEWwithIDs[substr($value, 1)] ?? $value;
+                            // Deliberate divergence from
+                            // `typo3/testing-framework` 9.6.1, which returns
+                            // the substituted uid without the minus it just
+                            // stripped. `-42` means "put this record behind
+                            // record 42"; `42` means "put it on page 42". The
+                            // minus is the whole meaning of the value.
+                            $substitutedId = $this->dataHandler->substNEWwithIDs[substr($value, 1)] ?? null;
+                            return $substitutedId === null ? $value : '-' . $substitutedId;
                         }
                         return $value;
                     },

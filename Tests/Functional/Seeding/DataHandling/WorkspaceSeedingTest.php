@@ -137,26 +137,22 @@ final class WorkspaceSeedingTest extends AbstractFunctionalTestCase
     }
 
     #[Test]
-    public function aDiscardActionIsAcceptedByTheEngineAndIgnoredByTheDataHandler(): void
+    public function aDiscardActionThrowsTheVersionAwayAndLeavesTheLiveRecord(): void
     {
         $this->seed();
 
-        // `discard` becomes a command map entry `['clearWSID' => true]`, and
-        // only for a workspace greater than zero - the factory drops it
-        // otherwise. `DataHandler::process_cmdmap()` switches over the command
-        // name and knows no `clearWSID`: the spelling it still understands is
-        // `['version' => ['action' => 'clearWSID']]`, which it forwards to
-        // `discard()` under a `@todo` naming the testing framework as the last
-        // caller. An unknown command falls through the switch with no branch
-        // and no log entry, so the version survives and the seed reports
-        // success.
+        // `discard` becomes a command map entry
+        // `['version' => ['action' => 'clearWSID']]`, and only for a workspace
+        // greater than zero - the factory drops it otherwise.
+        // `DataHandler::process_cmdmap()` forwards that to `discard()`, which
+        // deletes the version row outright rather than soft deleting it.
         //
-        // The action has no consumer in TYPO3 Core either - it is one of the
-        // three the upstream format declares and nothing uses. Repairing it
-        // means changing the ported `DataHandlerFactory`, which the upstream
-        // conformance test holds to the letter, and is therefore a decision
-        // for the step that narrows that test rather than for this one.
-        $this->assertSame('Review: discarded', $this->overlayOf('tt_content', 303)['header']);
+        // `typo3/testing-framework` 9.6.1 emits `clearWSID` as the command
+        // *name*, which the switch in `process_cmdmap()` has no case for in
+        // v13 or in v14: it falls through with no branch and no log entry, so
+        // the version survived and the seed reported success. The divergence
+        // is stated in `UpstreamConformanceTest`.
+        $this->assertSame([], $this->rowsOf('tt_content', 303, 1));
         $this->assertSame('Live, versioned and discarded again', $this->row('tt_content', 303)['header']);
     }
 

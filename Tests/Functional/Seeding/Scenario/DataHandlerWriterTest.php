@@ -305,11 +305,13 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
 
         $this->assertSame([], $writer->getErrors());
         // The page and the content element were updated in place - the second
-        // page, whose identifier resolved to nothing, is the only new record.
+        // page, whose identifier resolved to nothing, is the only new record,
+        // and it was created where it was declared: next to the root page, not
+        // below it.
         $this->assertSame(
             [
                 ['uid' => 100, 'pid' => 0, 'title' => 'Updated'],
-                ['uid' => 110, 'pid' => 100, 'title' => 'Declared as a sibling of the root page'],
+                ['uid' => 110, 'pid' => 0, 'title' => 'Declared as a sibling of the root page'],
             ],
             $this->rows('pages', ['uid', 'pid', 'title'])
         );
@@ -348,21 +350,20 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
      * page, so the factory chained its `pid` to `-<identifier of the root
      * page>` - "create me on the page of that record, right after it".
      *
-     * `updateDataMap()` resolves that form as
+     * `typo3/testing-framework` 9.6.1 resolves that form as
      * `substNEWwithIDs[substr($value, 1)]`, which looks the identifier up
-     * without its leading minus and returns the uid without it as well. The
-     * "insert after" marker is therefore lost: what reaches `DataHandler` is a
-     * plain page id, and the record is created *inside* the record it was
-     * meant to be placed after.
+     * without its leading minus and returns the uid without it as well, so the
+     * "insert after" marker is lost: a plain page id reaches `DataHandler` and
+     * the record is created *inside* the record it was meant to be placed
+     * after. This port puts the sign back, which is the third divergence listed
+     * on `DataHandlerWriter`.
      *
-     * This is ported behaviour, not a divergence - the same line stands in
-     * `typo3/testing-framework` 9.6.1 - and it is pinned rather than fixed so
-     * a fix is a deliberate act with a test that changes. It only bites where
-     * a data map is written after an identifier was resolved, which is the
-     * second and every further workspace round.
+     * The unit tests of the substitution itself are in
+     * `Tests/Unit/Seeding/Scenario/DataHandlerWriterSubstitutionTest`. What
+     * this adds is that `DataHandler` reads the result the way the sign says.
      */
     #[Test]
-    public function aResolvedMinusNewValueLosesItsSignAndBecomesAPlainPageId(): void
+    public function aResolvedMinusNewValueKeepsItsSignAndStaysAPosition(): void
     {
         $this->writeSingleContentScenario();
         $factory = $this->factory('SingleContentUpdateScenario.yaml');
@@ -374,10 +375,11 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
 
         $dataMap = RecordingDataHandlerHook::$dataMaps[0] ?? [];
         $this->assertStringStartsWith('-NEW', (string)$declaredPid);
-        $this->assertSame(100, $dataMap['pages'][$unresolvedIdentifier]['pid']);
-        // And so the page ends up below the root page instead of next to it.
+        $this->assertSame('-100', $dataMap['pages'][$unresolvedIdentifier]['pid']);
+        // And so the page ends up next to the root page, which is where it was
+        // declared.
         $this->assertSame(
-            [['uid' => 110, 'pid' => 100]],
+            [['uid' => 110, 'pid' => 0]],
             $this->rows('pages', ['uid', 'pid'], 'uid', 'uid = 110')
         );
     }

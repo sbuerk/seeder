@@ -194,28 +194,26 @@ final class ScenarioSeederTest extends AbstractFunctionalTestCase
     }
 
     #[Test]
-    public function theThirdRecordOfAnyOtherTableIsSortedBehindTheFirstRatherThanTheSecond(): void
+    public function threeRecordsOfAnyOtherTableKeepTheOrderTheyWereDeclaredIn(): void
     {
         $this->seed($this->definition(['ThreeSiblingsScenario.yaml']));
 
         // The pages above and these three content elements are declared the
-        // same way, and only the pages come out in the declared order.
+        // same way, and both come out in the declared order.
         //
         // The factory chains every record behind the previous one on its page
         // by rewriting the `pid` to `-<previous identifier>`, and it finds that
         // previous record by filtering the data map for records on the same
-        // page. `resolveDataMapPageId()` follows such a back-reference by
-        // looking the identifier up in the data map of `pages` - whatever table
-        // the record belongs to. For any other table the second record is
-        // therefore invisible to the third one, which chains behind the first
-        // and lands between the two.
+        // page. Following such a back-reference means looking the identifier up
+        // in a data map, and `typo3/testing-framework` 9.6.1 looks it up in
+        // `pages` whatever table the record belongs to - so for any other table
+        // the second record was invisible to the third, which chained behind
+        // the first and landed between the two.
         //
         // Two records are not enough to see it, which is why nothing noticed:
         // TYPO3 Core's own scenario fixtures put at most two elements on a
-        // page. Repairing it means changing the ported `DataHandlerFactory`,
-        // which the upstream conformance test holds to the letter, and is
-        // therefore a decision for the step that narrows that test.
-        $this->assertSame([300, 302, 301], $this->uidsInSortingOrder('tt_content', 'pid = 100'));
+        // page.
+        $this->assertSame([300, 301, 302], $this->uidsInSortingOrder('tt_content', 'pid = 100'));
     }
 
     /**
