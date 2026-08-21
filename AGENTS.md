@@ -33,6 +33,17 @@ is rule 8 below, and it is not a preference.
 
 → [`README.md`](README.md#what-it-does) states the same for users.
 
+**Two maintained lines, and a change belongs on exactly one of them.** This
+branch, `1`, carries the **1.x** line: TYPO3 v12.4 and v13.4, PHP 8.1 to 8.4,
+`Core12/` and `Core13/`, `typo3/testing-framework` `^8.3.3` — and because PHP
+8.1 does not parse a `readonly class`, rule 3 below reads differently here than
+it does on the other line: `readonly` sits on the properties. Branch `main`
+carries the **2.x** line: TYPO3 v13.4 and v14.3, PHP 8.2 to 8.5, `Core13/` and
+`Core14/`, `typo3/testing-framework` `^9.6.1`. Neither branch is merged into the
+other, so a fix affecting both needs a pull request on each, written against the
+core versions and the PHP floor that branch supports.
+→ [Pull requests](docs/workflow/pull-requests.md)
+
 ## Two formats, and only one of them is ours
 
 A seed set is written in two YAML formats, and the line between them is the
@@ -77,7 +88,7 @@ thing to get right:
   placed, which no set author can write down. That, and only that, is why
   `references:` is a key of `config.yml`.
 - **The port is not a copy any more, and the list of differences is finite.**
-  Nine divergences from `typo3/testing-framework` 9.6.1 are deliberate; seven
+  Nine divergences from `typo3/testing-framework` 8.3.3 are deliberate; seven
   of them fix a defect of the upstream engine, among them the declared order of
   every table other than `pages`, `{action: 'discard'}` and the workspace a
   version variant lands in. Each is stated on
@@ -107,8 +118,11 @@ thing to get right:
   [Seed definitions](docs/development/seed-definitions.md).
 - **A format change needs a `Documentation/Changelog/<version>/` entry** —
   `Feature-*.rst` for a new `config.yml` key, `Breaking-*.rst` or
-  `Deprecation-*.rst` when an existing one changes meaning or goes away. Being
-  pre-1.0 exempts a change from a deprecation phase, not from being documented.
+  `Deprecation-*.rst` when an existing one changes meaning or goes away. Both
+  lines are released, so a key does not simply disappear: it is deprecated in a
+  minor release with `Deprecation-*.rst` naming the migration, and removed in
+  the next **major** with `Breaking-*.rst`. A change that has to reach both
+  lines carries its own entry on each, under that line's version directory.
 
 ## Discovery is over active extensions, and it is deterministic
 
@@ -243,22 +257,22 @@ Nothing below `.agent/` is ever committed.
 
 ## Read this before changing code
 
-| Topic                                               | Page                                                                    |
-|-----------------------------------------------------|-------------------------------------------------------------------------|
-| What is seeded, and from where                      | [What this extension is](#what-this-extension-is)                       |
-| Development environment, container based tooling    | [Environment](docs/development/environment.md)                          |
-| **Dual core setup — read this first**               | [Dual core setup](docs/development/dual-core-setup.md)                  |
-| The gates and what they check                       | [Quality gates](docs/development/quality-gates.md)                      |
-| Version differences split classes, not conditionals | [Core version aware code](docs/architecture/core-version-aware-code.md) |
-| Symfony DI attributes, stateless services           | [Dependency injection](docs/architecture/dependency-injection.md)       |
-| `final readonly`, injected abstracts, DTOs          | [Class design](docs/architecture/class-design.md)                       |
-| The DataHandler behaviours seeding works around     | [Seeding](docs/architecture/seeding.md)                                 |
-| The ported engine, its divergences, its test        | [The scenario engine](docs/architecture/scenario-engine.md)             |
-| The descriptor and the scenario format, key by key  | [Seed definitions](docs/development/seed-definitions.md)                |
-| Discovery, ordering and the command surface         | [Seed sets and the CLI](docs/development/seed-sets.md)                  |
-| Site templates, refusals, uncovered site roots      | [Site configurations](docs/architecture/site-configuration.md)          |
-| Both test suites and their strictness               | [Testing](docs/testing/Index.md)                                        |
-| Commit message conventions                          | [Commit messages](docs/workflow/commit-messages.md)                     |
+| Topic                                                        | Page                                                                    |
+|--------------------------------------------------------------|-------------------------------------------------------------------------|
+| What is seeded, and from where                               | [What this extension is](#what-this-extension-is)                       |
+| Development environment, container based tooling             | [Environment](docs/development/environment.md)                          |
+| **Dual core setup — read this first**                        | [Dual core setup](docs/development/dual-core-setup.md)                  |
+| The gates and what they check                                | [Quality gates](docs/development/quality-gates.md)                      |
+| Version differences split classes, not conditionals          | [Core version aware code](docs/architecture/core-version-aware-code.md) |
+| Symfony DI attributes, stateless services                    | [Dependency injection](docs/architecture/dependency-injection.md)       |
+| `final` with `readonly` properties, injected abstracts, DTOs | [Class design](docs/architecture/class-design.md)                       |
+| The DataHandler behaviours seeding works around              | [Seeding](docs/architecture/seeding.md)                                 |
+| The ported engine, its divergences, its test                 | [The scenario engine](docs/architecture/scenario-engine.md)             |
+| The descriptor and the scenario format, key by key           | [Seed definitions](docs/development/seed-definitions.md)                |
+| Discovery, ordering and the command surface                  | [Seed sets and the CLI](docs/development/seed-sets.md)                  |
+| Site templates, refusals, uncovered site roots               | [Site configurations](docs/architecture/site-configuration.md)          |
+| Both test suites and their strictness                        | [Testing](docs/testing/Index.md)                                        |
+| Commit message conventions                                   | [Commit messages](docs/workflow/commit-messages.md)                     |
 
 ## The rules that are not negotiable
 
@@ -283,10 +297,15 @@ violation of any of them is a rejected change, not a review comment.
    has to fetch them from the container.
    → [Dependency injection](docs/architecture/dependency-injection.md#rules)
 
-3. **Classes are `final readonly`** unless a framework constraint prevents it.
-   Abstract classes never use constructor injection; they use `#[Required]`
-   `inject*()` methods so the constructor stays free for extending classes.
-   → [Class design](docs/architecture/class-design.md)
+3. **Classes are `final`, and `readonly` sits on the properties** — never
+   `final readonly class`. This branch supports PHP 8.1, where a `readonly`
+   class does not parse at all, so the keyword goes on every declared property
+   and every promoted constructor parameter instead. Dropping the class keyword
+   without adding the property ones makes the class mutable and nothing reports
+   it: not the linter, not PHPStan, not a test. Abstract classes never use
+   constructor injection; they use `#[Required]` `inject*()` methods so the
+   constructor stays free for extending classes.
+   → [Class design](docs/architecture/class-design.md#the-php-81-rule-readonly-sits-on-the-properties)
 
 4. **Models, entities, value objects and DTOs are data, not services.** They are
    never registered in the container and carry no dependencies, and they

@@ -27,14 +27,15 @@ return static function (
         __DIR__ . '/../Classes/*',
     );
 
-    // Core version aware classes: `Core13/` on TYPO3 v13, `Core14/` on TYPO3
-    // v14. Both directories are autoloaded by composer, but only the one
+    // Core version aware classes: `Core12/` on TYPO3 v12, `Core13/` on TYPO3
+    // v13. Both directories are autoloaded by composer, but only the one
     // matching the running core version is registered as services, so an
     // implementation may safely use API that exists in its core version only.
     //
-    // The `is_dir()` guard covers the directory of a core version that has no
-    // implementation of its own yet. An empty or absent directory registers
-    // nothing and is not an error, here or in `Classes/` above.
+    // The `is_dir()` guard covers a core version whose directory is absent or
+    // holds no implementation of its own. Both carry one on this branch; an
+    // empty or absent directory registers nothing and is not an error, here or
+    // in `Classes/` above.
     $coreMajorVersion = (new Typo3Version())->getMajorVersion();
     $coreAwareDirectory = sprintf('%s/../Core%d', __DIR__, $coreMajorVersion);
     if (is_dir($coreAwareDirectory)) {

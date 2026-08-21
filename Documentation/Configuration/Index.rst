@@ -52,11 +52,16 @@ active extension, with :file:`config.yml` as its entry file:
             └── settings.yaml    optional site settings
 
 Every relative path inside a set - a :yaml:`scenarios` entry, a file
-:yaml:`source`, a site :yaml:`template`, an :yaml:`imports` resource - is
-resolved against the directory holding the **entry file**, not against the file
-declaring it. A set can therefore be moved or renamed without touching a single
-path inside it. :file:`EXT:` paths are accepted everywhere a path is, and an
-absolute path is taken as it stands.
+:yaml:`source`, a site :yaml:`template` - is resolved against the directory
+holding the **entry file**, not against the file declaring it. A set can
+therefore be moved or renamed without touching a single path inside it.
+:file:`EXT:` paths are accepted everywhere a path is, and an absolute path is
+taken as it stands.
+
+An :yaml:`imports` resource is the one exception: it never reaches this
+extension, it is resolved by the TYPO3 YAML loader relative to the file that
+declares it - see
+:ref:`Splitting a set over several files <configuration-imports>`.
 
 A set is found because the extension providing it is installed and activated.
 There is no path to configure and nothing to register. A directory below
@@ -1135,9 +1140,15 @@ The descriptor: imports
 
 :yaml:`imports` is handled by the loader TYPO3 reads its own site
 configurations with. Imported lists are **merged** into the importing file
-rather than replacing it, resources are resolved relative to the file declaring
-them, and :file:`EXT:` paths are accepted. An imported file carries the same
-keys as the entry file - except the three metadata keys, which belong into
+rather than replacing it, and the imported entries come **first**: a
+:file:`config.yml` declaring :yaml:`scenarios: [Content.yaml]` and importing a
+file declaring :yaml:`scenarios: [Pages.yaml]` composes
+``Pages.yaml, Content.yaml``. That is the order the scenarios are applied in, so
+the entry file wins a conflicting :yaml:`entitySettings` value against anything
+it imports. Resources are resolved relative to the file **declaring** them - not
+against the entry file, which is the one path in a set that behaves this way -
+and :file:`EXT:` paths are accepted. An imported file carries the same keys as
+the entry file - except the three metadata keys, which belong into
 :file:`config.yml`.
 
 A resource that cannot be read stops the import with an error. It is not
@@ -1268,10 +1279,11 @@ is answered with the sets that look like it.
             run wrote for each declared uid.
 
 :bash:`--root-page` moves the **top level** items of every entity onto the given
-page, and only those that do not declare a :sql:`pid` of their own. Nested
-records, children, language variants and version variants are untouched - they
-take their page from their node or from their ancestor, and moving them would
-take them off the tree they were declared in.
+page, and only those that do not declare a non-zero :sql:`pid` of their own - a
+declared ``pid: 0`` names the page tree root, which is exactly what the option
+replaces. Nested records, children, language variants and version variants are
+untouched - they take their page from their node or from their ancestor, and
+moving them would take them off the tree they were declared in.
 
 Exit codes
 ~~~~~~~~~~
@@ -1294,8 +1306,9 @@ Exit codes
             once, or a :file:`config.yml` in this installation cannot be read.
     *   -   5
         -   The set is not a valid seed definition: an unknown key, a scenario
-            that cannot be read or built, a scenario without a single record,
-            or a site whose :yaml:`rootPage` the scenario does not declare.
+            that cannot be read or built, a scenario without a single record, a
+            site whose :yaml:`rootPage` the scenario does not declare, or a
+            file reference whose record it does not declare.
     *   -   6
         -   The set suggests uids this installation already uses, or
             :bash:`--force` would give up the page uids a declared site needs.
@@ -1352,8 +1365,18 @@ What the seeder writes by itself
 Everything else in a record comes from its :yaml:`self` or :yaml:`version`, from
 the :yaml:`defaultValues` of its entity, or from the TCA of the installation
 where neither declares anything. This extension adds no default of its own - in
-particular, a record is created **hidden** unless the scenario says otherwise,
-which is why every example above declares :yaml:`defaultValues: {hidden: 0}`.
+particular, a **page** is created hidden unless the scenario says otherwise,
+because :sql:`pages` is the one table whose TCA sets
+:php:`'hidden' => ['config' => ['default' => 1]]`. :sql:`tt_content` and the
+other tables of an installation default to ``0``. That is why every example
+above declares :yaml:`defaultValues: {hidden: 0}`: it costs nothing on the
+tables that already default to ``0``, and it is what keeps a seeded page tree
+visible.
+
+The same holds for :sql:`doktype`, :sql:`l10n_parent` and
+:sql:`sys_language_uid` - they come from the TCA of the installation unless the
+scenario declares them, so a set that wants the same records in two
+installations declares them.
 
 See also
 ========

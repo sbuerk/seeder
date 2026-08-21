@@ -57,30 +57,53 @@ hosted runners, not of this repository.
 
 ## Suites
 
-| Suite                        | Purpose                                                       |
-|------------------------------|---------------------------------------------------------------|
-| `unit`                       | PHP unit tests (default suite).                               |
-| `unitRandom`                 | Unit tests in random order.                                   |
-| `functional`                 | PHP functional tests.                                         |
-| `cgl`                        | Coding guidelines, fix in place or check with `-n`.           |
-| `phpstan`                    | Static analysis.                                              |
-| `phpstanGenerateBaseline`    | Regenerate the PHPStan baseline of the selected core version. |
-| `lintPhp`                    | PHP linting.                                                  |
-| `checkBom`                   | UTF-8 files must not contain a BOM.                           |
-| `checkExceptionCodes`        | Duplicate or missing exception codes.                         |
-| `checkMarkdownTables`        | Markdown tables must be formatted, `-- --fix` formats them.   |
-| `checkTestMethodsPrefix`     | Test methods must not start with `test`.                      |
-| `composer`                   | `composer` with all remaining arguments dispatched.           |
-| `composerInstall`            | `composer install`.                                           |
-| `composerUpdate`             | `composer update` for the core version given with `-t`.       |
-| `composerValidate`           | `composer validate --strict` of the root `composer.json`.     |
-| `renderDocumentation`        | Render `Documentation/` into `Documentation-GENERATED-temp/`. |
-| `setVersion`                 | Apply a version, `-- <version> <type>`.                       |
-| `watchDocumentation`         | Serve `Documentation/`, re-rendering on every change.         |
-| `clean`                      | Remove build, cache, rendered documentation and test files.   |
-| `cleanCache`                 | Cache files and folders only.                                 |
-| `cleanRenderedDocumentation` | `Documentation-GENERATED-temp/` only.                         |
-| `cleanTests`                 | Test related files and folders only.                          |
+| Suite                        | Purpose                                                                     |
+|------------------------------|-----------------------------------------------------------------------------|
+| `unit`                       | PHP unit tests (default suite).                                             |
+| `unitRandom`                 | Unit tests in random order.                                                 |
+| `functional`                 | PHP functional tests.                                                       |
+| `cgl`                        | Coding guidelines, fix in place or check with `-n`.                         |
+| `phpstan`                    | Static analysis.                                                            |
+| `phpstanGenerateBaseline`    | Regenerate the PHPStan baseline of the selected core version.               |
+| `lintPhp`                    | PHP linting.                                                                |
+| `checkBom`                   | UTF-8 files must not contain a BOM.                                         |
+| `checkExceptionCodes`        | Duplicate or missing exception codes.                                       |
+| `checkMarkdownTables`        | Markdown tables must be formatted, `-- --fix` formats them.                 |
+| `checkTestMethodsPrefix`     | Test methods must not start with `test`.                                    |
+| `composer`                   | `composer` with all remaining arguments dispatched.                         |
+| `composerInstall`            | `composer install`.                                                         |
+| `composerUpdate`             | Install the dependency set of the core version given with `-t` — see below. |
+| `composerValidate`           | `composer validate --strict` of the root `composer.json`.                   |
+| `renderDocumentation`        | Render `Documentation/` into `Documentation-GENERATED-temp/`.               |
+| `setVersion`                 | Apply a version, `-- <version> <type>`.                                     |
+| `watchDocumentation`         | Serve `Documentation/`, re-rendering on every change.                       |
+| `clean`                      | Remove build, cache, rendered documentation and test files.                 |
+| `cleanCache`                 | Cache files and folders only.                                               |
+| `cleanRenderedDocumentation` | `Documentation-GENERATED-temp/` only.                                       |
+| `cleanTests`                 | Test related files and folders only.                                        |
+
+### What `composerUpdate` actually does
+
+It is not `composer update`, and the difference matters when a diff or a missing
+file has to be explained. In order, the suite:
+
+1. deletes `.Build/`, `composer.lock` and `composer.json.orig`;
+2. **locally only** — guarded by `IS_CORE_CI` — deletes and recreates `.cache/`;
+3. copies `composer.json` aside to `composer.json.orig`;
+4. runs `composer require --dev --no-update "typo3/minimal":"^<core version>"`,
+   which is how `-t` selects the core: through `typo3/minimal`, not by touching
+   the `typo3/cms-core` constraint;
+5. runs `composer install` — with the lock file gone, this is where the
+   resolution happens;
+6. restores `composer.json` from the backup, so the injected `typo3/minimal`
+   requirement never survives the run.
+
+So `composer.json` is unchanged afterwards, `composer.lock` is **gone** rather
+than updated, and the core version is pinned by a package that is not in
+`require-dev` when the run ends. It is also what makes `-p` part of the install
+rather than of the gate: the platform PHP version of the set is written into the
+autoloader here — see
+[Dual core setup](dual-core-setup.md#the-php-dimension-is-not-square).
 
 ## Passing arguments to the underlying tool
 

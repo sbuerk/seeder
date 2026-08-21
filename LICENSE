@@ -1,3 +1,33 @@
+TYPO3 extension "data_factory"
+Copyright (C) 2026 Stefan Bürk <stefan@buerk.tech>
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, see <https://www.gnu.org/licenses/>.
+
+composer.json declares "GPL-2.0-or-later". Nothing but the "or (at your option)
+any later version" wording above substantiates that identifier for this code —
+the verbatim license text below grants version 2 and says nothing about this
+program — which is why this notice exists rather than a bare copy of the GPL.
+
+The three classes below Classes/Seeding/Scenario/ are ported from
+typo3/testing-framework and keep the upstream file header, which points at a
+"LICENSE.txt". That file is this one; the name differs, the terms do not, and
+the header is left byte-identical on purpose so the port stays comparable to
+its origin.
+
+The verbatim text of version 2 of the GNU General Public License follows.
+
+--------------------------------------------------------------------------------
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
 

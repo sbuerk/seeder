@@ -139,6 +139,43 @@ directly stay private — see
 > instead. That is a property of the branch, not of the version aware layout.
 > → [Class design](class-design.md#the-php-81-rule-readonly-sits-on-the-properties)
 
+### The checklist for a real one
+
+The sketch above is three files; a real addition touches more, and nothing in
+the container configuration is one of them. In order:
+
+1. `Classes/<Area>/<Thing>Interface.php` — the seam. This is the only one of the
+   three that is ever type hinted.
+2. `Classes/<Area>/Abstract<Thing>.php` — **only if** the two implementations
+   genuinely share behaviour. A pair that shares nothing but its signature does
+   not need a base class, and an abstract class that exists only to look
+   symmetrical is a liability. None of the three seams below has one.
+3. `Core12/<Area>/<Thing>.php` and `Core13/<Area>/<Thing>.php`, each carrying
+   `#[AsAlias(id: <Thing>Interface::class, public: true)]` and `final`, with
+   `readonly` on the properties rather than on the class.
+4. A functional test asserting that the interface resolves to the implementation
+   of the **running** core version, with the expected class name computed from
+   `Typo3Version` rather than written out — so one test class covers both legs
+   and the shared promise of the pair is asserted on each. Only a test whose
+   setup cannot exist on the other version goes into `Tests/Functional/Core12/`
+   or `Core13/` under `#[Group('not-core-<the other one>')]`. See
+   [Core version aware functional tests](../testing/functional-tests.md#core-version-aware-functional-tests).
+5. Run `phpstan` for **both** `-t` values, each after its own `composerUpdate`.
+   It is the one gate configured per core version, and the one that catches an
+   implementation reaching for API the other version does not have. On this
+   branch the two legs are also two PHPStan majors, so a finding fixed on one is
+   not automatically gone on the other.
+
+Nothing has to be registered by hand: `Configuration/Services.php` loads the
+whole matching directory, and `composer.json` already declares both PSR-4 roots.
+
+> [!NOTE]
+> This branch is the worked example of the whole mechanism: it carries **three**
+> version aware seams, listed below. Branch `main` carries the 2.x line for
+> TYPO3 v13 and v14 and has **none** — its `Core13/` and `Core14/` hold nothing
+> but a `.gitkeep`, because everything v13 and v14 differ in has so far been
+> expressible in shared code. v12 and v13 differ where v13 and v14 do not.
+
 ### What the split is actually used for
 
 The seams this extension carries are small and each of them is one API whose
@@ -247,10 +284,11 @@ rather than SQLite alone.
   **different PHPStan majors**, see
   [Dual core setup](../development/dual-core-setup.md#the-dependency-sets-differ-by-more-than-the-core).
   See [Quality gates](../development/quality-gates.md).
-- **Tests** mirror the same layout: `Tests/Unit/Core12/`, `Tests/Unit/Core13/`,
-  `Tests/Functional/Core12/` and `Tests/Functional/Core13/`, one such directory
-  per supported core version. A core version aware test class carries the PHPUnit
-  group of the core version it must **not** run on:
+- **Tests** may mirror the same layout — `Tests/Unit/Core12/`,
+  `Tests/Unit/Core13/`, `Tests/Functional/Core12/` and
+  `Tests/Functional/Core13/`, one such directory per supported core version —
+  and a test class placed there carries the PHPUnit group of the core version it
+  must **not** run on:
 
   ```php
   #[Group('not-core-13')]
@@ -262,6 +300,16 @@ rather than SQLite alone.
   `Build/Scripts/runTests.sh` passes `--exclude-group not-core-<version>` for
   the selected core version, so those tests are skipped automatically on the
   other one.
+
+  **None of the four directories exists today**, and that is the right state:
+  the three seams of this branch are covered by one ungrouped test each, which
+  computes the implementation it expects from `Typo3Version` and therefore
+  asserts the shared promise on both legs rather than on one — see step 4 of
+  [the checklist](#the-checklist-for-a-real-one) and
+  [Core version aware functional tests](../testing/functional-tests.md#core-version-aware-functional-tests).
+  The `Build/phpstan/Core*/phpstan.neon` exclusions for `Tests/*/Core12/*` and
+  `Tests/*/Core13/*` are in place regardless, so the layout is usable the moment
+  a test needs it.
 - Both core versions must be verified before opening a pull request, each after
   its own `composerUpdate` — see
   [Dual core setup](../development/dual-core-setup.md) and

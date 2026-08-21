@@ -15,8 +15,11 @@ All four are **copies** of the boilerplate maintained in
 those files directly but to copy them, because an extension needs different test
 suite paths and usually additional bootstrap code.
 
-They are currently baselined from **testing-framework 9.6.1**, which each file
-records in its own header comment together with its deviations.
+They are currently baselined from **testing-framework 8.3.3** — the 8.x line,
+which is the one covering TYPO3 v12 and v13 — and each file records that
+version in its own header comment together with its deviations. The two
+bootstraps additionally record that the 8.3.3 boilerplate is byte identical to
+the 9.6.1 one, so the branch supporting v13 and v14 carries the same two files.
 
 Being copies, they do not update themselves. When `typo3/testing-framework` is
 raised to a new version, diff the four files against the new template, adopt
@@ -32,14 +35,36 @@ diff -u .Build/vendor/typo3/testing-framework/Resources/Core/Build/FunctionalTes
 Everything that differs from the upstream boilerplate is intentional and listed
 here. Anything not on this list is drift and should be reconciled.
 
-| Deviation                                                                 | Reason                                                                                                                                |
-|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| `<directory>../../Tests/Unit/</directory>` and `../../Tests/Functional/`  | The template points at the TYPO3 mono-repository system extension paths.                                                              |
-| Schema location `../../.Build/vendor/phpunit/phpunit/phpunit.xsd`         | Resolves against the installed PHPUnit instead of a remote URL, so validation works offline and always matches the installed version. |
-| Additional `failOn*`, `beStrictAbout*` and `displayDetailsOn*` attributes | The strictness policy below. The template stops at the defaults of a core test run.                                                   |
-| Imports and `: void` in the bootstraps                                    | Coding guidelines of this repository (`cgl` gate).                                                                                    |
-| `AvailableFixturePackages` adoption in `FunctionalTestsBootstrap.php`     | Makes fixture extensions loadable by composer package name — see [Fixture extensions](fixture-extensions.md).                         |
-| No TYPO3 v12 fallback branch in `UnitTestsBootstrap.php`                  | v12 is not supported here.                                                                                                            |
+| Deviation                                                                 | Reason                                                                                                                                                                                                                     |
+|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `<directory>../../Tests/Unit/</directory>` and `../../Tests/Functional/`  | The template points at the TYPO3 mono-repository system extension paths.                                                                                                                                                   |
+| Schema location `../../.Build/vendor/phpunit/phpunit/phpunit.xsd`         | Resolves against the installed PHPUnit instead of a remote URL, so validation works offline and always matches the installed version. The template names the 10.1 schema, which predates three of the attributes set here. |
+| Additional `failOn*`, `beStrictAbout*` and `displayDetailsOn*` attributes | The strictness policy below. The template stops at the defaults of a core test run.                                                                                                                                        |
+| Imports and `: void` in the bootstraps                                    | Coding guidelines of this repository (`cgl` gate).                                                                                                                                                                         |
+| `AvailableFixturePackages` adoption in `FunctionalTestsBootstrap.php`     | Makes fixture extensions loadable by composer package name — see [Fixture extensions](fixture-extensions.md).                                                                                                              |
+| The request type is passed unconditionally in `UnitTestsBootstrap.php`    | The template's `class_exists(CoreHttpApplication::class)` branch distinguishes nothing, and the two request types are indistinguishable in effect on v12. See below.                                                       |
+
+### The request type branch that is not reproduced
+
+The boilerplate calls `SystemEnvironmentBuilder::run()` with
+`REQUESTTYPE_BE|REQUESTTYPE_CLI` where `CoreHttpApplication` is absent — meant to
+be TYPO3 v12 — and with `REQUESTTYPE_CLI` otherwise. This repository always
+passes `REQUESTTYPE_CLI`, for two reasons that were read rather than assumed:
+
+- The boilerplate declares **no namespace and no import** for
+  `CoreHttpApplication`, so the name resolves to the global
+  `\CoreHttpApplication`, `class_exists()` is false on every core version, and
+  upstream in fact always takes its else branch. The guard separates nothing.
+- On v12 the two values are indistinguishable in effect.
+  `Core\Core\SystemEnvironmentBuilder::run()` hands `$requestType` to
+  `calculateScriptPath()`, `calculateRootPath()` and `initializeEnvironment()`
+  only, and each of the three consumes it exclusively through
+  `isCliRequestType()`, which tests `($requestType & REQUESTTYPE_CLI)` and is
+  true for both. v12 no longer defines a `TYPO3_REQUESTTYPE` constant, so nothing
+  else can observe the difference either.
+
+The full reasoning is in the header comment of
+[`UnitTestsBootstrap.php`](../../Build/phpunit/UnitTestsBootstrap.php) itself.
 
 ## Strictness policy
 

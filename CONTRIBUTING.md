@@ -107,10 +107,15 @@ The extension supports TYPO3 v12.4 and v13.4 from one code base — PHP 8.1 up t
   `Configuration/Services.php`. They are private unless something really has to
   fetch them from the container.
   → [Dependency injection](docs/architecture/dependency-injection.md)
-- **Classes are `final readonly`** where a framework constraint does not prevent
-  it. Abstract classes never use constructor injection — they use `#[Required]`
-  `inject*()` methods, so the constructor stays free for extending classes.
-  → [Class design](docs/architecture/class-design.md)
+- **Classes are `final`, and `readonly` sits on the properties** — never
+  `final readonly class`, which does not parse on the PHP 8.1 this branch
+  supports. Every declared property and every promoted constructor parameter
+  carries the keyword instead. Abstract classes never use constructor injection
+  — they use `#[Required]` `inject*()` methods, so the constructor stays free
+  for extending classes. On branch `main`, which carries the 2.x line and has a
+  PHP 8.2 floor, the rule reads `final readonly class`; porting a class between
+  the lines is not a copy.
+  → [Class design](docs/architecture/class-design.md#the-php-81-rule-readonly-sits-on-the-properties)
 - **Models, entities, value objects and DTOs are data, not services** and always
   carry `#[Exclude]`, Extbase models included — directory based service
   registration cannot tell them apart, and the omission stays invisible until
@@ -177,7 +182,9 @@ burying the real change in the diff.
 
 Two scripts drive the release: `Build/Scripts/setVersion.sh` applies a version to
 every file carrying one, `Build/Scripts/release.sh` orchestrates branch, commit,
-pull request, merge and tag. Nothing remote happens without `--execute`.
+pull request, merge and tag. `--dry-run` rehearses without writing anything;
+without `--execute` the remote steps are withheld but every local one still
+runs, so a bare invocation is not a rehearsal.
 
 → [Releasing](docs/workflow/releasing.md)
 

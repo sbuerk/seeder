@@ -13,10 +13,13 @@ tests are written in.
 - **Repository**: https://github.com/sbuerk/data-factory
 - **License**: GPL-2.0-or-later
 
+[![Packagist Version](https://img.shields.io/packagist/v/sbuerk/data-factory)](https://packagist.org/packages/sbuerk/data-factory)
+
 > [!IMPORTANT]
-> **This is pre-1.0.** The seed definition format and the public API may change
-> without a deprecation phase until the first stable release. See
-> [Status](#status) for what that covers and what it deliberately does not.
+> **This is the 1.x line: TYPO3 v12.4 and v13.4.** TYPO3 v14.3 is served by the
+> 2.x line on branch
+> [`main`](https://github.com/sbuerk/data-factory/tree/main) - see
+> [Compatibility](#compatibility) for both lines.
 
 ## What it does
 
@@ -58,12 +61,28 @@ Everything is written through the TYPO3 `DataHandler` rather than through
 direct database inserts, so slugs, TCA defaults and evaluations, `sorting`, the
 reference index and the cache flush all happen the way they do for an editor.
 
-`data-factory:import` takes `--dry-run` to validate and report without writing,
-`--force` to import although the set suggests uids the installation already
-uses, `--root-page` to choose where the set is written, `--base` to override the
-base URL of every site configuration it declares, and `--no-site-config` to skip
-them entirely. It exits with a distinct code per failure, so a deployment script
-can tell "no such set" from "that would overwrite something".
+`data-factory:import` takes five options:
+
+| Option             | Does                                                                        |
+|--------------------|-----------------------------------------------------------------------------|
+| `--dry-run`        | Parse, validate and report what an import would do. Writes nothing.         |
+| `--force`          | Import although the set suggests uids the installation already uses.        |
+| `--root-page`      | The page the set is written below. `0`, the page tree root, is the default. |
+| `--base`           | Override the `base` of every site configuration the set declares.           |
+| `--no-site-config` | Skip the site configurations entirely.                                      |
+
+`--force` gives up the declared uids of a colliding table, so the records land
+under free ones and nothing in the way is deleted or overwritten - which is why
+a set declaring sites cannot be forced past a collision in `pages`: a site names
+its root page by that uid. The command exits with a distinct code per failure,
+so a deployment script can tell "no such set" from "that would overwrite
+something".
+
+An import runs on the command line as an administrator - the TYPO3 console
+authenticates the `_cli_` backend user, which is one by default - because TYPO3
+honours a declared uid for an administrator only and ignores it silently
+otherwise. A set that brings files also needs a file storage to write into;
+`typo3 setup` creates `fileadmin/` on a new installation.
 
 Every record is written with a known uid: the `id` its entity declares, or one
 handed out from 10000 upwards. Declaring it is what makes a seeded page tree
@@ -79,15 +98,19 @@ covered by no site configuration.
 
 ## Status
 
-**Feature complete, and pre-1.0.** Both commands, the set descriptor, the
-scenario format, record seeding, file seeding, file references and site
-configurations are implemented, covered by unit and functional tests, and green
-on TYPO3 v12.4 and v13.4.
+**Released and maintained.** Both commands, the set descriptor, the scenario
+format, record seeding, file seeding, file references and site configurations
+are implemented, covered by unit and functional tests, and green on TYPO3 v12.4
+and v13.4.
 
-What that does *not* mean: the seed definition format and the public API may
-still change without a deprecation phase until the first stable release, and the
-classes below `Classes/Seeding/` are `@internal` on purpose - the supported
-interface is the scenario format, `config.yml` and the two commands.
+The **supported interface** is the scenario format, `config.yml` and the two
+commands with their options and exit codes. A change to it that is not
+backwards compatible goes into a new major version and carries a
+`Breaking-*.rst` entry in
+[`Documentation/Changelog/`](Documentation/Changelog). Everything below
+`Classes/`, `Core12/` and `Core13/` is `@internal` - it is the implementation of
+that interface, it carries no compatibility promise, and it may change in any
+release.
 
 Deliberate limitations, worth knowing before adopting it:
 
@@ -104,11 +127,11 @@ Deliberate limitations, worth knowing before adopting it:
 
 ## Compatibility
 
-| Branch | State       | Extension | TYPO3         | PHP       |
-|--------|-------------|-----------|---------------|-----------|
-| `main` | development | 2.x       | v13.4 / v14.3 | 8.2 - 8.5 |
-| `1`    | development | 1.x       | v12.4         | 8.1 - 8.4 |
-| `1`    | development | 1.x       | v13.4         | 8.2 - 8.4 |
+| Branch | State      | Extension | TYPO3         | PHP       |
+|--------|------------|-----------|---------------|-----------|
+| `main` | active     | 2.x       | v13.4 / v14.3 | 8.2 - 8.5 |
+| `1`    | maintained | 1.x       | v12.4         | 8.1 - 8.4 |
+| `1`    | maintained | 1.x       | v13.4         | 8.2 - 8.4 |
 
 Branch `1` - this branch - is the 1.x line for TYPO3 v12.4 and v13.4. It gets
 one row per TYPO3 version because the PHP ranges differ: PHP 8.1 is supported
@@ -120,11 +143,12 @@ raises it to.
 Branch `main` is the 2.x line, on TYPO3 v13.4 and v14.3. One row is enough
 there, because the PHP range is the same for both of its core versions.
 
-Nothing has been released yet, so `development` is the truthful state for both
-lines rather than "active support": until the first stable release the seed
-definition format and the public API may change without a deprecation phase.
-Once 1.0 is tagged from branch `1`, that line moves to active support and `main`
-carries on as the development line.
+Both lines are released. `main` is the active line and gets new features; branch
+`1` - this branch - is maintained for installations still on TYPO3 v12.4 and
+gets fixes. The two lines are released independently and neither is merged into
+the other, so a fix that applies to both is applied to both. TYPO3 v13.4 is
+served by either, which means an installation on v13.4 can move between the
+lines without changing a seed set.
 
 ## Installation
 
@@ -143,15 +167,11 @@ commands then exist in the deployed installation:
 composer require sbuerk/data-factory
 ```
 
-As long as no stable version has been released, require the development version
-of the `1` branch explicitly - the branch alias maps it onto `1.0.x-dev`:
-
-```bash
-composer require --dev sbuerk/data-factory:^1.0@dev
-```
-
-This additionally requires `minimum-stability: "dev"` together with
-`prefer-stable: true` in the root `composer.json` file.
+Either command resolves to the line matching the installed core - 1.x on TYPO3
+v12.4, 2.x on v13.4 and v14.3 - because each line constrains `typo3/cms-core`
+itself. On v13.4, which both lines serve, the 2.x line wins unless the 1.x line
+is pinned: `sbuerk/data-factory:^1.0` for this line,
+`sbuerk/data-factory:^2.0` for the other.
 
 ## Usage at a glance
 
@@ -165,7 +185,8 @@ vendor/bin/typo3 data-factory:import demo --base='https://example.com/'
 ```
 
 Without an identifier the command asks which set to import; without a terminal
-to ask on it lists them and stops.
+to ask on it lists them and exits `2`. `data-factory:import --help` documents
+every exit code.
 
 A minimal set is two files. `config.yml` describes the set and names the
 scenario files it is built from:
@@ -177,13 +198,7 @@ identifier: demo
 title: 'Demo page tree'
 scenarios:
   - Scenario.yaml
-sites:
-  - identifier: main
-    rootPage: 1000
 ```
-
-`rootPage` is a page uid, and the site is written from `Sites/main/` next to
-`config.yml` unless a `template` says otherwise.
 
 `packages/my_extension/Configuration/DataFactory/demo/Scenario.yaml`:
 
@@ -219,14 +234,46 @@ and in
 [`docs/development/seed-definitions.md`](docs/development/seed-definitions.md)
 for developers, where it also says why each rule exists.
 
+A set that also writes a **site configuration** is three files. `sites:` in
+`config.yml` names the site, and the site itself is a template directory next to
+it - `Sites/<identifier>/config.yaml`, the same shape as a site below
+`config/sites/`, which a `template` key may point elsewhere. `rootPage` is the
+uid of a seeded page, and the import writes the uid that page actually got into
+the template's `rootPageId`, whatever the template says:
+
+`packages/my_extension/Configuration/DataFactory/demo/config.yml`, extended:
+
+```yaml
+identifier: demo
+title: 'Demo page tree'
+scenarios:
+  - Scenario.yaml
+sites:
+  - identifier: main
+    rootPage: 1000
+```
+
+`packages/my_extension/Configuration/DataFactory/demo/Sites/main/config.yaml`:
+
+```yaml
+rootPageId: 1000
+base: 'https://example.com/'
+languages:
+  - languageId: 0
+    title: 'English'
+    locale: 'en_US.UTF-8'
+    base: '/'
+```
+
 ## Documentation
 
-| For                        | Where                                                         |
-|----------------------------|---------------------------------------------------------------|
-| Users and integrators      | [`Documentation/`](Documentation), rendered to docs.typo3.org |
-| Developers and maintainers | [`docs/`](docs/Index.md)                                      |
-| Contributors, entry point  | [`CONTRIBUTING.md`](CONTRIBUTING.md)                          |
-| AI coding agents           | [`AGENTS.md`](AGENTS.md)                                      |
+| For                        | Where                                                                                                   |
+|----------------------------|---------------------------------------------------------------------------------------------------------|
+| Users and integrators      | [`Documentation/`](Documentation) · [rendered](https://docs.typo3.org/p/sbuerk/data-factory/1.0/en-us/) |
+| What changed per version   | [`Documentation/Changelog/`](Documentation/Changelog)                                                   |
+| Developers and maintainers | [`docs/`](docs/Index.md)                                                                                |
+| Contributors, entry point  | [`CONTRIBUTING.md`](CONTRIBUTING.md)                                                                    |
+| AI coding agents           | [`AGENTS.md`](AGENTS.md)                                                                                |
 
 ```bash
 # Render once, as CI does. Must pass without errors.
@@ -269,6 +316,14 @@ Everything has to pass for **both** TYPO3 v12 and v13, each after the matching
 
 → [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow ·
 [`docs/`](docs/Index.md) for the full developer documentation
+
+## Support
+
+Questions, bug reports and feature requests belong in the
+[issue tracker](https://github.com/sbuerk/data-factory/issues). There is no
+support channel besides it. Include the seed set, the command line and the
+output of `data-factory:import … --dry-run` - it reports what an import would do
+without writing anything.
 
 ## License
 

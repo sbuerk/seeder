@@ -1,8 +1,7 @@
 name: publish
 
 # Turns a version tag into a GitHub release with a TER upload artifact attached,
-# and — once enabled at the bottom of this file — publishes that artifact to the
-# TYPO3 Extension Repository.
+# and publishes that artifact to the TYPO3 Extension Repository.
 #
 # Triggered by pushing a tag. The tag has to be a bare "MAJOR.MINOR.PATCH"
 # without a "v" prefix, which is what "Build/Scripts/release.sh" creates, and it
@@ -13,88 +12,119 @@ name: publish
 # The extension key is read from "composer.json" at runtime rather than written
 # into this file, so this workflow does not become one more place carrying it.
 #
-# Requirements before the first release:
+# Two things this file cannot enforce and a release has to observe:
 #
-#   - The repository secret "TYPO3_API_TOKEN" for the TER publishing step.
-#   - The extension key registered in the TER, owned by that token.
+#   - "TYPO3_API_TOKEN" has to stay a repository secret of an account that owns
+#     the extension key in the TER. Publishing is refused otherwise, and no
+#     step short of the last one would notice.
+#   - The lower line is tagged first. "make_latest: legacy" below settles the
+#     "Latest" badge by version, but "generate_release_notes" has no such
+#     fallback: it diffs against whatever tag GitHub considers the previous one,
+#     so a 1.x tag pushed after a 2.x tag gets its notes computed against a tag
+#     from the other line.
 #
 # → "docs/workflow/releasing.md"
 
 on:
   push:
     tags:
-      - '*'
+      # Any tag at all used to start this job, which then failed at "Verify tag"
+      # — a red cross and a notification for a tag that was never meant to
+      # publish. The pattern keeps those runs from starting; the step below
+      # stays, because it is what decides, and it is stricter than a tag filter
+      # can be.
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   publish:
     name: Ensure GitHub Release with extension TER artifact
-    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    env:
-      TYPO3_API_TOKEN: ${{ secrets.TYPO3_API_TOKEN }}
     permissions:
       contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      # No "run:" block below interpolates a "${{ … }}" expression. Expressions
+      # are substituted textually before bash parses the line, and a git ref may
+      # contain "$", "(", ")" and backticks — so a tag named like a command
+      # substitution would execute in a job that holds "contents: write" and,
+      # further down, the TER token. Everything the steps need is an environment
+      # variable instead: either one the runner exports itself ("GITHUB_REF",
+      # "GITHUB_REPOSITORY") or one an earlier step wrote to "$GITHUB_ENV",
+      # which later steps see as an ordinary shell variable.
       - name: Verify tag
         run: |
-          if ! [[ ${{ github.ref }} =~ ^refs/tags/[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}$ ]]; then
-            echo "ERR: Invalid publish version tag: ${{ github.ref }}"
+          if ! [[ "${GITHUB_REF}" =~ ^refs/tags/[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "ERR: Invalid publish version tag: ${GITHUB_REF}"
             exit 1
           fi
 
+      # Everything after this point treats "$version" as trusted, which it is
+      # only because the step above rejected everything that is not three
+      # numbers and two dots.
       - name: Get version
-        id: get-version
-        run: echo "version=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
 
       - name: Get extension key
-        id: get-extension-key
-        run: |
-          echo "DETECTED_EXTENSION_KEY=$(cat composer.json | jq -r '.extra."typo3/cms"."extension-key"' )" >> "$GITHUB_ENV"
+        run: echo "DETECTED_EXTENSION_KEY=$(jq -r '.extra."typo3/cms"."extension-key"' composer.json)" >> "$GITHUB_ENV"
 
       - name: Get comment
-        id: get-comment
-        run: |
-          {
-            echo 'terReleaseNotes<<EOF'
-            echo "https://github.com/${{ github.repository }}/releases/tag/${{ env.version }}"
-            echo EOF
-          } >> "$GITHUB_ENV"
+        run: echo "terReleaseNotes=https://github.com/${GITHUB_REPOSITORY}/releases/tag/${version}" >> "$GITHUB_ENV"
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.2
+          php-version: 8.4
           extensions: intl, mbstring, json, zip, curl
           tools: composer:v2
 
       - name: Install tailor
-        run: composer global require typo3/tailor --prefer-dist --no-progress --no-suggest
-
-      # Note that step will fail when `env.version` does not match the `ext_emconf.php` version.
-      - name: Create local TER package upload artifact
+        # Pinned to the major. Tailor 2.0.0 raised its PHP floor and replaced
+        # its HTTP client; a future major is equally free to change the command
+        # surface these two steps depend on, and a release is the worst moment
+        # to find that out. "--no-suggest" is gone with the old line: composer 2
+        # accepts and ignores it, composer 3 will not.
+        #
+        # The binary directory is asked for rather than assumed. "~/.composer"
+        # exists here only because "setup-php" creates it for
+        # "tools: composer:v2" — composer itself prefers
+        # "$XDG_CONFIG_HOME/composer" when that directory is absent, so a
+        # hardcoded path breaks the day either input changes.
         run: |
-          php ~/.composer/vendor/bin/tailor create-artefact ${{ env.version }}
+          composer global require typo3/tailor:^2.0 --prefer-dist --no-progress
+          echo "$(composer --no-interaction config --global home)/vendor/bin" >> "$GITHUB_PATH"
+
+      # Note that step will fail when the tag does not match the `ext_emconf.php` version.
+      - name: Create local TER package upload artifact
+        run: tailor create-artefact "$version"
 
       # Note that when release already exists for tag, only files will be uploaded and lets this acting as a
       # fallback to ensure that a real GitHub release is created for the tag along with extension artifacts.
       - name: Create release and upload artifacts in the same step
         uses: softprops/action-gh-release@v3
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           name: "[RELEASE] ${{ env.version }}"
           generate_release_notes: true
+          # Without this the GitHub API default applies and whichever release
+          # was created last becomes "Latest", regardless of version — so a 1.x
+          # patch published after a 2.x release would take the badge off the
+          # maintained line. "legacy" resolves by creation date *and* higher
+          # semantic version.
+          make_latest: legacy
           files: |
             tailor-version-artefact/${{ env.DETECTED_EXTENSION_KEY }}_${{ env.version }}.zip
             LICENSE
           fail_on_unmatched_files: true
 
-      # @todo Enable the TER publishing as soon as the extension is public and
-      #       its extension key is registered in the TER. The `TYPO3_API_TOKEN`
-      #       repository secret must be set up for it.
-      #- name: Publish to TER
-      #  run: |
-      #    php ~/.composer/vendor/bin/tailor ter:publish --comment "${{ env.terReleaseNotes }}" ${{ env.version }} \
-      #      --artefact=tailor-version-artefact/${{ env.DETECTED_EXTENSION_KEY }}_${{ env.version }}.zip
+      - name: Publish to TER
+        # The token is granted to this one step. At job level it also sat in the
+        # environment of "composer global require", which executes package
+        # scripts, and of the release action, which is third party JavaScript —
+        # neither has any use for it.
+        env:
+          TYPO3_API_TOKEN: ${{ secrets.TYPO3_API_TOKEN }}
+        run: |
+          tailor ter:publish "$version" \
+            --comment="$terReleaseNotes" \
+            --artefact="tailor-version-artefact/${DETECTED_EXTENSION_KEY}_${version}.zip"

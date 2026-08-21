@@ -160,21 +160,30 @@ The jobs are staged, cheapest and most likely to fail first:
 
 ```
 quality ─┐
-phpstan ─┤
-lint    ─┼─> unit ─> functional (SQLite) ─> functional (MySQL, MariaDB, Postgres)
-         │
-docs ────┘
+phpstan ─┼─> unit ─> functional (SQLite) ─> functional (MySQL, MariaDB, Postgres)
+lint    ─┘
+
+documentation   (independent, for fast feedback on documentation changes)
 ```
 
-| Job                 | Matrix                                   | Runs                                        |
-|---------------------|------------------------------------------|---------------------------------------------|
-| `quality`           | PHP 8.2, TYPO3 v12 only                  | The gates that inspect source files         |
-| `phpstan`           | PHP 8.2 × both core versions             | The one gate configured per core version    |
-| `lint`              | all PHP versions × both core versions    | `lintPhp`                                   |
-| `unit`              | edge PHP versions × both core versions   | `unit`, `unitRandom`                        |
-| `functional-sqlite` | edge PHP versions × both core versions   | `functional -d sqlite`                      |
-| `functional-dbms`   | edge PHP × both cores × 4 DBMS — 16 jobs | `functional` against each database          |
-| `documentation`     | —                                        | `renderDocumentation`, uploads the artifact |
+| Job                 | Matrix                                                      | Runs                                                                            |
+|---------------------|-------------------------------------------------------------|---------------------------------------------------------------------------------|
+| `quality`           | PHP 8.2, TYPO3 v12 only — 1 job                             | The gates that inspect source files                                             |
+| `phpstan`           | PHP 8.2 × both core versions — 2 jobs                       | The one gate configured per core version                                        |
+| `lint`              | all 4 PHP versions × both core versions, minus one — 7 jobs | `lintPhp`                                                                       |
+| `unit`              | edge PHP versions × both core versions — 4 jobs             | `unit`, `unitRandom`                                                            |
+| `functional-sqlite` | edge PHP versions × both core versions — 4 jobs             | `functional -d sqlite`                                                          |
+| `functional-dbms`   | edge PHP × both cores × 4 DBMS configurations — 16          | `functional` against each database                                              |
+| `documentation`     | — 1 job                                                     | `renderDocumentation`, uploads the rendered result and the pull request context |
+
+Thirty-five jobs in total, and every one of them but `documentation` starts with
+its own `composerUpdate`. The four DBMS configurations are three engines —
+MariaDB is matrixed twice, at 10.4 and 10.6, because its two lines differ in
+what they accept.
+
+`documentation` has no `needs` of its own: it runs immediately and in parallel
+with the staged chain, so a change that only touches `Documentation/` is
+answered without waiting for the test matrix.
 
 "Edge PHP versions" is **not** the same pair on both legs, because the PHP
 matrix is not square: the lower edge is 8.1 on v12 and 8.2 on v13, the upper
