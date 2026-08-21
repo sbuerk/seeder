@@ -33,7 +33,8 @@ Seeder
 Seeds a TYPO3 installation — pages, content elements, records of any table,
 files and site configurations — from YAML definitions shipped inside extensions,
 so that the content an installation starts from lives in a repository instead of
-being clicked together by hand. Supports TYPO3 v13 and v14 within one code base.
+being clicked together by hand. Supports TYPO3 v13.4 and v14.3 within one code
+base.
 
 ..  note::
 

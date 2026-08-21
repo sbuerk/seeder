@@ -1,8 +1,10 @@
 # Dual core setup
 
-This extension supports TYPO3 v13 and v14 from one code base. Only one of the
-two dependency sets can be installed in `.Build/` at a time, which makes the
-following rule the most important one in the whole development workflow.
+This branch supports TYPO3 v13 and v14 from one code base — branch `1` carries
+the 1.x line on v12 and v13, and the rule below applies there just the same,
+with its own pair. Only one of the two dependency sets can be installed in
+`.Build/` at a time, which makes it the most important rule in the whole
+development workflow.
 
 ## The rule
 

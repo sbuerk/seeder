@@ -13,4 +13,5 @@ documented here, grouped by version and change type.
     :maxdepth: 1
     :titlesonly:
 
+    2.0/Index
     1.0/Index

@@ -1,7 +1,15 @@
 # Pull requests
 
-1. Create a topic branch off `main` — for example `feature/example-service` or
-   `bugfix/empty-response`.
+1. Create a topic branch off the branch the change belongs on — for example
+   `feature/example-service` or `bugfix/empty-response`. **This branch line is
+   `main`**, which carries TYPO3 v13.4 + v14.3; `1` carries the 1.x line for
+   TYPO3 v12.4 + v13.4. Both release scripts default `--source-branch` to
+   `main`, see
+   [Releasing](releasing.md#--source-branch-and-the-key-the-alias-is-stored-under).
+
+   Neither branch is merged into the other, so a fix that affects both lines
+   needs a pull request on each — written against the core versions that branch
+   supports.
 2. Keep commits focused; one logical change per commit, following the
    [commit message rules](commit-messages.md).
 3. Make sure the quality gates and both test suites pass locally before opening
@@ -33,9 +41,12 @@
    [`docs/`](../Index.md) page covering what changed, and a changelog entry
    below `Documentation/Changelog/` for user facing changes. See
    [Changelog and documentation](changelog-and-documentation.md).
-5. Open the pull request against `main`, describing what changes and why. The
+5. Open the pull request against the branch the topic branch was cut from —
+   `main` for a change to the TYPO3 v13 + v14 line, `1` for the v12 + v13 line
+   — describing what changes and why. The
    [CI workflow](../../.github/workflows/ci.yml) runs the full matrix for TYPO3
-   v13 and v14, and comments the rendered documentation on the pull request —
+   v13 and v14 on this branch, and comments the rendered documentation on the
+   pull request —
    for a fork as well, see
    [continuous integration](../development/quality-gates.md#continuous-integration).
 6. Address review feedback by amending or adding commits; keep the history
