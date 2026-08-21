@@ -305,29 +305,9 @@ alias-key rule above exists for.
 Pushing the tag triggers the [`publish`](../../.github/workflows/publish.yml)
 workflow. It runs for **every** tag and rejects anything that is not a bare
 `MAJOR.MINOR.PATCH` — no `v` prefix — then reads the extension key out of
-`composer.json` at run time, builds the upload artifact and creates a GitHub
-release named `[RELEASE] X.Y.Z` with `data_factory_X.Y.Z.zip` and `LICENSE`
+`composer.json` at run time, builds the upload artifact with
+`tailor create-artefact` and creates a GitHub release named `[RELEASE] X.Y.Z` with `data_factory_X.Y.Z.zip` and `LICENSE`
 attached. Both files must exist: `fail_on_unmatched_files` is on.
-
-### What ends up in the artifact
-
-`tailor create-artefact` does **not** read `.gitattributes`. It walks a
-directory and filters it against a list of its own, which knows nothing about
-`docs/`, `AGENTS.md` or `CONTRIBUTING.md` — pointed at the checkout it would put
-a quarter of a megabyte of internal development documentation into the published
-zip.
-
-So the workflow does not point it at the checkout. It exports the tree with
-`git archive HEAD` first, which *does* honour `export-ignore`, and runs
-`tailor create-artefact --path=` against that export. The consequence is worth
-holding on to:
-
-> **`.gitattributes` decides the TER zip and the composer dist alike.** They are
-> the same set of files, filtered in one place. Adding something to the
-> repository that must not ship means one `export-ignore` line, not two lists.
-
-Tailor's own filter still runs on top of the export and finds nothing left to
-remove.
 
 `tailor create-artefact` fails when the tag does not match the `version` in
 `ext_emconf.php`. That is deliberate, and it is the reason a release cannot
