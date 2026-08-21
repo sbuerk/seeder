@@ -94,8 +94,8 @@ frontend sub-requests available everywhere.
 
 ## Code rules
 
-The extension supports TYPO3 v13 and v14 from one code base. The rules that make
-that work:
+This branch supports TYPO3 v13.4 and v14.3 from one code base. The rules that
+make that work:
 
 - **Version differences split classes, they do not add conditionals.**
   `Classes/` holds everything working on all supported versions; `Core13/` and
@@ -135,6 +135,11 @@ characters. An issue reference is not required, but must be verified when used.
 → [Commit messages](docs/workflow/commit-messages.md)
 
 ## Pull request checklist
+
+Open the pull request against the branch the change belongs on: **`main`** for
+the 2.x line (TYPO3 v13.4 + v14.3), **`1`** for the 1.x line (TYPO3 v12.4 +
+v13.4). Neither branch is merged into the other, so a fix affecting both lines
+needs a pull request on each.
 
 Before opening a pull request, run every gate from
 [Quality gates](#quality-gates), both test suites, and `renderDocumentation`

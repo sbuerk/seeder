@@ -78,7 +78,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "2.0.x-dev"
         },
         "sbuerk/fixture-packages": {
             "paths": {
@@ -90,7 +90,7 @@
         "typo3/cms": {
             "extension-key": "seeder",
             "web-dir": ".Build/Web",
-            "version": "1.0.0-dev",
+            "version": "2.0.0-dev",
             "Package": {
                 "providesPackages": []
             }

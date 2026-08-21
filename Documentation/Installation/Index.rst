@@ -8,6 +8,14 @@ Installation
 
 The extension has to be installed like any other TYPO3 CMS extension.
 
+This is the documentation of branch ``main``, the 2.x line of the extension. It
+requires ``typo3/cms-core`` ``^13.4 || ^14.3`` and PHP
+``^8.2 || ^8.3 || ^8.4 || ^8.5``, so it installs on **TYPO3 v13.4 up to v14.3**
+and **PHP 8.2 up to 8.5**. TYPO3 v12.4 is served by branch ``1``, the 1.x line,
+which supports PHP 8.1 as well - for TYPO3 v12 only. See
+:ref:`Compatibility <compatibility>` for the full matrix, branch ``1``
+included.
+
 Composer mode
 =============
 
@@ -29,11 +37,12 @@ commands then exist in the deployed installation as well:
 ..  note::
 
     As long as no stable version has been released, the development version of
-    the main branch has to be required explicitly:
+    the ``main`` branch has to be required explicitly - its branch alias maps
+    ``^2.0@dev`` onto ``2.0.x-dev``:
 
     ..  code-block:: bash
 
-        composer require --dev sbuerk/seeder:^1.0@dev
+        composer require --dev sbuerk/seeder:^2.0@dev
 
     This additionally requires ``minimum-stability`` to be set to ``dev``
     together with ``prefer-stable`` set to ``true`` in the root

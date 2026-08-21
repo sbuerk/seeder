@@ -3,7 +3,7 @@
 $EM_CONF['seeder'] = [
     'title' => 'TYPO3 Data Seeder',
     'description' => 'Seeds pages, records, files and site configurations into a TYPO3 installation from YAML definitions shipped by extensions.',
-    'version' => '1.0.0',
+    'version' => '2.0.0',
     'category' => 'misc',
     'state' => 'alpha',
     'author' => 'Stefan Bürk',

@@ -14,9 +14,12 @@ tests are written in.
 - **License**: GPL-2.0-or-later
 
 > [!IMPORTANT]
-> **This is pre-1.0.** The seed definition format and the public API may change
-> without a deprecation phase until the first stable release. See
-> [Status](#status) for what that covers and what it deliberately does not.
+> **This is the 2.x line, and it is pre-2.0.** Nothing has been released from it
+> yet, and the seed definition format and the public API may change without a
+> deprecation phase until the first stable release. 1.0 comes from branch `1`,
+> which carries TYPO3 v12.4 and v13.4 — see [Compatibility](#compatibility) for
+> both lines, and [Status](#status) for what the caveat covers and what it
+> deliberately does not.
 
 ## What it does
 
@@ -79,7 +82,7 @@ covered by no site configuration.
 
 ## Status
 
-**Feature complete, and pre-1.0.** Both commands, the set descriptor, the
+**Feature complete, and pre-2.0.** Both commands, the set descriptor, the
 scenario format, record seeding, file seeding, file references and site
 configurations are implemented, covered by unit and functional tests, and green
 on TYPO3 v13.4 and v14.3.
@@ -104,9 +107,27 @@ Deliberate limitations, worth knowing before adopting it:
 
 ## Compatibility
 
-| Branch | Extension | TYPO3         | PHP       |
-|--------|-----------|---------------|-----------|
-| `main` | 1.x       | v13.4 / v14.3 | 8.2 - 8.5 |
+| Branch | State       | Extension | TYPO3         | PHP       |
+|--------|-------------|-----------|---------------|-----------|
+| `main` | development | 2.x       | v13.4 / v14.3 | 8.2 - 8.5 |
+| `1`    | development | 1.x       | v12.4         | 8.1 - 8.4 |
+| `1`    | development | 1.x       | v13.4         | 8.2 - 8.4 |
+
+Branch `main` - this branch - is the 2.x line for TYPO3 v13.4 and v14.3. One row
+is enough for it, because the PHP range is the same for both of its core
+versions.
+
+Branch `1` is the 1.x line, on TYPO3 v12.4 and v13.4. It gets one row per TYPO3
+version because the PHP ranges differ there: PHP 8.1 is supported for **TYPO3
+v12 only**, as `typo3/cms-core` 13.4 requires PHP `^8.2` and a v13 dependency
+set on PHP 8.1 cannot be installed at all. The lowest supported v12 patch level
+is **12.4.22**, the floor `fgtclb/environment-state-manager` 1.0 raises it to.
+
+Nothing has been released yet, so `development` is the truthful state for both
+lines rather than "active support": until the first stable release the seed
+definition format and the public API may change without a deprecation phase.
+Once 1.0 is tagged from branch `1`, that line moves to active support and `main`
+carries on as the development line.
 
 ## Installation
 
@@ -126,10 +147,11 @@ composer require sbuerk/seeder
 ```
 
 As long as no stable version has been released, require the development version
-of the main branch explicitly:
+of the `main` branch explicitly - its branch alias maps `dev-main` onto
+`2.0.x-dev`, so `^2.0@dev` resolves to it:
 
 ```bash
-composer require --dev sbuerk/seeder:^1.0@dev
+composer require --dev sbuerk/seeder:^2.0@dev
 ```
 
 This additionally requires `minimum-stability: "dev"` together with

@@ -42,26 +42,29 @@ Both ways produce the same result — the wrapper only adds the container.
 
 ### `--source-branch`, and the key the alias is stored under
 
-Development happens on one branch, `main`, and both scripts default
-`--source-branch` to it:
+This line is released from **`main`** — the branch carrying TYPO3 v13.4 + v14.3
+support — and both scripts default `--source-branch` to it:
 
 ```bash
 SOURCE_BRANCH="main"
 ```
 
-so nothing has to be passed here. Pass it explicitly only once a maintenance
-branch exists and its release is driven from a checkout of another branch.
+so nothing has to be passed here. Pass it explicitly only when a release is
+driven from a checkout of another branch — `--source-branch=1` for the 1.x line
+on branch `1`, which carries TYPO3 v12.4 + v13.4.
 
 The key `extra.branch-alias` is stored under is **not** always
 `dev-<source-branch>`. Composer derives a version from the branch name before it
 consults the alias map, and a branch whose name looks like a version is
 normalised to `<name>.x-dev`:
 
-| Branch                    | Derived by composer | Alias key  |
-|---------------------------|---------------------|------------|
-| `main`                    | `dev-main`          | `dev-main` |
-| `1`, were such a line cut | `1.x-dev`           | `1.x-dev`  |
+| Branch | Derived by composer | Alias key  |
+|--------|---------------------|------------|
+| `main` | `dev-main`          | `dev-main` |
+| `1`    | `1.x-dev`           | `1.x-dev`  |
 
+That is why `composer.json` on this branch carries `"dev-main": "2.0.x-dev"`,
+while the one on `1` carries `"1.x-dev": "1.0.x-dev"` and not `"dev-1"`.
 `setVersion.sh` derives the key from the source branch, so this is not something
 to get right by hand — but it is worth knowing, because getting it wrong is
 **silent**. An alias keyed `dev-1` on a branch named `1` matches no reference
@@ -70,8 +73,9 @@ version it claims to, and nothing reports it.
 
 `release.sh` uses the source branch for more than the alias: it is the branch it
 branches off, refreshes, targets pull requests at with `gh pr create --base`,
-and tags. Run with the default from a maintenance branch, it would open the
-release pull request against `main`.
+and tags. Running it with the default from a checkout of `1` would branch off
+and tag `main` instead — pass `--source-branch` there, or work from a checkout
+of the branch being released.
 
 ## `release.sh` — orchestrate the release
 
@@ -114,6 +118,9 @@ retry against instead of losing both.
 
 ## Before releasing
 
+- The release is cut from the branch that carries the line being released:
+  `main` for 2.x, `1` for 1.x. The two lines are released independently, and
+  neither branch is merged into the other.
 - Both core versions green across the full [gate matrix](../development/quality-gates.md).
 - Changelog entries for the version in place, see
   [Changelog and documentation](changelog-and-documentation.md).
