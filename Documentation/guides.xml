@@ -12,8 +12,8 @@
                typo3-core-preferred="stable"
     />
     <project title="Data Factory"
-             release="1 (development)"
-             version="1 (development)"
-             copyright="sbuerk &amp; Contributors"
+             release="1.0"
+             version="1.0"
+             copyright="Stefan Bürk &amp; Contributors"
     />
 </guides>

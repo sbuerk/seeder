@@ -35,19 +35,16 @@ commands then exist in the deployed installation as well:
 
     composer require sbuerk/data-factory
 
-..  note::
+Either command resolves to the line matching the installed core, because each
+line constrains ``typo3/cms-core`` itself - 1.x on TYPO3 v12.4, 2.x on v13.4 and
+v14.3. TYPO3 v13.4 is served by both, and the 2.x line wins there unless this
+one is pinned - which is what a project on v13.4 staying on the 1.x line writes
+down; the line keeps the set descriptor, the scenario format and the two
+commands compatible:
 
-    As long as no stable version has been released, the development version of
-    the ``1`` branch has to be required explicitly - its branch alias maps
-    ``^1.0@dev`` onto ``1.0.x-dev``:
+..  code-block:: bash
 
-    ..  code-block:: bash
-
-        composer require --dev sbuerk/data-factory:^1.0@dev
-
-    This additionally requires ``minimum-stability`` to be set to ``dev``
-    together with ``prefer-stable`` set to ``true`` in the root
-    :file:`composer.json` file.
+    composer require --dev "sbuerk/data-factory:^1.0"
 
 Classic mode
 ============
@@ -61,7 +58,20 @@ Classic mode
     You can always get the current version from `TER`_ by downloading the zip
     version. Upload the file afterwards in the Extension Manager.
 
+#.  **Get it from the repository**:
+    Every tag also publishes :file:`data_factory_<version>.zip` as a
+    `GitHub release <https://github.com/sbuerk/data-factory/releases>`__, which
+    is the same artefact the TER receives. Upload it in the Extension Manager.
+
 ..  _TER: https://extensions.typo3.org/extension/data_factory
+
+..  note::
+
+    Composer mode is the supported way to install this extension. Seed sets are
+    discovered from the active packages of the installation either way, so
+    nothing about a set changes - but the two console commands are reached
+    through :file:`vendor/bin/typo3` in composer mode and through
+    :file:`typo3/sysext/core/bin/typo3` in classic mode.
 
 After the installation
 ======================
@@ -98,6 +108,10 @@ with an explanation rather than silent failures:
 See also
 ========
 
-*   :ref:`Configuration <configuration>` — the seed definition format and the
-    two commands
+*   :ref:`A complete seed set <configuration-complete-set>` — a whole set, with
+    what importing it writes
+*   :ref:`Configuration <configuration>` — the seed definition format, key by
+    key
+*   :ref:`The commands <configuration-commands>` — every option and every exit
+    code
 *   :ref:`Changelog <changelog>`

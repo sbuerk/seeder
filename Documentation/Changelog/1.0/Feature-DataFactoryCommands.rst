@@ -48,10 +48,11 @@ rather than guessing. The options are:
     *   -   :bash:`--no-site-config`
         -   Skip the site configurations the set declares.
 
-Every failure has an exit code of its own — unknown set, ambiguous set, invalid
-definition, uid collision, no administrator, failed write — so that a deployment
-script can tell "no such set" from "that would overwrite something" without
-parsing the output.
+Each kind of failure has its own exit code — unknown set, unresolvable set,
+invalid definition, uid collision, no administrator, failed write — so that a
+deployment script can tell "no such set" from "that would overwrite something"
+without parsing the output. The complete list is in the
+:ref:`Configuration <configuration-command-import>` chapter.
 
 Impact
 ======

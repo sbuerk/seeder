@@ -204,8 +204,8 @@ core version aware code is exactly where mistakes happen.
 | `Classes/`                      | No — must work on every supported version.                         |
 | `Core<major>/`                  | Yes — `Core12/` and `Core13/`.                                     |
 | `Build/phpstan/Core<major>/`    | Yes — separate config and baseline each, and two PHPStan majors.   |
-| `Tests/Unit/Core<major>/`       | Yes — grouped, see below.                                          |
-| `Tests/Functional/Core<major>/` | Yes — same grouping.                                               |
+| `Tests/Unit/Core<major>/`       | Yes — grouped, see below. None exists today.                       |
+| `Tests/Functional/Core<major>/` | Yes — same grouping. None exists today.                            |
 | `Build/phpunit/*.xml`           | No — one configuration for both.                                   |
 | `Configuration/`                | No — loaded from a fixed path, so a difference is applied in-file. |
 | `.github/workflows/ci.yml`      | No — the core version is a matrix dimension.                       |

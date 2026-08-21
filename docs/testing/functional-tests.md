@@ -99,6 +99,34 @@ and the run stopped there.
 Remember to run both core versions, each after the matching `composerUpdate` —
 see [Dual core setup](../development/dual-core-setup.md).
 
+### Debugging a failure
+
+- **Narrow it first.** `-- --filter '<Class>::<method>'` runs one method, and
+  `-- --stop-on-failure` stops at the first one instead of printing the rest.
+- **Attach a debugger with `-x`.** The wrapper sets `XDEBUG_MODE=debug` and
+  points xdebug at the host on port **9003**, which is what PhpStorm listens on
+  by default; `-y <port>` moves it. It applies to `functional`, `unit` and
+  `unitRandom` and is silently ignored by every other suite, so `-x -s phpstan`
+  looks like it worked and did nothing.
+
+  ```bash
+  Build/Scripts/runTests.sh -x -s functional -d sqlite -- --filter SomeTest
+  ```
+
+- **Do not reach for `var_dump()`.** `beStrictAboutOutputDuringTests` is on, so
+  output written during a test makes it risky and — with `failOnRisky` — failed.
+  The debug output buries the failure it was meant to explain under a second,
+  unrelated one. Use the debugger, or assert on the value.
+  → [Strictness policy](phpunit-configuration.md#strictness-policy)
+- **The SQLite database does not survive the run.** It lives under
+  `.Build/Web/typo3temp/var/tests/functional-sqlite-dbs/`, which the wrapper
+  removes, recreates and then mounts as a **tmpfs** — so the files exist only
+  inside the container and are gone when it exits. To look at the rows a test
+  wrote, run the same test with `-d mariadb -i 10.6` and inspect the database
+  container while it is still up.
+- **Read the first lines, not the last.** A wall of `Connection refused` is the
+  case above, and its real message is at the top of the output.
+
 ## The test that proves the instance boots
 
 [`Tests/Functional/ExtensionLoadedTest`](../../Tests/Functional/ExtensionLoadedTest.php)
@@ -185,8 +213,38 @@ Additionally:
 
 ## Core version aware functional tests
 
-Mirroring the source layout, they live in `Tests/Functional/Core12/` and
-`Tests/Functional/Core13/` and carry the group of the core version they must
+This branch has three core version aware seams — `FileImporter`,
+`SiteConfigurationWriter` and `SeedYamlFileLoader` — and **none** of them is
+tested this way. `Tests/Functional/Core12/` and `Tests/Functional/Core13/` do
+not exist; the three are covered by
+[`FileImporterTest`](../../Tests/Functional/Seeding/DataHandling/FileImporterTest.php),
+[`SiteConfigurationSeederTest`](../../Tests/Functional/Seeding/DataHandling/SiteConfigurationSeederTest.php)
+and
+[`SeedYamlFileLoaderTest`](../../Tests/Functional/Seeding/Parser/SeedYamlFileLoaderTest.php),
+each carrying **no** group at all and **computing** the expected implementation
+from `Typo3Version`:
+
+```php
+$this->assertSame(
+    sprintf(
+        'SBUERK\\DataFactory\\Core%d\\Seeding\\DataHandling\\FileImporter',
+        (new Typo3Version())->getMajorVersion(),
+    ),
+    $this->get(FileImporterInterface::class)::class,
+);
+```
+
+That is deliberate and is the shape to copy where it fits. What a version split
+promises is that **both** implementations keep the same behaviour, so a test
+restricted by a group can only ever prove it for the version it was written on,
+and the behaviour the split exists for goes unasserted on the other one. Two
+test classes would also have to be kept in step by hand.
+
+The grouped layout below is for the case that computation does not cover: a test
+whose *setup* or *assertion* cannot exist on the other core version — a class
+that is not there to reference, an API with no counterpart. Mirroring the source
+layout, such a test belongs in `Tests/Functional/Core12/` or
+`Tests/Functional/Core13/` and carries the group of the core version it must
 **not** run on:
 
 ```php

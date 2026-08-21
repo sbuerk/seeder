@@ -30,7 +30,25 @@ why `Classes/Seeding/Scenario/` has no counterpart below `Core12/` or `Core13/`.
 
 The version this branch resolves is `typo3/testing-framework` **8.3.3**, for
 `-t 12` and `-t 13` alike — the same package on both legs, which is what lets
-`UpstreamConformanceTest` compare against one upstream rather than two.
+`UpstreamConformanceTest` compare against one upstream rather than two. It is
+also the version the four `Build/phpunit/` files are baselined from, and the
+version every statement on this page was verified against, by reading
+`Classes/Core/Functional/Framework/DataHandling/Scenario/` below
+`.Build/vendor/typo3/testing-framework/`. **All nine divergences below are
+present in 8.3.3 verbatim**, at the same call sites, so the list does not change
+with the constraint.
+
+The code itself was ported from **9.6.1**, and that is the version the class
+docblocks and the divergence comments in `Classes/Seeding/Scenario/` name. The
+two upstream lines differ in these three classes only in how they are typed and
+written — 9.6.1 promotes constructor properties, narrows return types and adds
+one `property_exists($dataHandler, 'copyTree')` guard for TYPO3 v14, which is
+true on both versions this branch runs on. One row of the table below is
+therefore a difference against 9.6.1 and not against 8.3.3: 8.3.3 already spells
+`$workspaceId` as `int` on those two methods. (It gives `resolveDataMapPageId()`
+no parameter or return types at all; the port carries 9.6.1's.) None of the nine
+is affected. Raising or lowering the `typo3/testing-framework` constraint in
+`composer.json` means re-reading all of it.
 
 ## Why it is ported and not required
 
@@ -43,7 +61,7 @@ typo3/testing-framework 8.3.3 requires:
 ```
 
 `data-factory:import` runs in real installations. Moving that package into `require`
-would install PHPUnit on every site that seeds anything, and would pull four
+would install PHPUnit on every site that seeds anything, and would pull five
 sysexts in as hard runtime requirements. The classes themselves have no such
 problem — `DataHandlerFactory` imports **only** `Symfony\Component\Yaml\Yaml`,
 and `DataHandlerWriter` only `DataHandler`, `BackendUserAuthentication` and
@@ -51,9 +69,10 @@ and `DataHandlerWriter` only `DataHandler`, `BackendUserAuthentication` and
 `FunctionalTestCase`. They are a leaf that happens to sit in a test package.
 
 So the three classes — `DataHandlerFactory`, `DataHandlerWriter` and
-`EntityConfiguration`, 779 lines together — are ported into
-`SBUERK\DataFactory\Seeding\Scenario`, and `typo3/testing-framework` stays in
-`require-dev`.
+`EntityConfiguration`, 779 lines of upstream code — are ported into
+`SBUERK\DataFactory\Seeding\Scenario`, where the added array shape annotations
+and the divergence comments bring them to roughly 1,070, and
+`typo3/testing-framework` stays in `require-dev`.
 
 The cost of that decision is drift: upstream can change and we would not
 notice. That cost is paid by a test, see below.
@@ -62,21 +81,22 @@ notice. That cost is paid by a test, see below.
 
 Everything that is not listed here is unchanged.
 
-| Change                                                                                           | Why                                                                                                                                                    |
-|--------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Namespace `SBUERK\DataFactory\Seeding\Scenario`                                                  | It is our code now.                                                                                                                                    |
-| `final class`, `new self()` instead of `new static()`                                            | Repository rule; the classes were never subclassed upstream either.                                                                                    |
-| `#[Exclude]` on all three                                                                        | They are a builder, a writer and a value object — data, not services. Without it, directory based registration would pick them up.                     |
-| PHPStan level 8 array shapes throughout                                                          | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                              |
-| `?int $workspaceId` became `int $workspaceId` on two private methods                             | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input. |
-| The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. Upstream indexes a list of identifiers by an identifier.                                                                                    |
-| `resolveDataMapPageId()` resolves through the record's own table                                 | See below. Upstream hard-codes `pages`, which collapses the declared order of every other table.                                                       |
-| `{action: 'discard'}` emits `version`/`clearWSID` rather than the command `clearWSID`            | See below. Nothing handles the latter as a *command*, on either supported version.                                                                     |
-| `processEntityValues()` records a declared `id` in `$staticIdsPerEntity`                         | See below. Upstream declares the registry, reads it and never writes it.                                                                               |
-| `processVersionVariantItem()` reads the workspace from the declaration                           | See below. Upstream reads it from the processed values, which a `columnNames` remap empties.                                                           |
-| `DataHandlerWriter::__construct()` gained an optional third parameter                            | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                          |
-| `DataHandlerWriter::invokeFactory()` resets `DataHandler::$autoVersionIdMap` per workspace round | See below. Only observable for a scenario declaring more than one workspace.                                                                           |
-| `updateDataMap()` and `updateCommandMap()` keep the minus of a substituted `-NEW…`               | See below. Upstream returns the uid without the sign, turning a position into a page pointer.                                                          |
+| Change                                                                                           | Why                                                                                                                                                       |
+|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Namespace `SBUERK\DataFactory\Seeding\Scenario`                                                  | It is our code now.                                                                                                                                       |
+| `final class`, `new self()` instead of `new static()`                                            | Repository rule; the classes were never subclassed upstream either.                                                                                       |
+| `#[Exclude]` on all three                                                                        | They are a builder, a writer and a value object — data, not services. Without it, directory based registration would pick them up.                        |
+| PHPStan level 8 array shapes throughout                                                          | The baseline is empty and stays empty. No behaviour changed; only annotations were added.                                                                 |
+| `?int $workspaceId` became `int $workspaceId` on two private methods                             | Null was never passed by any call site, and a null array key would silently have become the empty string. Behaviour is identical for every real input.    |
+| The `elseif ($currentIndex > 0)` branch of `setInDataMap()` was fixed                            | See below. Upstream indexes a list of identifiers by an identifier.                                                                                       |
+| `assignValueInstructions()` spells the null offset out as `$value ?? ''`                         | See below. The key arrived at is unchanged; PHP 8.5 deprecates coercing a `null` array offset, and the 1.x line stops at 8.4 while the 2.x line does not. |
+| `resolveDataMapPageId()` resolves through the record's own table                                 | See below. Upstream hard-codes `pages`, which collapses the declared order of every other table.                                                          |
+| `{action: 'discard'}` emits `version`/`clearWSID` rather than the command `clearWSID`            | See below. Nothing handles the latter as a *command*, on either supported version.                                                                        |
+| `processEntityValues()` records a declared `id` in `$staticIdsPerEntity`                         | See below. Upstream declares the registry, reads it and never writes it.                                                                                  |
+| `processVersionVariantItem()` reads the workspace from the declaration                           | See below. Upstream reads it from the processed values, which a `columnNames` remap empties.                                                              |
+| `DataHandlerWriter::__construct()` gained an optional third parameter                            | See below. Additive: with its default, every existing call behaves byte for byte as upstream.                                                             |
+| `DataHandlerWriter::invokeFactory()` resets `DataHandler::$autoVersionIdMap` per workspace round | See below. Only observable for a scenario declaring more than one workspace.                                                                              |
+| `updateDataMap()` and `updateCommandMap()` keep the minus of a substituted `-NEW…`               | See below. Upstream returns the uid without the sign, turning a position into a page pointer.                                                             |
 
 The original TYPO3 file headers are kept. The code is GPL-2.0-or-later and so is
 this repository; dropping the header to make the files look native would be
