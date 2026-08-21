@@ -227,10 +227,10 @@ final class DataHandlerFactoryParsingTest extends UnitTestCase
     }
 
     /**
-     * Unlike the seed definition format of this extension, which refuses an
-     * unknown key, the scenario format ignores it silently. That is upstream
-     * behaviour and it is what the core fixtures rely on; it is pinned so the
-     * difference between the two formats is a decision and not a surprise.
+     * Unlike the set descriptor of this extension, which refuses an unknown
+     * key, the scenario format ignores it silently. That is upstream behaviour
+     * and it is what the core fixtures rely on; it is pinned so the difference
+     * between the two formats is a decision and not a surprise.
      */
     #[DataProvider('unknownTopLevelKeys')]
     #[Test]

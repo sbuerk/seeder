@@ -74,10 +74,9 @@ free, reports success, and every site configuration, TypoScript condition or
 test pointing at a root page by its number is wrong. That is exactly the class
 of failure this extension exists to avoid, so it is turned into a refusal.
 
-It bites harder with the scenario format than it did with the old record format,
-because **every** record of a scenario carries a suggested uid - a declared `id`
-or a dynamic one from 10000 upwards. There is no subset of a scenario that would
-survive a non-admin run intact.
+It bites hard, because **every** record of a scenario carries a suggested uid -
+a declared `id` or a dynamic one from 10000 upwards. There is no subset of a
+scenario that would survive a non-admin run intact.
 
 `ImportSeedCommand` asks the same question before the seeder does, which is what
 turns the exception into a sentence and an exit code of its own
@@ -118,19 +117,14 @@ A **language variant of a node entity** is given the same convention - a `pid`
 of `-<identifier of the original>` - so a translated page sits next to its
 original rather than at the top of the page tree.
 
-## Nothing is defaulted for the scenario any more
+## Nothing is defaulted for the scenario
 
-The record format this extension started with wrote four columns on the seeder's
-own initiative: `hidden = 0` on every record, and `doktype`, `l10n_parent` and
-`sys_language_uid` on every page, each only where the definition declared none.
-The reasoning was that *a seed should say what it writes* rather than inherit
-whatever the TCA of an installation happens to default to.
-
-The scenario format keeps that property and moves it: **the scenario says it**,
-in `entitySettings`, and this extension adds nothing. What the engine writes
-into a row is the suggested `uid`, the node pointer, the parent pointer and the
-sibling `pid`. Everything else comes from `defaultValues` and from the declared
-values, in that order.
+A seed should say what it writes rather than inherit whatever the TCA of an
+installation happens to default to - and in this format **the scenario says
+it**, in `entitySettings`. This extension adds nothing on its behalf. What the
+engine writes into a row is the suggested `uid`, the node pointer, the parent
+pointer and the sibling `pid`. Everything else comes from `defaultValues` and
+from the declared values, in that order.
 
 Two consequences reach an integrator, and both are stated on
 [Seed definitions](../development/seed-definitions.md#hidden-is-not-defaulted-for-you):
@@ -153,7 +147,7 @@ though the hook does nothing afterwards. It is unguarded on v13.4 and `?? 0` on
 v14.3. On v13.4, exactly one TCA override removing the enrichment default
 therefore separates a seeded page from an `Undefined array key` warning - which
 this test suite turns into a failure. A scenario that declares `l10n_parent: 0`
-in its `'*'` defaults is immune; this extension no longer declares it on the
+in its `'*'` defaults is immune; this extension does not declare it on the
 scenario's behalf.
 
 ## Suggested uids need both halves
@@ -413,10 +407,9 @@ Three properties of that layout are worth naming because they are easy to erode:
 - **`Definition/` depends on nothing.** No service, no TYPO3 API, no other part
   of this extension - which is what would let the descriptor model be extracted
   into a package of its own later. It models the *set*, not its records, which is
-  why `SeedRecord` went away with the record format and did not come back.
-  `SeedFileReference` did come back, and it is not a counter example: it declares
-  which seeded *file* hangs on which record, which is a statement about the set
-  and not a record of a scenario.
+  why it holds no record type at all. `SeedFileReference` is not a counter
+  example: it declares which seeded *file* hangs on which record, which is a
+  statement about the set and not a record of a scenario.
 - **`Scenario/` is a boundary.** Three of its four classes are upstream's and
   are held to what upstream does by a conformance test, minus a written list of
   divergences that fix upstream defects; anything this extension *invents*

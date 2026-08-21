@@ -533,8 +533,7 @@ The `pages` TCA ships `$GLOBALS['TCA']['pages']['columns']['hidden']['config']['
 `hidden` value is **hidden**. `tt_content` and the tables enriched by
 `TcaEnrichment::enrichDisabledField()` default to `0`.
 
-Nothing in this extension overrides that any more. The old record format wrote
-`hidden = 0` unless a record said otherwise; a scenario has to say so itself,
+Nothing in this extension overrides that. A scenario has to say so itself,
 which is why every TYPO3 Core scenario carries `defaultValues: {hidden: 0}` on
 its `'*'` entity. A seeded tree that exists and renders nothing is almost always
 this.
