@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
-use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileImporterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Definition\SeedFile;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\DataFactory\Seeding\Parser\SeedYamlFileLoaderInterface;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -44,7 +44,7 @@ final class FileSeedingTest extends AbstractFunctionalTestCase
      * `source` relative to the directory holding the set has nothing to resolve
      * against otherwise.
      */
-    private const SEED = 'EXT:seeder/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml';
+    private const SEED = 'EXT:data_factory/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml';
 
     /**
      * The test instance is created once for the **whole test case** and only

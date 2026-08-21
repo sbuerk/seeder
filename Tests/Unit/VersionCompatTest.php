@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit;
+namespace SBUERK\DataFactory\Tests\Unit;
 
-use SBUERK\Seeder\Tests\ExtensionCoreVersionCompatTestsTrait;
+use SBUERK\DataFactory\Tests\ExtensionCoreVersionCompatTestsTrait;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**

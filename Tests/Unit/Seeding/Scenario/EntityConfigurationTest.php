@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Scenario;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Scenario;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Scenario\EntityConfiguration;
+use SBUERK\DataFactory\Seeding\Scenario\EntityConfiguration;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;
 
 /**
@@ -92,7 +92,7 @@ final class EntityConfigurationTest extends UnitTestCase
      * falsy declaration is therefore not applied and not reported either - the
      * configuration behaves as if the key had never been written. Worth pinning
      * because `nodeColumnName` and `parentColumnName` staying NULL is what
-     * makes {@see \SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory} skip the
+     * makes {@see \SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory} skip the
      * pointer assignment entirely.
      *
      * @param array<string, mixed> $settings

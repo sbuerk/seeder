@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Exception;
+namespace SBUERK\DataFactory\Seeding\Exception;
 
 /**
  * Thrown when more than one active package provides a seed set with the same
@@ -13,7 +13,7 @@ namespace SBUERK\Seeder\Seeding\Exception;
  * meant it, and picking one silently means an integrator seeds something other
  * than what they asked for without anything saying so. The message therefore
  * names every provider, and the caller decides what to do about it - which for
- * `seeder:list` is to report and exit non-zero, and for a lookup by identifier
+ * `data-factory:list` is to report and exit non-zero, and for a lookup by identifier
  * is to refuse.
  *
  * @internal Part of the seeding implementation, not public API.

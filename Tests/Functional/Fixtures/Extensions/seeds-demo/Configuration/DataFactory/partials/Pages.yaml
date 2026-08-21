@@ -1,5 +1,5 @@
 #
-# A directory below "Configuration/Seeder/" without a "config.yml" is not a
+# A directory below "Configuration/DataFactory/" without a "config.yml" is not a
 # seed set and is passed over by discovery. This one exists to keep that true:
 # a set that grows out of one file puts its parts next to itself, and the
 # discovery test asserts that this extension provides two sets, not three.

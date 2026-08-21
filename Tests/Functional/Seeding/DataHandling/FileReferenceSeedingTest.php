@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\DataHandling\FileImporterInterface;
-use SBUERK\Seeder\Seeding\DataHandling\FileReferenceSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\FileSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
-use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\DataHandling\FileImporterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\FileReferenceSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\FileSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeedResult;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Definition\SeedFile;
+use SBUERK\DataFactory\Seeding\Definition\SeedFileReference;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\DataFactory\Seeding\Parser\SeedYamlFileLoaderInterface;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -49,10 +49,10 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
      * a key of `config.yml`, and what is under test is a set declaring it the
      * way an extension ships it.
      */
-    private const SEED = 'EXT:seeder/Tests/Functional/Fixtures/Seeds/FileReferenceSeeding.yaml';
+    private const SEED = 'EXT:data_factory/Tests/Functional/Fixtures/Seeds/FileReferenceSeeding.yaml';
 
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         __DIR__ . '/../../Fixtures/Extensions/file-fields',
     ];
 
@@ -226,7 +226,7 @@ final class FileReferenceSeedingTest extends AbstractFunctionalTestCase
     public function aSetWithoutReferencesWritesNone(): void
     {
         $definition = $this->parser()->parseFile(
-            'EXT:seeder/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml',
+            'EXT:data_factory/Tests/Functional/Fixtures/Seeds/FileSeeding.yaml',
         );
 
         $result = $this->seed($definition);

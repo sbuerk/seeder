@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\Parser;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\Parser;
 
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Log\NullLogger;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
-use SBUERK\Seeder\Seeding\Parser\ThrowOnErrorLogger;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Parser\SeedYamlFileLoaderInterface;
+use SBUERK\DataFactory\Seeding\Parser\ThrowOnErrorLogger;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlParseException;
 use TYPO3\CMS\Core\Information\Typo3Version;
 
@@ -41,12 +41,12 @@ use TYPO3\CMS\Core\Information\Typo3Version;
  *
  * The behaviour *around* the loader - which flags a caller asks for, and what it
  * makes of the result - is covered where those callers are:
- * {@see \SBUERK\Seeder\Tests\Unit\Seeding\Parser\SeedDefinitionParserTest} and
- * {@see \SBUERK\Seeder\Tests\Functional\Seeding\DataHandling\SiteConfigurationSeederTest}.
+ * {@see \SBUERK\DataFactory\Tests\Unit\Seeding\Parser\SeedDefinitionParserTest} and
+ * {@see \SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling\SiteConfigurationSeederTest}.
  */
 final class SeedYamlFileLoaderTest extends AbstractFunctionalTestCase
 {
-    private const FIXTURES = 'EXT:seeder/Tests/Functional/Fixtures/Yaml/';
+    private const FIXTURES = 'EXT:data_factory/Tests/Functional/Fixtures/Yaml/';
 
     /**
      * The code TYPO3 raises for a file that parses to something other than a
@@ -70,7 +70,7 @@ final class SeedYamlFileLoaderTest extends AbstractFunctionalTestCase
         $this->assertInstanceOf(SeedYamlFileLoaderInterface::class, $loader);
         $this->assertSame(
             sprintf(
-                'SBUERK\\Seeder\\Core%d\\Seeding\\Parser\\SeedYamlFileLoader',
+                'SBUERK\\DataFactory\\Core%d\\Seeding\\Parser\\SeedYamlFileLoader',
                 (new Typo3Version())->getMajorVersion(),
             ),
             $loader::class,

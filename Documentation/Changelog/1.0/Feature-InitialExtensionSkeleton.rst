@@ -1,6 +1,6 @@
 ..  include:: /Includes.rst.txt
 
-..  _feature-initial-seeder:
+..  _feature-initial-data-factory:
 
 ===================================
 Feature: Initial extension skeleton
@@ -9,7 +9,7 @@ Feature: Initial extension skeleton
 Description
 ===========
 
-Initial skeleton of the ``sbuerk/seeder`` extension, providing the
+Initial skeleton of the ``sbuerk/data-factory`` extension, providing the
 project setup the actual implementation is built on:
 
 *   TYPO3 v12.4 and v13.4 support on PHP 8.1 up to 8.4 - PHP 8.1 for TYPO3 v12

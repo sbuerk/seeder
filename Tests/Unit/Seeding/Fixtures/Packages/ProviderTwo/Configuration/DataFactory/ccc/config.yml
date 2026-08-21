@@ -1,5 +1,5 @@
 #
-# Declares the identifier of "ProviderOne/Configuration/Seeder/aaa" a second
+# Declares the identifier of "ProviderOne/Configuration/DataFactory/aaa" a second
 # time, from a second package.
 #
 identifier: zulu

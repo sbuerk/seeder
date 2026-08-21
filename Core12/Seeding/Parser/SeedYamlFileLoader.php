@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Core12\Seeding\Parser;
+namespace SBUERK\DataFactory\Core12\Seeding\Parser;
 
 use Psr\Log\LoggerInterface;
-use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
+use SBUERK\DataFactory\Seeding\Parser\SeedYamlFileLoaderInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
@@ -28,7 +28,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * and be discarded, leaving `$this->logger` `null`, and a failing `imports`
  * entry would then fatal in `$this->logger->error()` (12.4:
  * YamlFileLoader.php:171) instead of being raised by
- * {@see \SBUERK\Seeder\Seeding\Parser\ThrowOnErrorLogger}.
+ * {@see \SBUERK\DataFactory\Seeding\Parser\ThrowOnErrorLogger}.
  *
  * ## 2. An empty file is answered before the loader sees it
  *
@@ -43,7 +43,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * `settings.yaml` holding a bare string is a broken template on v13 as well and
  * has to stay an error. Reading and parsing the file twice is the price, it is
  * paid only for a file the caller declared optional, and
- * {@see \SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder} is the only
+ * {@see \SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeeder} is the only
  * caller that does.
  *
  * `getFileContents()` of the loader is mirrored exactly, empty string for an

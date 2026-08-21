@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Parser;
+namespace SBUERK\DataFactory\Seeding\Parser;
 
 use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlFileLoadingException;

@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Command;
+namespace SBUERK\DataFactory\Tests\Functional\Command;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Command\ImportSeedCommand;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Command\ImportSeedCommand;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
- * How `seeder:import` decides *what* to import, and how it refuses.
+ * How `data-factory:import` decides *what* to import, and how it refuses.
  *
  * These are the six reasons the command exists in this shape rather than in the
  * shape of the one it is extracted from: a missing identifier is a question and
@@ -24,7 +24,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 final class ImportSeedCommandSelectionTest extends AbstractFunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/seeds-import',
         'tests/file-fields',
     ];
@@ -58,7 +58,7 @@ final class ImportSeedCommandSelectionTest extends AbstractFunctionalTestCase
         $display = $this->normalize($commandTester->getDisplay());
         $this->assertStringContainsString('there is no terminal to ask on', $display);
         $this->assertStringContainsString('import-full - Everything the importer writes', $display);
-        $this->assertStringContainsString('seeder:import <identifier>', $display);
+        $this->assertStringContainsString('data-factory:import <identifier>', $display);
         $this->assertSame(0, $this->countPages());
     }
 
@@ -98,7 +98,7 @@ final class ImportSeedCommandSelectionTest extends AbstractFunctionalTestCase
         $this->assertSame(ImportSeedCommand::EXIT_UNKNOWN_SET, $commandTester->getStatusCode());
         $display = $this->normalize($commandTester->getDisplay());
         $this->assertStringNotContainsString('Did you mean', $display);
-        $this->assertStringContainsString('seeder:list', $display);
+        $this->assertStringContainsString('data-factory:list', $display);
     }
 
     /**

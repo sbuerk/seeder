@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Seeding\Scenario;
+namespace SBUERK\DataFactory\Tests\Functional\Seeding\Scenario;
 
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerWriter;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerWriter;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
@@ -53,7 +53,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * written at all. The per workspace loop is covered here for the round it can
  * run - the clone of the backend user is asserted on the live workspace - and
  * what needs more than one round is covered by
- * {@see \SBUERK\Seeder\Tests\Functional\Seeding\DataHandling\WorkspaceSeedingTest},
+ * {@see \SBUERK\DataFactory\Tests\Functional\Seeding\DataHandling\WorkspaceSeedingTest},
  * which loads the extension and pays the setup cost once.
  */
 final class DataHandlerWriterTest extends AbstractFunctionalTestCase
@@ -495,7 +495,7 @@ final class DataHandlerWriterTest extends AbstractFunctionalTestCase
     /**
      * A held back suggestion is not a record that is skipped: the row is still
      * written, DataHandler just assigns the uid instead of honouring the
-     * declared one. That is what `seeder:import --force` needs - the uid of a
+     * declared one. That is what `data-factory:import --force` needs - the uid of a
      * table this installation already uses has to be given up, and giving up
      * the record would mean importing half a set.
      */

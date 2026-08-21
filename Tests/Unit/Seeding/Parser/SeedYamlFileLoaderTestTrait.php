@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Unit\Seeding\Parser;
+namespace SBUERK\DataFactory\Tests\Unit\Seeding\Parser;
 
-use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
+use SBUERK\DataFactory\Seeding\Parser\SeedYamlFileLoaderInterface;
 use TYPO3\CMS\Core\Information\Typo3Version;
 
 /**
@@ -21,7 +21,7 @@ use TYPO3\CMS\Core\Information\Typo3Version;
  * single `new`.
  *
  * The class name is **computed** rather than referenced, which is not cosmetic:
- * naming `\SBUERK\Seeder\Core13\Seeding\Parser\SeedYamlFileLoader` here would
+ * naming `\SBUERK\DataFactory\Core13\Seeding\Parser\SeedYamlFileLoader` here would
  * make PHPStan reflect it while analysing the v12 leg, and its v13 only
  * constructor argument types would be reported as missing classes. Both
  * directories are on the composer autoload path on both versions, so the string
@@ -36,7 +36,7 @@ trait SeedYamlFileLoaderTestTrait
     private function seedYamlFileLoader(): SeedYamlFileLoaderInterface
     {
         $className = sprintf(
-            'SBUERK\\Seeder\\Core%d\\Seeding\\Parser\\SeedYamlFileLoader',
+            'SBUERK\\DataFactory\\Core%d\\Seeding\\Parser\\SeedYamlFileLoader',
             (new Typo3Version())->getMajorVersion(),
         );
 

@@ -33,12 +33,12 @@ up afterwards, start at :ref:`A complete seed set <configuration-complete-set>`.
 Where a seed set lives
 ======================
 
-A seed set is a directory :file:`Configuration/Seeder/<name>/` inside any
+A seed set is a directory :file:`Configuration/DataFactory/<name>/` inside any
 active extension, with :file:`config.yml` as its entry file:
 
 ..  code-block:: none
 
-    packages/my_extension/Configuration/Seeder/demo/
+    packages/my_extension/Configuration/DataFactory/demo/
     ├── config.yml               entry file, and the only mandatory one
     ├── Scenario/
     │   ├── Pages.yaml           the records, named by "scenarios"
@@ -60,7 +60,7 @@ absolute path is taken as it stands.
 
 A set is found because the extension providing it is installed and activated.
 There is no path to configure and nothing to register. A directory below
-:file:`Configuration/Seeder/` without a :file:`config.yml` is not a set and is
+:file:`Configuration/DataFactory/` without a :file:`config.yml` is not a set and is
 passed over, which is what lets a set keep partials next to itself.
 
 ..  _configuration-set-level:
@@ -69,7 +69,7 @@ The set descriptor
 ==================
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     identifier: demo
     title: 'Demo page tree'
@@ -111,7 +111,7 @@ The set descriptor
             extensions would be silent.
     *   -   :yaml:`title`
         -   yes
-        -   Shown by :bash:`seeder:list`.
+        -   Shown by :bash:`data-factory:list`.
     *   -   :yaml:`description`
         -   no
         -   Free text describing the set.
@@ -296,7 +296,7 @@ entities
 --------
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/Scenario/Pages.yaml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/Scenario/Pages.yaml
 
     entities:
       page:
@@ -364,7 +364,7 @@ declare an :ref:`actions <configuration-actions>` entry with
     misspelled :yaml:`childern:` writes nothing and reports nothing. Only
     :file:`config.yml` refuses an unknown key.
 
-    A dry run is the cheapest guard against that: :bash:`seeder:import demo
+    A dry run is the cheapest guard against that: :bash:`data-factory:import demo
     --dry-run -v` lists every record the scenario builds, per table and with
     its uid.
 
@@ -852,7 +852,7 @@ A worked example
 ----------------
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/config.yml
 
     identifier: demo
     title: 'A content element with two images'
@@ -884,7 +884,7 @@ A worked example
         field: media
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/demo/Scenario.yaml
+    :caption: packages/my_extension/Configuration/DataFactory/demo/Scenario.yaml
 
     entitySettings:
       '*':
@@ -1002,7 +1002,7 @@ files on disk - so what is shown is what runs.
 
 ..  code-block:: none
 
-    packages/my_extension/Configuration/Seeder/complete/
+    packages/my_extension/Configuration/DataFactory/complete/
     ├── config.yml
     ├── Scenario.yaml
     ├── Files/
@@ -1012,7 +1012,7 @@ files on disk - so what is shown is what runs.
             └── config.yaml
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/complete/config.yml
+    :caption: packages/my_extension/Configuration/DataFactory/complete/config.yml
 
     identifier: import-documented
     title: 'A complete seed set'
@@ -1041,7 +1041,7 @@ files on disk - so what is shown is what runs.
         template: Sites/main
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/complete/Scenario.yaml
+    :caption: packages/my_extension/Configuration/DataFactory/complete/Scenario.yaml
 
     entitySettings:
       '*':
@@ -1073,7 +1073,7 @@ files on disk - so what is shown is what runs.
                       - self: {id: 2101, title: 'DE: Über uns', language: 1, type: 'header'}
 
 ..  code-block:: yaml
-    :caption: packages/my_extension/Configuration/Seeder/complete/Sites/main/config.yaml
+    :caption: packages/my_extension/Configuration/DataFactory/complete/Sites/main/config.yaml
 
     rootPageId: 0
     base: 'https://documented.example.org/'
@@ -1093,7 +1093,7 @@ files on disk - so what is shown is what runs.
     errorHandling: []
     routes: []
 
-Importing it with :bash:`vendor/bin/typo3 seeder:import import-documented`
+Importing it with :bash:`vendor/bin/typo3 data-factory:import import-documented`
 writes, in this order:
 
 *   the file :file:`placeholder.svg` into :file:`fileadmin/documented/`, indexed
@@ -1131,7 +1131,7 @@ The descriptor: imports
 
     imports:
       - { resource: Files.yaml }
-      - { resource: 'EXT:my_extension/Configuration/Seeder/shared/Sites.yaml' }
+      - { resource: 'EXT:my_extension/Configuration/DataFactory/shared/Sites.yaml' }
 
 :yaml:`imports` is handled by the loader TYPO3 reads its own site
 configurations with. Imported lists are **merged** into the importing file
@@ -1156,7 +1156,7 @@ The records: several scenarios
     scenarios:
       - Scenario/Pages.yaml
       - Scenario/Content.yaml
-      - 'EXT:my_extension/Configuration/Seeder/shared/Categories.yaml'
+      - 'EXT:my_extension/Configuration/DataFactory/shared/Categories.yaml'
 
 The listed files are composed into **one** scenario before anything is built,
 in the order they are declared:
@@ -1210,13 +1210,13 @@ The commands
 
 ..  _configuration-command-list:
 
-seeder:list
------------
+data-factory:list
+-----------------
 
 ..  code-block:: bash
 
-    vendor/bin/typo3 seeder:list
-    vendor/bin/typo3 seeder:list -v
+    vendor/bin/typo3 data-factory:list
+    vendor/bin/typo3 data-factory:list -v
 
 Lists identifier, title and providing extension of every set found. :bash:`-v`
 adds the directory the set lives in. Sets appear in the order the installation
@@ -1229,14 +1229,14 @@ itself. An installation without any seed set is not an error.
 
 ..  _configuration-command-import:
 
-seeder:import
--------------
+data-factory:import
+-------------------
 
 ..  code-block:: bash
 
-    vendor/bin/typo3 seeder:import demo
-    vendor/bin/typo3 seeder:import demo --dry-run -v
-    vendor/bin/typo3 seeder:import demo --base='https://example.com/'
+    vendor/bin/typo3 data-factory:import demo
+    vendor/bin/typo3 data-factory:import demo --dry-run -v
+    vendor/bin/typo3 data-factory:import demo --base='https://example.com/'
 
 Without an identifier the command asks which set to import. Without a terminal
 to ask on - a deployment script, a pipeline, a hook - it lists the available

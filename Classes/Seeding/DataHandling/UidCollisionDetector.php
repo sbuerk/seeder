@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Seeding\DataHandling;
 
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -45,7 +45,7 @@ final class UidCollisionDetector
     /**
      * @param array<string, true> $suggestedUids The uids of the run, keyed
      *        `<table>:<uid>` - what
-     *        {@see \SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory::getSuggestedIds()}
+     *        {@see \SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory::getSuggestedIds()}
      *        returns and `DataHandler::$suggestedInsertUids` is handed. Taking
      *        the check from there rather than from the scenario file is
      *        deliberate: what is checked is then literally what will be

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional\Command;
+namespace SBUERK\DataFactory\Tests\Functional\Command;
 
 use PHPUnit\Framework\Attributes\Test;
-use SBUERK\Seeder\Command\ImportSeedCommand;
-use SBUERK\Seeder\Tests\Functional\AbstractFunctionalTestCase;
+use SBUERK\DataFactory\Command\ImportSeedCommand;
+use SBUERK\DataFactory\Tests\Functional\AbstractFunctionalTestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\CMS\Core\Core\Environment;
@@ -36,7 +36,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 final class DocumentedSeedSetTest extends AbstractFunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
         'tests/seeds-import',
     ];
 
@@ -45,8 +45,8 @@ final class DocumentedSeedSetTest extends AbstractFunctionalTestCase
      * the directory of the set, relative to the repository root.
      */
     private const DOCUMENTATION = 'Documentation/Configuration/Index.rst';
-    private const CAPTION_PREFIX = 'packages/my_extension/Configuration/Seeder/complete/';
-    private const SET = 'Tests/Functional/Fixtures/Extensions/seeds-import/Configuration/Seeder/documented';
+    private const CAPTION_PREFIX = 'packages/my_extension/Configuration/DataFactory/complete/';
+    private const SET = 'Tests/Functional/Fixtures/Extensions/seeds-import/Configuration/DataFactory/documented';
 
     protected function setUp(): void
     {

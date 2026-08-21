@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Core13\Seeding\Parser;
+namespace SBUERK\DataFactory\Core13\Seeding\Parser;
 
 use Psr\Log\LoggerInterface;
-use SBUERK\Seeder\Seeding\Parser\SeedYamlFileLoaderInterface;
+use SBUERK\DataFactory\Seeding\Parser\SeedYamlFileLoaderInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader;
 
@@ -21,7 +21,7 @@ use TYPO3\CMS\Core\Configuration\Loader\YamlFileLoader;
  *
  * The loader is constructed rather than injected although v13 registers it as a
  * container service: the logger is per file, because
- * {@see \SBUERK\Seeder\Seeding\Parser\ThrowOnErrorLogger} carries the name of
+ * {@see \SBUERK\DataFactory\Seeding\Parser\ThrowOnErrorLogger} carries the name of
  * the file being read into its message. The container instance is wired with
  * the system logger and would swallow exactly what this extension needs raised.
  *

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Tests\Functional;
+namespace SBUERK\DataFactory\Tests\Functional;
 
 use SBUERK\TYPO3\Testing\TestCase\FunctionalTestCase;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 abstract class AbstractFunctionalTestCase extends FunctionalTestCase
 {
     protected array $testExtensionsToLoad = [
-        'sbuerk/seeder',
+        'sbuerk/data-factory',
     ];
 
     protected function setUp(): void
@@ -48,7 +48,7 @@ abstract class AbstractFunctionalTestCase extends FunctionalTestCase
      * supported core versions, so an unset global is a `TypeError` and not a
      * missing label.
      *
-     * Nothing in production hits that: a seed runs through `seeder:import`, and
+     * Nothing in production hits that: a seed runs through `data-factory:import`, and
      * `TYPO3\CMS\Core\Console\CommandApplication::run()` sets the same global
      * from the same factory - byte identical on 12.4 and 13.4 - before a
      * command is dispatched. A functional test invokes the command through

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Exception;
+namespace SBUERK\DataFactory\Seeding\Exception;
 
 /**
  * Base class of every failure this extension raises while reading, validating

@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Command;
+namespace SBUERK\DataFactory\Command;
 
-use SBUERK\Seeder\Seeding\DataHandling\OccupiedUid;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\ScenarioSeedResult;
-use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder;
-use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeedResult;
-use SBUERK\Seeder\Seeding\DataHandling\UidCollisionDetector;
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
-use SBUERK\Seeder\Seeding\Exception\SeedingException;
-use SBUERK\Seeder\Seeding\Exception\SeedingFailedException;
-use SBUERK\Seeder\Seeding\Exception\SeedSetNotFoundException;
-use SBUERK\Seeder\Seeding\Parser\SeedDefinitionParser;
-use SBUERK\Seeder\Seeding\Scenario\DataHandlerFactory;
-use SBUERK\Seeder\Seeding\Scenario\ScenarioComposer;
-use SBUERK\Seeder\Seeding\SeedSet;
-use SBUERK\Seeder\Seeding\SeedSetRepository;
+use SBUERK\DataFactory\Seeding\DataHandling\OccupiedUid;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\ScenarioSeedResult;
+use SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeeder;
+use SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeedResult;
+use SBUERK\DataFactory\Seeding\DataHandling\UidCollisionDetector;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Definition\SeedSiteConfiguration;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedDefinitionNotFoundException;
+use SBUERK\DataFactory\Seeding\Exception\SeedingException;
+use SBUERK\DataFactory\Seeding\Exception\SeedingFailedException;
+use SBUERK\DataFactory\Seeding\Exception\SeedSetNotFoundException;
+use SBUERK\DataFactory\Seeding\Parser\SeedDefinitionParser;
+use SBUERK\DataFactory\Seeding\Scenario\DataHandlerFactory;
+use SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer;
+use SBUERK\DataFactory\Seeding\SeedSet;
+use SBUERK\DataFactory\Seeding\SeedSetRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -81,7 +81,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * @internal Part of the seeding implementation, not public API.
  */
 #[AsCommand(
-    name: 'seeder:import',
+    name: 'data-factory:import',
     description: 'Imports a seed set into this installation.',
 )]
 final class ImportSeedCommand extends Command
@@ -185,7 +185,7 @@ final class ImportSeedCommand extends Command
             . ' relations, the reference index and the file index are what they would be after an'
             . ' editor had entered the same content.' . PHP_EOL . PHP_EOL
             . 'Without an identifier the command asks which set to import; without a terminal to ask'
-            . ' on it lists the available sets and exits non-zero. "seeder:list" shows the same list.'
+            . ' on it lists the available sets and exits non-zero. "data-factory:list" shows the same list.'
             . PHP_EOL . PHP_EOL
             . 'A seed set suggests the uid of every record it writes - the "id" its scenario declares,'
             . ' or one handed out from 10000 upwards - which is what makes a seeded page tree'
@@ -547,7 +547,7 @@ final class ImportSeedCommand extends Command
                 array_keys($choices),
                 array_values($choices),
             ));
-            $io->writeln('Pass one of them: <info>seeder:import <identifier></info>');
+            $io->writeln('Pass one of them: <info>data-factory:import <identifier></info>');
             return null;
         }
 
@@ -595,7 +595,7 @@ final class ImportSeedCommand extends Command
         }
 
         if ($candidates === []) {
-            $io->writeln('Run <info>seeder:list</info> to see the seed sets this installation provides.');
+            $io->writeln('Run <info>data-factory:list</info> to see the seed sets this installation provides.');
             return;
         }
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Scenario;
+namespace SBUERK\DataFactory\Seeding\Scenario;
 
 /*
  * This file is part of the TYPO3 CMS project.

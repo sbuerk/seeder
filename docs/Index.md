@@ -11,13 +11,13 @@ Documentation for people **using** the extension lives in
 
 ## [Development](development/Index.md)
 
-| Page                                                  | Contents                                                                     |
-|-------------------------------------------------------|------------------------------------------------------------------------------|
-| [Development environment](development/environment.md) | `runTests.sh`, container runtimes, suites and options.                       |
-| [Dual core setup](development/dual-core-setup.md)     | Running against TYPO3 v12 and v13, and the rule that avoids false positives. |
-| [Quality gates](development/quality-gates.md)         | Every gate and its configuration, PHPStan per core version, CI.              |
-| [Seed definitions](development/seed-definitions.md)   | `config.yml` and the testing-framework scenario format, key by key.          |
-| [Seed sets and the CLI](development/seed-sets.md)     | Discovery, ordering, `imports`, `seeder:list` and `seeder:import`.           |
+| Page                                                  | Contents                                                                       |
+|-------------------------------------------------------|--------------------------------------------------------------------------------|
+| [Development environment](development/environment.md) | `runTests.sh`, container runtimes, suites and options.                         |
+| [Dual core setup](development/dual-core-setup.md)     | Running against TYPO3 v12 and v13, and the rule that avoids false positives.   |
+| [Quality gates](development/quality-gates.md)         | Every gate and its configuration, PHPStan per core version, CI.                |
+| [Seed definitions](development/seed-definitions.md)   | `config.yml` and the testing-framework scenario format, key by key.            |
+| [Seed sets and the CLI](development/seed-sets.md)     | Discovery, ordering, `imports`, `data-factory:list` and `data-factory:import`. |
 
 ## [Architecture](architecture/Index.md)
 

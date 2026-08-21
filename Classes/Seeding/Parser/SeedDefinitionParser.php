@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Seeding\Parser;
+namespace SBUERK\DataFactory\Seeding\Parser;
 
-use SBUERK\Seeder\Seeding\Definition\SeedDefinition;
-use SBUERK\Seeder\Seeding\Definition\SeedFile;
-use SBUERK\Seeder\Seeding\Definition\SeedFileReference;
-use SBUERK\Seeder\Seeding\Definition\SeedSiteConfiguration;
-use SBUERK\Seeder\Seeding\Exception\InvalidSeedDefinitionException;
-use SBUERK\Seeder\Seeding\Exception\SeedDefinitionNotFoundException;
+use SBUERK\DataFactory\Seeding\Definition\SeedDefinition;
+use SBUERK\DataFactory\Seeding\Definition\SeedFile;
+use SBUERK\DataFactory\Seeding\Definition\SeedFileReference;
+use SBUERK\DataFactory\Seeding\Definition\SeedSiteConfiguration;
+use SBUERK\DataFactory\Seeding\Exception\InvalidSeedDefinitionException;
+use SBUERK\DataFactory\Seeding\Exception\SeedDefinitionNotFoundException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlFileLoadingException;
 use TYPO3\CMS\Core\Configuration\Loader\Exception\YamlParseException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -40,7 +40,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * The records live in the files named under `scenarios`, in the YAML scenario
  * format of `typo3/testing-framework`, and are read by
- * {@see \SBUERK\Seeder\Seeding\Scenario\ScenarioComposer}. Keeping the two
+ * {@see \SBUERK\DataFactory\Seeding\Scenario\ScenarioComposer}. Keeping the two
  * apart is what makes the rule of the scenario format - "the file is the
  * contract, and every key of it is upstream's" - hold: nothing this extension
  * adds is mixed into a scenario file, and nothing a scenario file declares has

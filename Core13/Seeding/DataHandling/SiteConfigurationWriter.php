@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SBUERK\Seeder\Core13\Seeding\DataHandling;
+namespace SBUERK\DataFactory\Core13\Seeding\DataHandling;
 
-use SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationWriterInterface;
+use SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationWriterInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 
@@ -39,7 +39,7 @@ use TYPO3\CMS\Core\Configuration\SiteWriter;
  *
  * @todo Remove together with {@see SiteConfigurationWriterInterface} when TYPO3
  *       v12 support is dropped, and inject `SiteWriter` back into
- *       {@see \SBUERK\Seeder\Seeding\DataHandling\SiteConfigurationSeeder}.
+ *       {@see \SBUERK\DataFactory\Seeding\DataHandling\SiteConfigurationSeeder}.
  *
  * @internal Part of the seeding implementation, not public API.
  */

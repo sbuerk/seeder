@@ -1,4 +1,4 @@
-# TYPO3 extension `seeder`
+# TYPO3 extension `data_factory`
 
 Seeds a TYPO3 installation - pages, content elements, records of any table,
 the relations between them, files, the references attaching those files to
@@ -8,9 +8,9 @@ of being clicked together by hand. The records are written in the **scenario
 format** of `typo3/testing-framework`, the one TYPO3 Core's own functional
 tests are written in.
 
-- **Package name**: `sbuerk/seeder`
-- **Extension key**: `seeder`
-- **Repository**: https://github.com/sbuerk/seeder
+- **Package name**: `sbuerk/data-factory`
+- **Extension key**: `data_factory`
+- **Repository**: https://github.com/sbuerk/data-factory
 - **License**: GPL-2.0-or-later
 
 > [!IMPORTANT]
@@ -20,12 +20,12 @@ tests are written in.
 
 ## What it does
 
-| Command                      | Purpose                                                                 |
-|------------------------------|-------------------------------------------------------------------------|
-| `seeder:list`                | List every discovered seed set: identifier, title, providing extension. |
-| `seeder:import <identifier>` | Import one seed set into the installation.                              |
+| Command                            | Purpose                                                                 |
+|------------------------------------|-------------------------------------------------------------------------|
+| `data-factory:list`                | List every discovered seed set: identifier, title, providing extension. |
+| `data-factory:import <identifier>` | Import one seed set into the installation.                              |
 
-A **seed set** is a directory `Configuration/Seeder/<name>/` in any active
+A **seed set** is a directory `Configuration/DataFactory/<name>/` in any active
 package, with `config.yml` as its entry point. Discovery walks the active
 packages, so an extension carries the data it needs with it and nothing has to
 be registered anywhere. Every path inside a set is resolved relative to that
@@ -58,7 +58,7 @@ Everything is written through the TYPO3 `DataHandler` rather than through
 direct database inserts, so slugs, TCA defaults and evaluations, `sorting`, the
 reference index and the cache flush all happen the way they do for an editor.
 
-`seeder:import` takes `--dry-run` to validate and report without writing,
+`data-factory:import` takes `--dry-run` to validate and report without writing,
 `--force` to import although the set suggests uids the installation already
 uses, `--root-page` to choose where the set is written, `--base` to override the
 base URL of every site configuration it declares, and `--no-site-config` to skip
@@ -133,21 +133,21 @@ extension usually belongs in `require-dev` of the repository or the test
 instance whose data you want to rebuild:
 
 ```bash
-composer require --dev sbuerk/seeder
+composer require --dev sbuerk/data-factory
 ```
 
 Require it normally when a project ships seed sets it provisions with — the
 commands then exist in the deployed installation:
 
 ```bash
-composer require sbuerk/seeder
+composer require sbuerk/data-factory
 ```
 
 As long as no stable version has been released, require the development version
 of the `1` branch explicitly - the branch alias maps it onto `1.0.x-dev`:
 
 ```bash
-composer require --dev sbuerk/seeder:^1.0@dev
+composer require --dev sbuerk/data-factory:^1.0@dev
 ```
 
 This additionally requires `minimum-stability: "dev"` together with
@@ -157,11 +157,11 @@ This additionally requires `minimum-stability: "dev"` together with
 
 ```bash
 # What is available in this installation?
-vendor/bin/typo3 seeder:list
+vendor/bin/typo3 data-factory:list
 
 # Validate a set without writing anything, then import it.
-vendor/bin/typo3 seeder:import demo --dry-run
-vendor/bin/typo3 seeder:import demo --base='https://example.com/'
+vendor/bin/typo3 data-factory:import demo --dry-run
+vendor/bin/typo3 data-factory:import demo --base='https://example.com/'
 ```
 
 Without an identifier the command asks which set to import; without a terminal
@@ -170,7 +170,7 @@ to ask on it lists them and stops.
 A minimal set is two files. `config.yml` describes the set and names the
 scenario files it is built from:
 
-`packages/my_extension/Configuration/Seeder/demo/config.yml`:
+`packages/my_extension/Configuration/DataFactory/demo/config.yml`:
 
 ```yaml
 identifier: demo
@@ -185,7 +185,7 @@ sites:
 `rootPage` is a page uid, and the site is written from `Sites/main/` next to
 `config.yml` unless a `template` says otherwise.
 
-`packages/my_extension/Configuration/Seeder/demo/Scenario.yaml`:
+`packages/my_extension/Configuration/DataFactory/demo/Scenario.yaml`:
 
 ```yaml
 entitySettings:
